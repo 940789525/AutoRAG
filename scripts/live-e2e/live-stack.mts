@@ -2,14 +2,13 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { AutoRAGAgent } from "../../src/agent/agent.ts";
+import { LocalIndexMethod } from "../../src/indexing/method.ts";
 import { QWEN3_QUERY_PREFIX } from "../../src/embedding/prefixes.ts";
 import {
-	assertKoreanLexicalHit,
 	assertLiteRetrieveHealthy,
 	assertLiteRetrieveReportsSkippedSurface,
 	buildLiveStackOptions,
 	REPO_ROOT,
-	resolveKoreanLexicalLane,
 } from "./workflow.mjs";
 
 const args = process.argv.slice(2);
@@ -25,30 +24,17 @@ const mode = args.includes("--mode") ? args[args.indexOf("--mode") + 1] : "warm"
 if (mode !== "cold" && mode !== "warm") throw new Error("invalid mode");
 
 const source = realpathSync(join(root, "corpus", "sample.txt"));
-const cursorPath = join(workspace, ".minsync", "cursor.json");
+const cursorPath = join(workspace, ".autorag", "local-index", "ready.json");
 const cursorExistedBefore = existsSync(cursorPath);
 const agent = new AutoRAGAgent(buildLiveStackOptions(root, workspace));
 const refresh = await agent.refresh(mode === "cold", { methods: ["parsed", "minsync"] });
 if (refresh.minsync?.ok !== true) throw new Error(`minsync-${refresh.minsync?.reason ?? "unready"}`);
-if (!existsSync(cursorPath)) throw new Error("minsync-cursor-missing");
-// The Korean fixture holds only suffixed forms of 인증서 (인증서를, 인증서는). Its bare stem reaches the fixture through
-// BM25 only when the agent built the index with the multilingual tokenizer, which AutoRAG always selects and which
-// needs Kiwi on the host. Without Kiwi the sync falls back to whitespace tokenization and the lane is a SKIP.
-const koreanLane = resolveKoreanLexicalLane(
-	refresh.minsync.lexicalFallback,
-	process.env.AUTORAG_LIVE_E2E_KIWI === "required",
-);
-if (koreanLane === "assert") {
-	const minsyncExecutable = process.platform === "win32" ? "minsync.exe" : "minsync";
-	const cachedMinsync = join(workspace, ".autorag", "bin", minsyncExecutable);
-	const koreanQuery = spawnSync(
-		existsSync(cachedMinsync) ? cachedMinsync : minsyncExecutable,
-		["query", "--mode", "bm25", "--format", "json", "-k", "5", "인증서"],
-		{ cwd: workspace, encoding: "utf8", timeout: 60_000 },
-	);
-	if (koreanQuery.status !== 0) throw new Error(`korean-lexical-query-exit-${koreanQuery.status}`);
-	assertKoreanLexicalHit(koreanQuery.stdout, "korean-policy.txt");
-}
+if (!existsSync(cursorPath)) throw new Error("autorag-index-marker-missing");
+if (refresh.minsync.report?.backend !== "autorag") throw new Error("autorag-index-report-missing");
+const method = agent.getRetrievalEngine().getMethodRegistry().get("minsync");
+if (!(method instanceof LocalIndexMethod)) throw new Error("autorag-native-index-method-missing");
+const koreanHits = await method.index.search("인증서", { mode: "bm25", topK: 5 });
+if (!koreanHits.some((hit) => hit.row.source_path.endsWith("korean-policy.txt"))) throw new Error("korean-lexical-stem-miss");
 const hits = await agent.retrieve("semantic question about the sample corpus", { topK: 5 });
 const hit = hits.find((result) => result.source === resolve(source));
 if (!hit) throw new Error("semantic-hit-source-mismatch");
@@ -135,8 +121,7 @@ let embedderDown:
 	  }
 	| undefined;
 
-// A remote endpoint is a first-class backend, and `minsync query` reads the embedder recorded in the
-// workspace's own config, so "the embedder is down" has to be tested on a workspace that was SYNCED through
+// A remote endpoint is a first-class backend, and the native index records the embedding identity, so "the embedder is down" has to be tested on a workspace that was SYNCED through
 // that endpoint. Build one against a loopback OpenAI-compatible stub, then stop the stub: retrieval must
 // still answer, name the skipped surface, and hand back the real error instead of a generic sentence.
 const remoteWorkspace = join(workspace, "remote-embedder");
@@ -161,6 +146,7 @@ const remoteOptions = {
 	...buildLiveStackOptions(root, remoteWorkspace),
 	searchPaths: [remoteCorpus],
 	minSync: { workspacePath: remoteWorkspace, autoInstall: true, embedder: remoteEmbedder },
+	localIndex: { tokenizerPath: join(workspace, ".autorag", "models", "tokenizers", (await import("../../src/indexing/chunker.ts")).contentHash("Qwen/Qwen3-Embedding-0.6B")) },
 };
 const remoteConfig = join(remoteWorkspace, "config.json");
 // The runner points this process at the main workspace through AUTORAG_* variables, and the environment wins
@@ -206,10 +192,7 @@ const result = {
 	refresh: { parsed: { scanned: refresh.scanned, written: refresh.written, skipped: refresh.skipped }, minsync: refresh.minsync },
 	cursorPath: resolve(cursorPath),
 	cursorExists: true,
-	koreanLexical:
-		koreanLane === "assert"
-			? { status: "PASS", query: "인증서", fixture: "korean-policy.txt" }
-			: { status: "SKIP", reason: "kiwi-unavailable", lexicalFallback: refresh.minsync.lexicalFallback },
+	koreanLexical: { status: "PASS", query: "인증서", fixture: "korean-policy.txt" },
 	hit: { source: hit.source, sourceAbsolute: true, sourceExists: true, sourceReadable: true, score: hit.score },
 	status: { state: status.state, stale: status.stale, components: status.components },
 	liteRetrieve: {

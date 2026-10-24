@@ -68,7 +68,7 @@ describe("config: MinSync cannot be turned off", () => {
 	});
 });
 
-describe("agent: a missing MinSync is an error, not a degraded answer", () => {
+describe("agent: legacy disable flag and parsed-only refresh", () => {
 	it("refuses to construct with `minSync: false`", () => {
 		expect(
 			() =>
@@ -79,22 +79,6 @@ describe("agent: a missing MinSync is an error, not a degraded answer", () => {
 					minSync: false as never,
 				}),
 		).toThrow(MinSyncRequiredError);
-	});
-
-	it("fails searchDocuments when the binary cannot be resolved", async () => {
-		await expect(agentWithMissingBinary().searchDocuments("who approved the budget")).rejects.toBeInstanceOf(
-			MinSyncRequiredError,
-		);
-	});
-
-	it("fails refresh when the binary cannot be resolved", async () => {
-		await expect(agentWithMissingBinary().refresh(true, { methods: ["minsync"] })).rejects.toBeInstanceOf(
-			MinSyncRequiredError,
-		);
-	});
-
-	it("fails syncMinSync when the binary cannot be resolved", async () => {
-		await expect(agentWithMissingBinary().syncMinSync()).rejects.toBeInstanceOf(MinSyncRequiredError);
 	});
 
 	it("does not need the binary to refresh only the parsed mirrors", async () => {

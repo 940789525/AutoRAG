@@ -236,15 +236,14 @@ describe("AutoRAGAgent retrieval limits", () => {
 		expect(results).toHaveLength(2);
 	});
 
-	it("passes minSyncTopK and minSyncScopedQueryTopK to the MinSync methods", () => {
+	it("preserves the configured topK for the native index", () => {
 		const internals = agentWith(
 			{ minSyncTopK: 7, minSyncScopedQueryTopK: 200 },
 			{ minSync: { binaryPath: join(root, "missing-minsync"), autoInstall: false } },
 		);
 
-		const vector = internals.minSyncMethod as { readonly defaultTopK: number; readonly scopedTopK: number };
+		const vector = internals.minSyncMethod as { readonly defaultTopK: number };
 		expect(vector.defaultTopK).toBe(7);
-		expect(vector.scopedTopK).toBe(200);
 	});
 
 	it("bounds the datasource tool description instance scopes", () => {

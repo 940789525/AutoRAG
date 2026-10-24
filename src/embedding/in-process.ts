@@ -56,9 +56,9 @@ export async function loadNativeEmbedder(options: { readonly id?: string } = {})
 			const info = await engine.identity();
 			return { provider: "minsync", model: info.id.replace(/^native:/, ""), dimension: info.dimension };
 		},
-		async embed(texts) {
+		async embed(texts, options) {
 			if (texts.length === 0) return [];
-			const vectors = await engine.embed([...texts]);
+			const vectors = await engine.embed([...texts], { signal: options?.signal });
 			return vectors.map((vector) => Array.from(vector));
 		},
 		close: () => engine.dispose(),

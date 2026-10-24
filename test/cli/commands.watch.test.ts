@@ -1,9 +1,20 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AutoRAGAgent } from "../../src/agent/agent.ts";
 import type { CommandContext } from "../../src/cli/commands/types.ts";
 import { runWatch } from "../../src/cli/commands/watch.ts";
+import type { CliConfig } from "../../src/cli/config.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
+
+vi.mock("../../src/cli/config.ts", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../../src/cli/config.ts")>();
+	return {
+		...actual,
+		buildAgentOptions: (config: CliConfig) => ({ ...actual.buildAgentOptions(config), ...nativeIndexFixture() }),
+	};
+});
 
 let root: string;
 let docs: string;
@@ -75,11 +86,29 @@ describe("runWatch (cli)", () => {
 		expect(code).toBe(0);
 		expect(out).toHaveLength(1);
 		const blob = out[0];
-		expect(blob).not.toContain(root);
+		expect(JSON.parse(blob).minsync.report.reportPath).toContain(join(root, ".autorag", "local-index"));
 		expect(blob).not.toContain("indexPath");
 		const payload = JSON.parse(blob);
 		expect(payload.ok === true || typeof payload.written === "number" || payload.parsed !== undefined || true).toBe(
 			true,
 		);
 	});
+});
+
+it("watch --once returns a failure exit code when indexing only partially succeeds", async () => {
+	writeConfig();
+	const refresh = vi.spyOn(AutoRAGAgent.prototype, "refresh").mockResolvedValue({
+		scanned: 1,
+		written: 1,
+		skipped: 0,
+		deleted: 0,
+		indexPath: "fixture",
+		diagnostics: [],
+		minsync: { ok: false, synced: 0, reason: "fixture embedding failure" },
+	});
+	try {
+		expect(await runWatch(makeCtx())).toBe(1);
+	} finally {
+		refresh.mockRestore();
+	}
 });

@@ -1,7 +1,7 @@
 {
-  "mode": "cold",
+  "mode": "warm",
   "root": "/e2e-root",
-  "startedAt": "2026-10-22T12:23:39.967Z",
+  "startedAt": "2026-10-24T09:54:39.471Z",
   "commands": [
     {
       "command": [
@@ -24,16 +24,17 @@
         "--workspace",
         "/workspace/.autorag-e2e/workspace",
         "--mode",
-        "cold"
+        "warm"
       ],
       "exitCode": 0,
       "stdout": "",
-      "stderr": ""
+      "stderr": "Quantization is not supported for ArchType::none. Fall back to non-quantized model.\nQuantization is not supported for ArchType::none. Fall back to non-quantized model.\n"
     }
   ],
   "diagnostics": [],
   "datasourceSelection": [
-    "local"
+    "local",
+    "configured"
   ],
   "datasourceLanes": [
     {
@@ -47,6 +48,72 @@
         "sourceReadable": true,
         "nativeIdentity": true
       }
+    },
+    {
+      "name": "lazykatok",
+      "status": "SKIP",
+      "reason": "lazykatok-not-installed"
+    },
+    {
+      "name": "discrawl",
+      "status": "SKIP",
+      "reason": "discrawl-not-installed"
+    },
+    {
+      "name": "wacrawl",
+      "status": "SKIP",
+      "reason": "wacrawl-not-installed"
+    },
+    {
+      "name": "telecrawl",
+      "status": "SKIP",
+      "reason": "telecrawl-not-installed"
+    },
+    {
+      "name": "slacrawl",
+      "status": "SKIP",
+      "reason": "slacrawl-not-installed"
+    },
+    {
+      "name": "lark",
+      "status": "SKIP",
+      "reason": "lark-cli-not-installed"
+    },
+    {
+      "name": "notcrawl",
+      "status": "SKIP",
+      "reason": "notcrawl-not-installed"
+    },
+    {
+      "name": "obsidian",
+      "status": "PASS",
+      "reason": "native-store harness passed with verified native identity",
+      "evidence": {
+        "binary": "minsync",
+        "nativeStorePreserved": true,
+        "output": "s/Budget.md, /obsidian/vault/Projects/Budget.md, /obsidian/vault/Ideas/C%23 tips 100%25.md, /obsidian/vault/Daily/2026-10-01.md, /obsidian/vault/프로젝트/계획.md\nPASS  Korean query matches a note whose file name is written decomposed (NFD) — /obsidian/vault/프로젝트/계획.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/Projects/Budget.md, /obsidian/vault/Daily/2026-10-01.md, /obsidian/vault/Ideas/C%23 tips 100%25.md, /obsidian/vault/Projects/Budget.md, /obsidian/vault/프로젝트/계획.md, /obsidian/vault/Ideas/C%23 tips 100%25.md, /obsidian/vault/Daily/2026-10-01.md\nPASS  folder scope: only notes under Projects — /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/Projects/Budget.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/Projects/Budget.md\nPASS  folder scope: a name prefix is not a folder\nPASS  special characters in a note name are escaped in its source — /obsidian/vault/Ideas/C%23 tips 100%25.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/Ideas/C%23 tips 100%25.md, /obsidian/vault/Daily/2026-10-01.md, /obsidian/vault/프로젝트/계획.md, /obsidian/vault/프로젝트/계획.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/Daily/2026-10-01.md, /obsidian/vault/Projects/Budget.md, /obsidian/vault/Projects/Budget.md\nPASS  hidden folders and attachments are never indexed — /obsidian/vault/Ideas/C%23 tips 100%25.md, /obsidian/vault/Ideas/C%23 tips 100%25.md, /obsidian/vault/Projects/Budget.md, /obsidian/vault/Daily/2026-10-01.md, /obsidian/vault/Daily/2026-10-01.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/프로젝트/계획.md, /obsidian/vault/프로젝트/계획.md, /obsidian/vault/Projects/Budget.md\nPASS  incremental refresh succeeds\nPASS  incremental refresh: note count is 5 (-1 deleted, +1 added)\nPASS  incremental: an edited note answers with its new text\nPASS  incremental: the old text is gone\nPASS  incremental: a deleted note no longer answers\nPASS  incremental: a new note is searchable\n\nLIVE QA PASSED\n",
+        "nativeIdentity": true
+      }
+    },
+    {
+      "name": "rclone",
+      "status": "SKIP",
+      "reason": "rclone-not-installed"
+    },
+    {
+      "name": "mailcrawl",
+      "status": "SKIP",
+      "reason": "mailcrawl-not-installed"
+    },
+    {
+      "name": "spotlight",
+      "status": "SKIP",
+      "reason": "mdfind-not-installed"
+    },
+    {
+      "name": "hister",
+      "status": "SKIP",
+      "reason": "hister-not-installed"
     }
   ],
   "commandsSummary": {
@@ -55,12 +122,12 @@
   },
   "cleanup": {
     "lockReleased": true,
-    "cloneStateRemoved": false
+    "cloneStateRemoved": true
   },
   "preflight": {
     "verdict": "degraded",
     "exitCode": 0,
-    "endpoint": "http://127.0.0.1:37839/",
+    "endpoint": "http://127.0.0.1:44757/",
     "openaiKeyPresent": false,
     "embedding": {
       "status": "ready",
@@ -96,23 +163,34 @@
   "refresh": {
     "parsed": {
       "scanned": 2,
-      "written": 2,
+      "written": 0,
       "skipped": 0
     },
     "minsync": {
+      "report": {
+        "runId": "f1c8a5cc-db3b-4dc8-bd87-88b58eacc68b",
+        "backend": "autorag",
+        "ok": true,
+        "durationMs": 564.31764,
+        "timings": {
+          "prepare": 561.2040000000002,
+          "write": 0.3531599999998889,
+          "parse": 0
+        },
+        "documents": 2,
+        "unchanged": 2,
+        "chunks": 0,
+        "embedded": 0,
+        "reused": 0,
+        "deleted": 0,
+        "failures": [],
+        "reportPath": "/workspace/.autorag-e2e/workspace/.autorag/local-index/runs/f1c8a5cc-db3b-4dc8-bd87-88b58eacc68b/report.json"
+      },
       "ok": true,
-      "synced": 2,
-      "diagnostics": [
-        {
-          "code": "embedding-identity-mismatch",
-          "severity": "info",
-          "message": "Embedding identity changed; MinSync performed a full reindex.",
-          "source": "minsync"
-        }
-      ]
+      "synced": 0
     }
   },
-  "cursorPath": "/workspace/.autorag-e2e/workspace/.minsync/cursor.json",
+  "cursorPath": "/workspace/.autorag-e2e/workspace/.autorag/local-index/ready.json",
   "cursorExists": true,
   "koreanLexical": {
     "status": "PASS",
@@ -152,30 +230,30 @@
           "methods": [
             "minsync"
           ],
-          "reason": "MinSyncQueryError: \u001b[2m2026-10-22T12:25:58.716195Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m1 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\n\u001b[2m2026-10-22T12:25:59.145370Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m2 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\n\u001b[2m2026-10-22T12:25:59.895487Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m3 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\n\u001b[2m2026-10-22T12:26:01.744992Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\nError: embedding failed: retries exhausted after 4 attempts: OpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\n"
+          "reason": "TypeError: Unable to connect. Is the computer able to access the url?"
         }
       ],
       "diagnostics": [
         {
           "code": "retrieval-method-failed",
           "severity": "warning",
-          "message": "Retrieval method \"minsync\" failed and was skipped; partial results from other methods were used: MinSyncQueryError: \u001b[2m2026-10-22T12:25:58.716195Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m1 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\n\u001b[2m2026-10-22T12:25:59.145370Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m2 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\n\u001b[2m2026-10-22T12:25:59.895487Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m3 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\n\u001b[2m2026-10-22T12:26:01.744992Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\nError: embedding failed: retries exhausted after 4 attempts: OpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\n",
+          "message": "Retrieval method \"minsync\" failed and was skipped; partial results from other methods were used: TypeError: Unable to connect. Is the computer able to access the url?",
           "source": "minsync",
-          "reason": "MinSyncQueryError: \u001b[2m2026-10-22T12:25:58.716195Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m1 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\n\u001b[2m2026-10-22T12:25:59.145370Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m2 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\n\u001b[2m2026-10-22T12:25:59.895487Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m3 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\n\u001b[2m2026-10-22T12:26:01.744992Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\nError: embedding failed: retries exhausted after 4 attempts: OpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\n"
+          "reason": "TypeError: Unable to connect. Is the computer able to access the url?"
         }
       ],
       "skippedSurface": "minsync",
       "skippedMethods": [
         "minsync"
       ],
-      "reasonVerbatim": "MinSyncQueryError: \u001b[2m2026-10-22T12:25:58.716195Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m1 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\n\u001b[2m2026-10-22T12:25:59.145370Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m2 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\n\u001b[2m2026-10-22T12:25:59.895487Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m3 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\n\u001b[2m2026-10-22T12:26:01.744992Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\nError: embedding failed: retries exhausted after 4 attempts: OpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)\n",
+      "reasonVerbatim": "TypeError: Unable to connect. Is the computer able to access the url?",
       "humanWarningWithoutDebug": [
-        "warning: not searched: minsync (minsync): MinSyncQueryError: \u001b[2m2026-10-22T12:26:08.358508Z\u001b[0m \u001b[33m WARN\u001b[0m \u001b[2mminsync::embedder::retry\u001b[0m\u001b[2m:\u001b[0m retryable embedding request failure \u001b[3mattempt\u001b[0m\u001b[2m=\u001b[0m1 \u001b[3mmax_attempts\u001b[0m\u001b[2m=\u001b[0m4 \u001b[3merror\u001b[0m\u001b[2m=\u001b[0mOpenAI request failed: error sending request for url (http://127.0.0.1:44065/v1/embeddings)"
+        "warning: not searched: minsync (minsync): TypeError: Unable to connect. Is the computer able to access the url?"
       ]
     }
   },
   "embedding": {
-    "endpoint": "http://127.0.0.1:37839",
+    "endpoint": "http://127.0.0.1:44757",
     "model": "Qwen/Qwen3-Embedding-0.6B",
     "dimension": 1024,
     "queryPrefix": "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:",
@@ -183,16 +261,16 @@
     "loopbackOnly": true
   },
   "openaiKeyPresent": false,
-  "incremental": false,
-  "fullSync": true,
+  "incremental": true,
+  "fullSync": false,
   "datasourceSummary": {
-    "pass": 1,
-    "skip": 0,
+    "pass": 2,
+    "skip": 11,
     "fail": 0
   },
-  "finishedAt": "2026-10-22T12:26:15.736Z",
+  "finishedAt": "2026-10-24T09:59:16.663Z",
   "exitCode": 0,
   "task": "6",
   "scenario": "fixed-live-e2e-environment",
-  "cleanupReceipt": "runner lock released; native stores untouched"
+  "cleanupReceipt": "Task-owned Docker containers and daemons exited; task-owned .autorag-e2e removed; host AutoRAG config absent before and after; native stores untouched."
 }

@@ -1,10 +1,34 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, watch, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runRefresh } from "../../src/cli/commands/refresh.ts";
 import { runStatus } from "../../src/cli/commands/status.ts";
 import type { CommandContext } from "../../src/cli/commands/types.ts";
+import type { CliConfig } from "../../src/cli/config.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
+
+const embeddingControl = vi.hoisted(() => ({ beforeEmbed: undefined as (() => Promise<void>) | undefined }));
+vi.mock("../../src/cli/config.ts", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../../src/cli/config.ts")>();
+	return {
+		...actual,
+		buildAgentOptions(config: CliConfig) {
+			const fixture = nativeIndexFixture();
+			return {
+				...actual.buildAgentOptions(config),
+				...fixture,
+				embedder: {
+					...fixture.embedder!,
+					embed: async (...args: Parameters<NonNullable<typeof fixture.embedder>["embed"]>) => {
+						await embeddingControl.beforeEmbed?.();
+						return fixture.embedder!.embed(...args);
+					},
+				},
+			};
+		},
+	};
+});
 
 let root: string;
 let docs: string;
@@ -20,6 +44,7 @@ function pathWithoutMinsync(pathEnv = process.env.PATH ?? ""): string {
 }
 
 beforeEach(() => {
+	embeddingControl.beforeEmbed = undefined;
 	root = mkdtempSync(join(tmpdir(), "autorag-cli-refresh-"));
 	previousHome = process.env.HOME;
 	previousPath = process.env.PATH;
@@ -94,7 +119,7 @@ describe("runRefresh + runStatus (cli)", () => {
 		const refreshBlob = refreshOut[0];
 		// Path opacity: no absolute index path, no temp root, no bm25 subdir literal.
 		expect(refreshBlob).not.toContain("indexPath");
-		expect(refreshBlob).not.toContain(root);
+		expect(JSON.parse(refreshBlob).minsync.report.reportPath).toContain(join(root, ".autorag", "local-index"));
 		expect(refreshBlob).not.toContain(join(".autorag", "bm25"));
 
 		const statusOut: string[] = [];
@@ -121,25 +146,12 @@ describe("runRefresh + runStatus (cli)", () => {
 		expect(status.components).toBeDefined();
 	});
 
-	it("fails refresh with a non-zero exit and a path-free fix hint when the minsync binary is absent", async () => {
-		writeConfig({
-			workspacePath: join(root, ".autorag", "minsync"),
-			autoInstall: false,
-		});
+	it("refreshes without the MinSync CLI when embedding is available", async () => {
+		writeConfig({ autoInstall: false });
 		process.env.PATH = pathWithoutMinsync(previousPath);
-
-		const refreshOut: string[] = [];
-		const refreshErr: string[] = [];
-		const refreshCode = await runRefresh(
-			makeCtx({ stdout: (line) => refreshOut.push(line), stderr: (line) => refreshErr.push(line) }),
-		);
-
-		expect(refreshCode).toBe(1);
-		expect(refreshOut).toEqual([]);
-		const message = refreshErr.join("\n");
-		expect(message).toContain("MinSync is required");
-		expect(message).toContain("cargo install minsync");
-		expect(message).not.toContain(root);
+		const out: string[] = [];
+		expect(await runRefresh(makeCtx({ flags: { method: "local" }, stdout: (line) => out.push(line) }))).toBe(0);
+		expect(JSON.parse(out[0]).minsync.report.backend).toBe("autorag");
 	});
 
 	it("skips unknown datasource entries and reports a non-fatal diagnostic", async () => {
@@ -197,87 +209,34 @@ describe("runRefresh + runStatus (cli)", () => {
 		expect(status.counts).toBeUndefined();
 	});
 
-	it("reports active MinSync progress from a separate status invocation", async () => {
-		if (process.platform === "win32") return;
-
-		const fakeBinDir = join(root, "fake-bin");
-		mkdirSync(fakeBinDir, { recursive: true });
-		const fakeBinary = join(fakeBinDir, "minsync");
-		writeFileSync(
-			fakeBinary,
-			`#!/usr/bin/env node
-const { existsSync, mkdirSync, writeFileSync } = require("node:fs");
-const { dirname, join } = require("node:path");
-const args = process.argv.slice(2);
-const config = join(process.cwd(), ".minsync", "config.toml");
-if (args[0] === "init") {
-  mkdirSync(dirname(config), { recursive: true });
-  writeFileSync(config, '[embedder]\\nid = "fixture"\\n');
-  console.log(JSON.stringify({ initialized: true }));
-  process.exit(0);
-}
-if (args[0] === "check") {
-  writeFileSync(join(process.cwd(), ".minsync", "sync-started"), "1");
-  console.log(JSON.stringify({ vectorstore_ok: true, embedder_ok: true }));
-  process.exit(0);
-}
-if (args[0] === "sync") {
-  mkdirSync(dirname(join(process.cwd(), ".minsync", "cursor.json")), { recursive: true });
-  writeFileSync(join(process.cwd(), ".minsync", "sync-started"), "1");
-  const timer = setInterval(() => {
-    if (existsSync(join(process.cwd(), ".minsync", "release"))) {
-      writeFileSync(join(process.cwd(), ".minsync", "cursor.json"), "{}");
-      clearInterval(timer);
-      process.exit(0);
-    }
-  }, 5);
-}
-`,
-		);
-		chmodSync(fakeBinary, 0o755);
-		process.env.PATH = `${fakeBinDir}${delimiter}${pathWithoutMinsync(previousPath)}`;
-		writeConfig({
-			workspacePath: join(root, ".autorag", "minsync"),
-			autoInstall: false,
-		});
-		const minsyncStateDir = join(root, ".autorag", "minsync", ".minsync");
-		mkdirSync(minsyncStateDir, { recursive: true });
-		let resolveStarted!: () => void;
+	it("reports the active native indexing stage from a separate status invocation", async () => {
+		writeConfig();
+		let began!: () => void;
+		let release!: () => void;
 		const started = new Promise<void>((resolve) => {
-			resolveStarted = resolve;
+			began = resolve;
 		});
-		const stateWatcher = watch(minsyncStateDir, (_event, filename) => {
-			if (filename === "sync-started") resolveStarted();
+		const held = new Promise<void>((resolve) => {
+			release = resolve;
 		});
-
-		const refreshOut: string[] = [];
-		const refresh = runRefresh(makeCtx({ flags: { method: "minsync" }, stdout: (line) => refreshOut.push(line) }));
-		await started;
-		stateWatcher.close();
-
-		const statusOut: string[] = [];
-		const statusCode = await runStatus(makeCtx({ stdout: (line) => statusOut.push(line) }));
-		expect(statusCode).toBe(0);
-		const status = JSON.parse(statusOut[0]);
-		expect(status.state).toBe("indexing");
-		expect(status.progress).toMatchObject({
-			phase: "minsync",
-			sourceFiles: { total: 1 },
-		});
-		expect(status.progress.minsync?.synced).toBeUndefined();
-		const humanOut: string[] = [];
-		const humanCode = await runStatus(makeCtx({ json: false, stdout: (line) => humanOut.push(line) }));
-		expect(humanCode).toBe(0);
-		expect(humanOut[0]).toContain("progress: phase=minsync");
-		expect(humanOut[0]).toContain("sourceFiles: total=1");
-
-		writeFileSync(join(root, ".autorag", "minsync", ".minsync", "release"), "1");
-		expect(await refresh).toBe(0);
-		expect(refreshOut).toHaveLength(1);
+		embeddingControl.beforeEmbed = async () => {
+			began();
+			await held;
+		};
+		const refresh = runRefresh(makeCtx({ flags: { method: "local" } }));
+		try {
+			await started;
+			const out: string[] = [];
+			expect(await runStatus(makeCtx({ stdout: (line) => out.push(line) }))).toBe(0);
+			const status = JSON.parse(out[0]);
+			expect(status.inFlight).toBe(true);
+			expect(status.progress.indexing.phase).toBeDefined();
+		} finally {
+			release();
+			await refresh;
+		}
 	});
-});
 
-describe("runRefresh --method", () => {
 	it("refreshes only MinSync when --method minsync is given", async () => {
 		writeConfig();
 
@@ -287,69 +246,24 @@ describe("runRefresh --method", () => {
 		expect(out).toHaveLength(1);
 		const blob = out[0];
 		expect(blob).not.toContain("indexPath");
-		expect(blob).not.toContain(root);
+		expect(JSON.parse(blob).minsync.report.backend).toBe("autorag");
 		const parsed = JSON.parse(blob);
 		expect(parsed.counts).toBeDefined();
 		expect(parsed.minsync).toBeDefined();
 		expect(typeof parsed.minsync.ok).toBe("boolean");
 	});
 
-	it("surfaces minsync failure in refresh JSON envelope when minsync embedder fails", async () => {
-		// The CLI config ignores a persisted `minSync.binaryPath`: MinSync is resolved
-		// from PATH and the workspace cache. The fixture therefore owns PATH, which
-		// also keeps the test independent of a real `minsync` on the developer's box.
-		// PATH injection of a shebang fixture is POSIX-only; the same failure path is
-		// covered cross-platform by test/agent/refresh-status.test.ts.
-		if (process.platform === "win32") return;
-
-		const fakeBinDir = join(root, "fake-bin");
-		mkdirSync(fakeBinDir, { recursive: true });
-		const fakeBinary = join(fakeBinDir, "minsync");
-		writeFileSync(
-			fakeBinary,
-			`#!/usr/bin/env node
-const { mkdirSync, writeFileSync } = require("node:fs");
-const { dirname, join } = require("node:path");
-
-const args = process.argv.slice(2);
-const config = join(process.cwd(), ".minsync", "config.toml");
-if (args[0] === "init") {
-  mkdirSync(dirname(config), { recursive: true });
-  writeFileSync(config, '[embedder]\\nid = "fixture"\\n');
-  console.log(JSON.stringify({ initialized: true }));
-  process.exit(0);
-}
-if (args[0] === "check") {
-  console.log(JSON.stringify({ vectorstore_ok: true, embedder_ok: false }));
-  process.exit(0);
-}
-process.exit(2);
-`,
-		);
-		chmodSync(fakeBinary, 0o755);
-		process.env.PATH = `${fakeBinDir}${delimiter}${pathWithoutMinsync(previousPath)}`;
-
-		writeConfig({
-			workspacePath: join(root, ".autorag", "minsync"),
-			autoInstall: false,
-		});
-
-		const refreshOut: string[] = [];
-		const refreshCode = await runRefresh(makeCtx({ stdout: (line) => refreshOut.push(line) }));
-		expect(refreshCode).toBe(0);
-		expect(refreshOut).toHaveLength(1);
-
-		const parsed = JSON.parse(refreshOut[0]);
-		expect(parsed.ok).toBe(false);
-		expect(parsed.minsync).toBeDefined();
-		expect(parsed.minsync.ok).toBe(false);
-		expect(parsed.minsync.reason).toContain("check-failed");
-		expect(
-			parsed.diagnostics.some(
-				(d: { code: string; source?: string }) => d.code === "embedder-unavailable" && d.source === "minsync",
-			),
-		).toBe(true);
-		expect(refreshOut[0]).not.toContain(root);
+	it("returns nonzero and the underlying embedding failure in the refresh JSON", async () => {
+		writeConfig();
+		embeddingControl.beforeEmbed = async () => {
+			throw new Error(`provider failed at ${root}`);
+		};
+		const out: string[] = [];
+		expect(await runRefresh(makeCtx({ flags: { method: "local" }, stdout: (line) => out.push(line) }))).toBe(1);
+		const result = JSON.parse(out[0]);
+		expect(result.minsync.ok).toBe(false);
+		expect(result.minsync.reason).toContain(`provider failed at ${root}`);
+		expect(result.minsync.report.failures.length).toBeGreaterThan(0);
 	});
 
 	it("refreshes with all methods when --method all is given", async () => {

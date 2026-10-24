@@ -1,4 +1,5 @@
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { Client, ProtocolError, ProtocolErrorCode } from "@modelcontextprotocol/client";
@@ -6,12 +7,11 @@ import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { describe, expect, it, onTestFinished } from "vitest";
 import { writeFakeDupeyExecutable } from "../helpers/fake-dupey.ts";
 import { writeFakeFSearchExecutable } from "../helpers/fake-fsearch.ts";
-import { writeFakeMinSyncExecutable } from "../helpers/fake-minsync.ts";
 
 const REFUND_FILE = "refund.md";
 const REFUND_TEXT = "Refund exceptions require director approval before payout.\n";
 
-function makeFixture() {
+async function makeFixture() {
 	const root = mkdtempSync(join(tmpdir(), "autorag-mcp-stdio-"));
 	// Registered before any connection: even if the handshake or an assertion
 	// throws, the workspace and any spawned children are torn down.
@@ -19,16 +19,57 @@ function makeFixture() {
 	const docs = join(root, "docs");
 	mkdirSync(docs, { recursive: true });
 	writeFileSync(join(docs, REFUND_FILE), REFUND_TEXT);
-	const stagedFiles = join(root, ".autorag", "minsync", "files");
-	mkdirSync(stagedFiles, { recursive: true });
-	writeFileSync(join(stagedFiles, REFUND_FILE), REFUND_TEXT);
-	// `AUTORAG_CONFIG` deliberately ignores `minSync.binaryPath` (MinSync resolves
-	// from PATH/the workspace cache), so the fake must sit on PATH under the
-	// resolver's platform name to make the e2e independent of an installed minsync.
+	// Only the embedding boundary is simulated: the child uses the real tokenizer,
+	// AutoRAG pipeline, database and source mapping.
+	const server = createServer(async (request, response) => {
+		if (request.method === "GET") {
+			response.end("{}");
+			return;
+		}
+		try {
+			let body = "";
+			for await (const chunk of request) body += String(chunk);
+			const { inputs } = JSON.parse(body) as { inputs: string[] };
+			response.setHeader("content-type", "application/json");
+			response.end(JSON.stringify(inputs.map(() => [1, 0, 0, 0])));
+		} catch (error) {
+			response.statusCode = 500;
+			response.end(String(error));
+		}
+	});
+	await new Promise<void>((resolve, reject) => {
+		server.once("error", reject);
+		server.listen(0, "127.0.0.1", resolve);
+	});
+	onTestFinished(async () => {
+		server.closeAllConnections();
+		await new Promise<void>((resolve) => server.close(() => resolve()));
+	});
+	const address = server.address();
+	if (!address || typeof address === "string") throw new Error("embedding fixture did not listen");
+	const tokenizerPath = join(root, "tokenizer");
+	mkdirSync(tokenizerPath);
+	writeFileSync(
+		join(tokenizerPath, "tokenizer.json"),
+		JSON.stringify({
+			version: "1.0",
+			truncation: null,
+			padding: null,
+			added_tokens: [],
+			normalizer: null,
+			pre_tokenizer: { type: "WhitespaceSplit" },
+			post_processor: null,
+			decoder: null,
+			model: { type: "WordLevel", vocab: { "[UNK]": 0 }, unk_token: "[UNK]" },
+		}),
+	);
+	writeFileSync(
+		join(tokenizerPath, "tokenizer_config.json"),
+		JSON.stringify({ unk_token: "[UNK]", model_max_length: 2048 }),
+	);
 	const binDir = join(root, "bin");
 	mkdirSync(binDir, { recursive: true });
 	writeFakeFSearchExecutable(binDir, join(docs, REFUND_FILE));
-	writeFakeMinSyncExecutable(binDir);
 	const dupeyBinary = writeFakeDupeyExecutable(binDir);
 	const config = join(root, "config.json");
 	writeFileSync(
@@ -38,9 +79,10 @@ function makeFixture() {
 			workspacePath: root,
 			memoryPath: join(root, "memory.json"),
 			minSync: {
-				workspacePath: join(root, ".autorag", "minsync"),
 				autoInstall: false,
+				embedder: { id: "tei:fixture", baseUrl: `http://127.0.0.1:${address.port}`, dimension: 4 },
 			},
+			localIndex: { tokenizerPath },
 			jikji: false,
 			everything: false,
 			// `watch: false` keeps the fake from becoming a live daemon: the fixture
@@ -232,7 +274,7 @@ function chunksOf(result: unknown): readonly unknown[] {
 
 describe("AutoRAG Lite MCP stdio", () => {
 	it("refreshes, searches exact fixture evidence, routes filename search to fsearch-cli, and preserves results across a restart", async () => {
-		const { docs, config, binDir } = makeFixture();
+		const { docs, config, binDir } = await makeFixture();
 		const first = await connect(config, binDir);
 		const listed = await first.client.listTools();
 		const names = listed.tools.map((tool) => tool.name);
@@ -327,7 +369,7 @@ describe("AutoRAG Lite MCP stdio", () => {
 	}, 120000);
 
 	it("persists exact curated report evidence across a restart", async () => {
-		const { root, docs, config, binDir } = makeFixture();
+		const { root, docs, config, binDir } = await makeFixture();
 		const first = await connect(config, binDir);
 
 		// The report is built from a real retrieved hit, so evidence must round-trip.
@@ -439,7 +481,7 @@ describe("AutoRAG Lite MCP stdio", () => {
 	}, 180000);
 
 	it("omits refresh and report under the read-only env, keeps evidence, and rejects direct calls", async () => {
-		const { config, binDir } = makeFixture();
+		const { config, binDir } = await makeFixture();
 		const connection = await connect(config, binDir, { AUTORAG_MCP_READ_ONLY: "1" });
 		const names = (await connection.client.listTools()).tools.map((tool) => tool.name);
 		expect(names).toContain("autorag.status");
@@ -472,7 +514,7 @@ describe("AutoRAG Lite MCP stdio", () => {
 	}, 60000);
 
 	it("lists only allowlisted tools and rejects an omitted tool as a protocol error", async () => {
-		const { config, binDir } = makeFixture();
+		const { config, binDir } = await makeFixture();
 		const connection = await connect(config, binDir, { AUTORAG_MCP_TOOLS: "autorag.status,autorag.search.files" });
 		const names = (await connection.client.listTools()).tools.map((tool) => tool.name);
 		expect(names).toHaveLength(2);
@@ -500,7 +542,7 @@ describe("AutoRAG Lite MCP stdio", () => {
 	}, 60000);
 
 	it("reports invalid input as a tool error without poisoning the connection", async () => {
-		const { config, binDir } = makeFixture();
+		const { config, binDir } = await makeFixture();
 		const connection = await connect(config, binDir);
 
 		const invalid = await connection.client.callTool({

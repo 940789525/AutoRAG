@@ -5,6 +5,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AutoRAGAgent } from "../../src/agent/agent.ts";
 import { JIKJI_FIND_TOOL_NAME } from "../../src/agent/jikji-find-tool.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
 
 let root: string;
 let docs: string;
@@ -83,6 +84,7 @@ function loggedArgs(): readonly string[][] {
 describe("AutoRAGAgent Jikji indexing integration", () => {
 	it("registers jikji_find by default", () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -96,6 +98,7 @@ describe("AutoRAGAgent Jikji indexing integration", () => {
 
 	it("keeps Jikji out of the retrieval registry when configured", () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -111,6 +114,7 @@ describe("AutoRAGAgent Jikji indexing integration", () => {
 
 	it("can configure MinSync and Jikji indexing independently", () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -125,6 +129,7 @@ describe("AutoRAGAgent Jikji indexing integration", () => {
 
 	it("registers jikji_find tool when jikji is configured", () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -139,6 +144,7 @@ describe("AutoRAGAgent Jikji indexing integration", () => {
 
 	it("does not register jikji_find when jikji is explicitly disabled", () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -154,6 +160,7 @@ describe("AutoRAGAgent Jikji indexing integration", () => {
 	it("runs prepare --json during refresh and uses the new local-discovery prompt section", async () => {
 		writeFakeJikji();
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -179,6 +186,7 @@ describe("AutoRAGAgent Jikji indexing integration", () => {
 
 	it("adds prompt guidance for Jikji local discovery section", () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -197,6 +205,7 @@ describe("AutoRAGAgent Jikji indexing integration", () => {
 	it("emits ['find', root, query, '--json'] when findJikji is called and returns answer_paths", async () => {
 		writeFakeJikji();
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -229,6 +238,7 @@ describe("AutoRAGAgent Jikji indexing integration", () => {
 
 	it("constructs and retrieves without Jikji configured and without any Python runtime", async () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -246,6 +256,7 @@ describe("AutoRAGAgent Jikji indexing integration", () => {
 	it("surfaces a path-free degraded diagnostic when the configured Jikji binary is missing", async () => {
 		const missingBinary = join(root, "does-not-exist-jikji");
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -270,6 +281,7 @@ describe("AutoRAGAgent Jikji indexing integration", () => {
 	it("returns jikji-unavailable result and leaves policy undefined when binary is missing", async () => {
 		const missingBinary = join(root, "does-not-exist-jikji");
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -290,6 +302,7 @@ describe("AutoRAGAgent Jikji indexing integration", () => {
 		// Index builds belong to refresh; a query only reads what is there.
 		writeFakeJikji();
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -313,6 +326,7 @@ describe("AutoRAGAgent Jikji indexing integration", () => {
 		writeFileSync(join(nested, "deep.txt"), "Nested document.\n");
 		writeFakeJikji();
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [nested, docs, docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -351,6 +365,7 @@ describe("AutoRAGAgent Jikji indexing integration", () => {
 		});
 		const excluded = join(docs, "secret-plan.txt");
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -388,6 +403,7 @@ ${body}
 
 	function agentFor(searchPaths: string[], jikji: Record<string, unknown> = {}): AutoRAGAgent {
 		return new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths,
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,

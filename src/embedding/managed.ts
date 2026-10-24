@@ -1,12 +1,5 @@
 import { DEFAULT_DAEMON_MODEL, type MinSyncDaemon, probeMinSyncDaemon } from "./daemon.ts";
-import type {
-	Embedder,
-	EmbedderEndpoint,
-	EmbedderHealth,
-	EmbeddingIdentity,
-	EmbedOptions,
-	ManagedEmbedder,
-} from "./embedder.ts";
+import type { Embedder, EmbedderHealth, EmbeddingIdentity, EmbedOptions, ManagedEmbedder } from "./embedder.ts";
 import { createHttpEmbedder, type EmbeddingProtocol } from "./http-embedder.ts";
 import { type InProcessEmbedder, loadNativeEmbedder } from "./in-process.ts";
 import type { EmbeddingPrefixes } from "./prefixes.ts";
@@ -94,8 +87,9 @@ export function createManagedEmbedder(options: ManagedEmbedderOptions): ManagedE
 			fetchImpl,
 		});
 		return {
+			capabilities: async () => ({ queryPrefix: prefixes?.query, passagePrefix: prefixes?.passage }),
 			identity: () => remote.identity(),
-			embed: (texts, embedOptions) => remote.embed(prefixed(texts, embedOptions)),
+			embed: (texts, embedOptions) => remote.embed(prefixed(texts, embedOptions), embedOptions),
 			health: () => probeRemote(remoteSettings, fetchImpl),
 			describeEndpoint: async () => ({
 				baseUrl: remoteSettings.baseUrl,
@@ -163,6 +157,14 @@ export function createManagedEmbedder(options: ManagedEmbedderOptions): ManagedE
 	}
 
 	return {
+		async capabilities() {
+			const found = await probe();
+			return {
+				maxInputTokens: found?.maxInputTokens ?? 2048,
+				queryPrefix: prefixes?.query,
+				passagePrefix: prefixes?.passage,
+			};
+		},
 		async identity() {
 			return normalized((await active()).source);
 		},
@@ -171,14 +173,14 @@ export function createManagedEmbedder(options: ManagedEmbedderOptions): ManagedE
 			const inputs = prefixed(texts, embedOptions);
 			const { source, viaDaemon } = await active();
 			try {
-				return await source.embed(inputs);
+				return await source.embed(inputs, embedOptions);
 			} catch (error) {
-				if (!viaDaemon) throw error;
+				if (!viaDaemon || embedOptions?.signal?.aborted) throw error;
 				// The daemon exited (idle timeout, crash) since it was found: forget it and use what is left.
 				daemon = undefined;
 				const next = await active();
 				if (next.viaDaemon) throw error;
-				return next.source.embed(inputs);
+				return next.source.embed(inputs, embedOptions);
 			}
 		},
 		async health() {

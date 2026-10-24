@@ -20,6 +20,7 @@ export interface RefreshProgressCounts {
 }
 
 export interface PersistedRefreshProgress {
+	readonly indexing?: import("../indexing/types.ts").IndexEvent;
 	readonly version: 1;
 	readonly runId: string;
 	readonly pid: number;

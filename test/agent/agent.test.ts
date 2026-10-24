@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
@@ -256,9 +256,6 @@ describe("AutoRAGAgent", () => {
 	});
 
 	it("does not cap retrieval tools at three executions per source", async () => {
-		// A prior sync creates the MinSync workspace; without it the query's spawn
-		// fails on the missing working directory, and CI has no repo-local one.
-		mkdirSync(join(tmpDir, ".autorag", "minsync"), { recursive: true });
 		const agent = new AutoRAGAgent({
 			model: fakeModel(),
 			searchPaths: [FIXTURE_DIR],
@@ -267,6 +264,9 @@ describe("AutoRAGAgent", () => {
 			minSync: { autoInstall: false },
 			jikji: false,
 		});
+		const method = agent.getMethodRegistry().get("minsync");
+		expect(method).toBeDefined();
+		vi.spyOn(method!, "retrieve").mockResolvedValue([]);
 		const tool = internals(agent).tools.find((entry) => entry.name === "semantic_search_local_docs");
 		expect(tool).toBeDefined();
 		const execute = tool?.execute as (id: string, params: { query: string }) => Promise<{ details?: unknown }>;
@@ -287,14 +287,23 @@ describe("AutoRAGAgent", () => {
 		expect(agent).toBeDefined();
 	});
 
-	it("accepts MinSync chunk size configuration", () => {
+	it("accepts native token budgets alongside legacy chunk settings and validates the serving limit", () => {
 		const agent = new AutoRAGAgent({
 			searchPaths: [FIXTURE_DIR],
 			memoryPath: join(tmpDir, "memory.json"),
 			minSync: { maxChunkSize: 1000, autoInstall: false },
+			localIndex: { targetTokens: 64, maxTokens: 96 },
 		});
 
-		expect((internals(agent).minSyncMethod as unknown as { maxChunkSize?: number }).maxChunkSize).toBe(1000);
+		expect(agent.getMethodRegistry().get("minsync")?.describe().capabilities).toContain("stage-timings");
+		expect(
+			() =>
+				new AutoRAGAgent({
+					searchPaths: [FIXTURE_DIR],
+					memoryPath: join(tmpDir, "other-memory.json"),
+					localIndex: { maxTokens: 2048, maxInputTokens: 2048 },
+				}),
+		).toThrow(/exceeds/);
 	});
 
 	it("accepts and retains configured languages", () => {

@@ -18,9 +18,15 @@ export type EmbedRole = "query" | "document";
 
 export interface EmbedOptions {
 	readonly role?: EmbedRole;
+	readonly signal?: AbortSignal;
 }
 
 export interface Embedder {
+	capabilities?(): Promise<{
+		readonly maxInputTokens?: number;
+		readonly queryPrefix?: string;
+		readonly passagePrefix?: string;
+	}>;
 	identity(): Promise<EmbeddingIdentity>;
 	embed(texts: readonly string[], options?: EmbedOptions): Promise<readonly (readonly number[])[]>;
 }

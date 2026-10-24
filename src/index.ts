@@ -40,6 +40,7 @@ export * from "./datasource/index.ts";
 export * from "./dupey/index.ts";
 export * from "./everything/index.ts";
 export * from "./fsearch/index.ts";
+export * from "./indexing/index.ts";
 export * from "./jikji/index.ts";
 export { type AutoRAGMcpServerOptions, createAutoRAGMcpServer } from "./mcp/server.ts";
 export * from "./memory/index.ts";

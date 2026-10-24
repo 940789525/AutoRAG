@@ -1,9 +1,10 @@
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { writeRefreshProgress } from "../../src/agent/refresh-progress.ts";
 import { AutoRAGAgent } from "../../src/index.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
 
 let root: string;
 let docs: string;
@@ -21,6 +22,7 @@ afterEach(() => {
 
 function makeAgent(overrides: Record<string, unknown> = {}) {
 	return new AutoRAGAgent({
+		...nativeIndexFixture(),
 		searchPaths: [docs],
 		memoryPath: join(root, "memory.json"),
 		workspacePath: root,
@@ -43,13 +45,18 @@ describe("getRefreshStatus", () => {
 	});
 
 	it("reports the active indexing phase and known document progress", async () => {
-		const agent = makeAgent();
 		const releaseMinSync = deferred<void>();
 		const minSyncStarted = deferred<void>();
-		vi.spyOn(agent, "syncMinSync").mockImplementation(async () => {
-			minSyncStarted.resolve();
-			await releaseMinSync.promise;
-			return { ok: true, synced: 0, workspacePath: "" };
+		const fixture = nativeIndexFixture();
+		const agent = makeAgent({
+			embedder: {
+				...fixture.embedder,
+				embed: async (...args: Parameters<NonNullable<typeof fixture.embedder>["embed"]>) => {
+					minSyncStarted.resolve();
+					await releaseMinSync.promise;
+					return fixture.embedder!.embed(...args);
+				},
+			},
 		});
 
 		const refresh = agent.refresh(true, { methods: ["minsync"] });
@@ -85,7 +92,7 @@ describe("getRefreshStatus", () => {
 		expect(blob).not.toContain("indexPath");
 	});
 
-	it("captures a path-free failure summary when a refresh step throws", async () => {
+	it("preserves the underlying error when a refresh step throws", async () => {
 		const agent = makeAgent();
 		vi.spyOn(agent, "syncParsedMirrors").mockRejectedValue(new Error("boom at /Users/secret/x"));
 
@@ -95,7 +102,7 @@ describe("getRefreshStatus", () => {
 		expect(status.state).toBe("failed");
 		expect(status.inFlight).toBe(false);
 		expect(status.lastError).toBeDefined();
-		expect(status.lastError).not.toContain("/Users/");
+		expect(status.lastError).toContain("/Users/");
 	});
 
 	it("becomes stale again when a source file changes after refresh", async () => {
@@ -174,7 +181,7 @@ describe("getRefreshStatus", () => {
 		await agent.refresh(true, { methods: ["parsed"] });
 		const status = await agent.getRefreshStatus();
 
-		expect(status.components.minsync).toBe("unavailable");
+		expect(status.components.minsync).toBe("configured");
 		expect(JSON.stringify(status)).not.toContain(root);
 	});
 
@@ -238,51 +245,22 @@ describe("getRefreshStatus", () => {
 		expect(status.diagnostics.some((d) => d.code === "watch-limited")).toBe(true);
 	});
 
-	it("surfaces minsync failure diagnostics in refresh results and getRefreshStatus", async () => {
-		// `.mjs` keeps the fixture spawnable on Windows, where shebang scripts are not.
-		const fakeBinary = join(root, "fake-failing-minsync.mjs");
-		writeFileSync(
-			fakeBinary,
-			`#!/usr/bin/env node
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-
-const args = process.argv.slice(2);
-const config = join(process.cwd(), ".minsync", "config.toml");
-if (args[0] === "init") {
-  mkdirSync(dirname(config), { recursive: true });
-  writeFileSync(config, '[embedder]\\nid = "fixture"\\n');
-  console.log(JSON.stringify({ initialized: true }));
-  process.exit(0);
-}
-if (args[0] === "check") {
-  console.log(JSON.stringify({ vectorstore_ok: true, embedder_ok: false }));
-  process.exit(0);
-}
-process.exit(2);
-`,
-		);
-		chmodSync(fakeBinary, 0o755);
-
+	it("surfaces native embedding failures verbatim in the report and failed status", async () => {
+		const fixture = nativeIndexFixture();
+		const failure = `provider failed at ${join(root, "model")}`;
 		const agent = makeAgent({
-			minSync: {
-				binaryPath: fakeBinary,
-				workspacePath: join(root, ".autorag", "minsync"),
-				autoInstall: false,
+			embedder: {
+				...fixture.embedder,
+				embed: async () => {
+					throw new Error(failure);
+				},
 			},
 		});
-
 		const result = await agent.refresh(true);
-		expect(result.minsync).toBeDefined();
 		expect(result.minsync?.ok).toBe(false);
-		expect(result.minsync?.diagnostics?.some((d) => d.code === "embedder-unavailable")).toBe(true);
-		expect(result.diagnostics.some((d) => d.code === "embedder-unavailable" && d.source === "minsync")).toBe(true);
-		// Path opacity: MinSync text reaches the public result already sanitized.
-		expect(JSON.stringify(result.minsync)).not.toContain(root);
-
-		const status = await agent.getRefreshStatus();
-		expect(status.components.minsync).toBe("degraded");
-		expect(status.diagnostics.some((d) => d.code === "embedder-unavailable" && d.source === "minsync")).toBe(true);
+		expect(result.minsync?.report?.failures.some((item) => item.error === failure)).toBe(true);
+		expect(result.minsync?.reason).toContain(failure);
+		expect((await agent.getRefreshStatus()).state).toBe("failed");
 	});
 
 	it("keeps parsed mirrors and warns when a previously indexed root is emptied, without leaking paths", async () => {

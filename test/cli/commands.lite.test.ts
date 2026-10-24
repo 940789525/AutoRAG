@@ -1,9 +1,20 @@
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { CliConfig } from "../../src/cli/config.ts";
 import { main } from "../../src/cli/index.ts";
+import { acquireIndexLease } from "../../src/indexing/lease.ts";
 import { RetrievalEngine } from "../../src/retrieval/engine.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
+
+vi.mock("../../src/cli/config.ts", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../../src/cli/config.ts")>();
+	return {
+		...actual,
+		buildAgentOptions: (config: CliConfig) => ({ ...actual.buildAgentOptions(config), ...nativeIndexFixture() }),
+	};
+});
 
 function writeConfig(root: string, configPath: string, model = false): void {
 	const docs = join(root, "docs");
@@ -207,48 +218,25 @@ describe("autorag lite lifecycle dispatch", () => {
 		}
 	});
 
-	// The fake `minsync` is a shebang script, which Windows cannot execute.
-	it.skipIf(process.platform === "win32")(
-		"reports a held MinSync lock during --refresh as minsync-lock-held",
-		async () => {
-			const root = mkdtempSync(join(tmpdir(), "autorag-lite-refresh-lock-"));
-			const configPath = join(root, "config.json");
-			const binDir = join(root, "bin");
-			mkdirSync(binDir, { recursive: true });
-			const binary = join(binDir, "minsync");
-			writeFileSync(
-				binary,
-				`#!/usr/bin/env node
-import { mkdirSync, writeFileSync } from "node:fs";
-const args = process.argv.slice(2);
-if (args[0] === "init") {
-  mkdirSync(".minsync", { recursive: true });
-  writeFileSync(".minsync/config.toml", "[embedder]\\nid = \\"openai\\"\\n");
-  process.exit(0);
-}
-if (args[0] === "check" || args[0] === "sync") { console.error("Error: another sync is in progress"); process.exit(3); }
-process.exit(2);
-`,
+	it("reports the native writer lease owner when --refresh cannot acquire the index", async () => {
+		const root = mkdtempSync(join(tmpdir(), "autorag-lite-refresh-lock-"));
+		const configPath = join(root, "config.json");
+		writeConfig(root, configPath);
+		const out = vi.spyOn(process.stdout, "write").mockReturnValue(true);
+		const err = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+		let release: (() => void) | undefined;
+		try {
+			expect(await main(["lite", "refresh", "--config", configPath, "--json"])).toBe(0);
+			release = acquireIndexLease(join(root, ".autorag", "local-index"));
+			expect(await main(["lite", "retrieve", "query", "--config", configPath, "--refresh", "--json"])).not.toBe(0);
+			expect(out.mock.calls.flat().join("\n") + err.mock.calls.flat().join("\n")).toContain(
+				"another AutoRAG index writer is active",
 			);
-			chmodSync(binary, 0o755);
-			writeConfig(root, configPath);
-			vi.stubEnv("PATH", `${binDir}${delimiter}${process.env.PATH ?? ""}`);
-			const out = vi.spyOn(process.stdout, "write").mockReturnValue(true);
-			try {
-				await main(["lite", "refresh", "--config", configPath, "--json"]);
-
-				expect(await main(["lite", "retrieve", "query", "--config", configPath, "--refresh", "--json"])).toBe(0);
-				const envelope = JSON.parse(String(out.mock.calls.at(-1)?.[0] ?? ""));
-				expect(envelope.diagnostics).toContainEqual(
-					expect.objectContaining({ code: "minsync-lock-held", severity: "warning" }),
-				);
-				expect(envelope.diagnostics).not.toContainEqual(expect.objectContaining({ code: "minsync-sync-failed" }));
-			} finally {
-				vi.unstubAllEnvs();
-				rmSync(root, { recursive: true, force: true });
-			}
-		},
-	);
+		} finally {
+			release?.();
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 
 	it("reports a clean corpus as current, including a product artifact in the root", async () => {
 		const root = mkdtempSync(join(tmpdir(), "autorag-lite-clean-"));

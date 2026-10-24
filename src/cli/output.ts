@@ -65,6 +65,10 @@ function refreshEnvelope(result: AutoRAGRefreshResult) {
 			ok: result.minsync.ok,
 			synced: result.minsync.synced,
 		};
+		if (result.minsync.report) {
+			minsyncObj.backend = "autorag";
+			minsyncObj.report = result.minsync.report;
+		}
 		if (result.minsync.reason !== undefined) {
 			minsyncObj.reason = result.minsync.reason;
 		}
@@ -105,7 +109,19 @@ function renderRefreshHuman(result: AutoRAGRefreshResult, debug: boolean): strin
 		if (result.minsync.reason !== undefined) {
 			parts.push(`reason=${result.minsync.reason}`);
 		}
-		lines.push(`  minsync: ${parts.join(" ")}`);
+		lines.push(`  ${result.minsync.report ? "local index (AutoRAG)" : "minsync"}: ${parts.join(" ")}`);
+		if (result.minsync.report) {
+			const report = result.minsync.report;
+			lines.push(
+				`  indexing: ${Math.round(report.durationMs)}ms, chunks=${report.chunks} embedded=${report.embedded} reused=${report.reused} unchanged=${report.unchanged}`,
+			);
+			lines.push(
+				`  stages: ${Object.entries(report.timings)
+					.map(([phase, ms]) => `${phase}=${Math.round(ms)}ms`)
+					.join(" ")}`,
+			);
+			lines.push(`  report: ${report.reportPath}`);
+		}
 	}
 	if (result.datasources && result.datasources.length > 0) {
 		for (const ds of result.datasources) {
@@ -156,6 +172,8 @@ function renderStatusHuman(status: AutoRAGRefreshStatus, debug: boolean): string
 	}
 	if (status.progress) {
 		lines.push(`  progress: phase=${status.progress.phase}`);
+		if (status.progress.indexing)
+			lines.push(`  local index: ${status.progress.indexing.phase} (${status.progress.indexing.state})`);
 		if (status.progress.sourceFiles) {
 			lines.push(`    sourceFiles: total=${status.progress.sourceFiles.total}`);
 		}

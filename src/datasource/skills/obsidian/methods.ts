@@ -14,7 +14,7 @@ export interface ObsidianMethodOptions {
 
 const COMMON_CAPABILITIES = ["scoped", "incremental", "path-opaque-sources"] as const;
 
-/** One MinSync query mode over one vault. A failure reaches the pipeline verbatim and is reported as unsearched. */
+/** One native index query mode over one vault. A failure reaches the pipeline verbatim and is reported as unsearched. */
 class ObsidianMinSyncMethod implements RetrievalMethod {
 	private readonly index: ObsidianVaultIndex;
 	private readonly tags: readonly string[];
@@ -31,7 +31,7 @@ class ObsidianMinSyncMethod implements RetrievalMethod {
 			? {
 					name: "obsidian-bm25",
 					type: "bm25",
-					description: "BM25 lexical retrieval over an Obsidian vault, indexed by MinSync",
+					description: "BM25 lexical retrieval over an Obsidian vault, indexed by AutoRAG",
 					status: "active",
 					capabilities: ["lexical", ...COMMON_CAPABILITIES],
 					datasourceId: OBSIDIAN_DATASOURCE_ID,
@@ -40,7 +40,7 @@ class ObsidianMinSyncMethod implements RetrievalMethod {
 			: {
 					name: "obsidian-semantic",
 					type: "vector",
-					description: "Semantic vector retrieval over an Obsidian vault, indexed by MinSync",
+					description: "Semantic vector retrieval over an Obsidian vault, indexed by AutoRAG",
 					status: "active",
 					capabilities: ["semantic", ...COMMON_CAPABILITIES],
 					datasourceId: OBSIDIAN_DATASOURCE_ID,

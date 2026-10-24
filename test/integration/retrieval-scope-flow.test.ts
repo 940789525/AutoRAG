@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { AutoRAGAgent } from "../../src/agent/agent.js";
 import { writeFakeMinSync } from "../helpers/fake-minsync.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
 
 const temporaryRoots: string[] = [];
 
@@ -33,6 +34,7 @@ describe("AutoRAG retrieval scope flow", () => {
 		const fake = join(workspace, "fake-minsync.mjs");
 		writeFakeMinSync(fake);
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [link],
 			workspacePath: workspace,
 			jikji: false,
@@ -62,6 +64,7 @@ describe("AutoRAG retrieval scope flow", () => {
 		const fake = join(prepared, "fake-minsync.mjs");
 		writeFakeMinSync(fake);
 		const preparingAgent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [prepared],
 			workspacePath: prepared,
 			jikji: false,
@@ -75,6 +78,7 @@ describe("AutoRAG retrieval scope flow", () => {
 		const relocatedFake = join(relocated, "fake-minsync.mjs");
 		writeFakeMinSync(relocatedFake);
 		const relocatedAgent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [relocated],
 			workspacePath: relocated,
 			jikji: false,
@@ -101,6 +105,7 @@ describe("AutoRAG retrieval scope flow", () => {
 		const fake = join(workspace, "fake-minsync.mjs");
 		writeFakeMinSync(fake);
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [source],
 			workspacePath: workspace,
 			jikji: false,

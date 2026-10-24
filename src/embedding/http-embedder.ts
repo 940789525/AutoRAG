@@ -1,4 +1,4 @@
-import type { Embedder, EmbeddingIdentity } from "./embedder.ts";
+import type { Embedder, EmbeddingIdentity, EmbedOptions } from "./embedder.ts";
 
 export type EmbeddingProtocol = "openai" | "tei";
 
@@ -76,12 +76,15 @@ export function createHttpEmbedder(options: HttpEmbedderOptions): Embedder {
 	let dimension = options.dimension;
 	let probing: Promise<void> | undefined;
 
-	async function request(batch: readonly string[]): Promise<number[][]> {
+	async function request(batch: readonly string[], embedOptions?: EmbedOptions): Promise<number[][]> {
 		const response = await fetchImpl(endpoint(options), {
 			method: "POST",
 			headers: headers(options),
 			body: requestBody(options, batch),
-			signal: AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+			signal: AbortSignal.any([
+				AbortSignal.timeout(options.timeoutMs ?? DEFAULT_TIMEOUT_MS),
+				...(embedOptions?.signal ? [embedOptions.signal] : []),
+			]),
 		});
 		if (!response.ok) {
 			const detail = await response.text().catch(() => "");
@@ -106,11 +109,11 @@ export function createHttpEmbedder(options: HttpEmbedderOptions): Embedder {
 			await learnDimension();
 			return { provider: options.provider, model: options.model, dimension: dimension as number };
 		},
-		async embed(texts) {
+		async embed(texts, embedOptions) {
 			if (texts.length === 0) return [];
 			const vectors: number[][] = [];
 			for (let offset = 0; offset < texts.length; offset += batchSize) {
-				vectors.push(...(await request(texts.slice(offset, offset + batchSize))));
+				vectors.push(...(await request(texts.slice(offset, offset + batchSize), embedOptions)));
 			}
 			return vectors;
 		},

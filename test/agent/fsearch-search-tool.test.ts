@@ -6,6 +6,7 @@ import { AutoRAGAgent } from "../../src/agent/agent.ts";
 import { createFSearchSearchTool, FSEARCH_SEARCH_TOOL_NAME } from "../../src/agent/fsearch-search-tool.ts";
 import { buildSystemPrompt } from "../../src/agent/system-prompt.ts";
 import type { FSearchRunner, FSearchSearchRequest } from "../../src/fsearch/index.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
 
 const FIXTURE_DIR = "test/fixtures/sample-project";
 let tmpDir: string;
@@ -158,6 +159,7 @@ function toolNames(agent: AutoRAGAgent): string[] {
 describe("AutoRAGAgent FSearch wiring", () => {
 	function macAgent(overrides: Record<string, unknown> = {}) {
 		return new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [FIXTURE_DIR],
 			workspacePath: tmpDir,
 			memoryPath: join(tmpDir, "memory.json"),
@@ -192,6 +194,7 @@ describe("AutoRAGAgent FSearch wiring", () => {
 		expect(toolNames(windows)).not.toContain(FSEARCH_SEARCH_TOOL_NAME);
 
 		const disabled = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [FIXTURE_DIR],
 			workspacePath: tmpDir,
 			memoryPath: join(tmpDir, "memory.json"),

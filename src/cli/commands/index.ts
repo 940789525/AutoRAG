@@ -1,28 +1,36 @@
 import { existsSync, lstatSync, rmSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { AutoRAGAgent, type AutoRAGRefreshResult, type RefreshMethod } from "../../agent/agent.ts";
 import { removeRefreshProgress } from "../../agent/refresh-progress.ts";
-import { MINSYNC_SUBDIR } from "../../minsync/paths.ts";
+import { chunkMarkdown } from "../../indexing/chunker.ts";
+import { loadIndexTokenizer } from "../../indexing/tokenizer.ts";
+import { loadMirrorIndex } from "../../mirror/index-store.ts";
 import { PARSED_MIRROR_SUBDIR, refreshReadinessPath } from "../../mirror/paths.ts";
 import { buildAgentOptions, type CliConfig, resolveConfig } from "../config.ts";
 import { renderError, renderIndex } from "../output.ts";
 import { parseMethodFlag } from "./refresh.ts";
 import type { CommandContext } from "./types.ts";
 
-const ALL_RESET_TARGETS = [PARSED_MIRROR_SUBDIR, MINSYNC_SUBDIR] as const;
+const LOCAL_INDEX_SUBDIR = ".autorag/local-index";
+const ALL_RESET_TARGETS = [PARSED_MIRROR_SUBDIR, LOCAL_INDEX_SUBDIR] as const;
 const ALL_RESET_TARGET_NAMES = ["parsed", "minsync"] as const;
 
 /**
  * Run the `autorag index` command. `reset` removes the parsed mirror
- * and MinSync indexes
+ * and local indexes
  * (preserving `bin`, `datasources`, and the memory file). `rebuild` resets then re-runs a forced
  * refresh. Returns 0 on success, 2 for usage/decline errors, 1 for runtime
  * errors including path-escape guard violations.
  */
 export async function runIndex(ctx: CommandContext): Promise<number> {
 	const sub = ctx.positionals[0];
-	if (sub !== "reset" && sub !== "rebuild") {
-		ctx.stderr(renderError(new Error("Usage: autorag index <reset|rebuild> [--yes] [--method]"), { json: ctx.json }));
+	if (sub !== "reset" && sub !== "rebuild" && sub !== "inspect") {
+		ctx.stderr(
+			renderError(new Error("Usage: autorag index <reset|rebuild|inspect SOURCE> [--yes] [--method]"), {
+				json: ctx.json,
+			}),
+		);
 		return 2;
 	}
 
@@ -34,7 +42,49 @@ export async function runIndex(ctx: CommandContext): Promise<number> {
 		return 2;
 	}
 
-	// Determine scoped reset targets from --method. Default: all three.
+	if (sub === "inspect") {
+		try {
+			const source = ctx.positionals[1];
+			const entry = Object.values(loadMirrorIndex(config.workspacePath).entries).find(
+				(entry) => entry.virtualPath === source || entry.sourcePath === source,
+			);
+			if (!entry)
+				throw new Error(
+					`No parsed mirror for ${source ?? "(missing source)"}; run refresh first and pass a virtual source or absolute original path`,
+				);
+			const tokenizer = await loadIndexTokenizer({
+				root: config.workspacePath,
+				model: config.minSync?.embedder?.id?.replace(/^(?:native|openai|tei):/, "") ?? "Qwen/Qwen3-Embedding-0.6B",
+				tokenizerPath: config.localIndex?.tokenizerPath,
+			});
+			const markdown = await readFile(entry.outputPath, "utf8");
+			ctx.stdout(
+				JSON.stringify(
+					{
+						source: entry.sourcePath,
+						virtualPath: entry.virtualPath,
+						tokenizer: tokenizer.fingerprint,
+						chunks: chunkMarkdown(markdown, tokenizer, config.localIndex).map((chunk) => {
+							const embeddingInput = `${config.minSync?.embedder?.passagePrefix ?? ""}${chunk.embeddingText}`;
+							return {
+								...chunk,
+								embeddingInput,
+								inputTokens: tokenizer.count(embeddingInput),
+								specialTokenReserve: 8,
+							};
+						}),
+					},
+					null,
+					2,
+				),
+			);
+			return 0;
+		} catch (error) {
+			ctx.stderr(renderError(error, { json: ctx.json, debug: ctx.debug }));
+			return 1;
+		}
+	}
+	// Reset only AutoRAG-owned indexes. Keep the legacy MinSync directory for rollback.
 	const methods = parseMethodFlag(ctx.flags.method);
 	const { targetNames, targetSubdirs, refreshMethods } = resolveResetScope(methods);
 
@@ -86,7 +136,7 @@ export async function runIndex(ctx: CommandContext): Promise<number> {
 	for (const target of targets) {
 		rmSync(target, { recursive: true, force: true });
 	}
-	if (sub === "reset" || targetSubdirs.includes(PARSED_MIRROR_SUBDIR) || targetSubdirs.includes(MINSYNC_SUBDIR)) {
+	if (sub === "reset" || targetSubdirs.includes(PARSED_MIRROR_SUBDIR) || targetSubdirs.includes(LOCAL_INDEX_SUBDIR)) {
 		rmSync(refreshReadinessPath(config.workspacePath), { force: true });
 		removeRefreshProgress(config.workspacePath);
 	}
@@ -107,18 +157,18 @@ export async function runIndex(ctx: CommandContext): Promise<number> {
 	}
 
 	ctx.stdout(renderIndex({ action: "rebuild", removed: [...targetNames], rebuilt }, { json: ctx.json }));
-	return 0;
+	return rebuilt.minsync?.ok === false ? 1 : 0;
 }
 
 /**
  * Resolve which index directories to reset and which refresh methods to run,
  * based on the parsed `--method` flag. When `methods` is undefined (no flag),
- * all three index dirs are reset and a full refresh runs.
+ * both index dirs are reset and a full refresh runs.
  *
  * Mapping:
- * - `minsync` → reset MINSYNC_SUBDIR, refresh with minsync (+ parsed)
+ * - `minsync` → reset LOCAL_INDEX_SUBDIR, refresh with minsync (+ parsed)
  * - `parsed` → reset PARSED_MIRROR_SUBDIR, refresh with parsed only
- * - `all` or undefined → all three dirs + full refresh
+ * - `all` or undefined → both dirs + full refresh
  * - `datasources`/`jikji` → no dirs to reset, but included in refresh methods
  */
 function resolveResetScope(methods: readonly RefreshMethod[] | undefined): {
@@ -146,7 +196,7 @@ function resolveResetScope(methods: readonly RefreshMethod[] | undefined): {
 		if (m === "parsed") {
 			addTarget("parsed", PARSED_MIRROR_SUBDIR);
 		} else if (m === "minsync") {
-			addTarget("minsync", MINSYNC_SUBDIR);
+			addTarget("minsync", LOCAL_INDEX_SUBDIR);
 		}
 		// datasources/jikji have no reset dir but are valid refresh methods.
 	}

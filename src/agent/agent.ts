@@ -38,6 +38,9 @@ import {
 	type FSearchSearchRequest,
 	type FSearchSearchResult,
 } from "../fsearch/index.ts";
+import { DocumentChannel } from "../indexing/channel.ts";
+import { LocalIndexMethod } from "../indexing/method.ts";
+import type { IndexDocument, IndexEvent, IndexReport, LocalIndexOptions } from "../indexing/types.ts";
 import { jikjiFindDiagnostic, jikjiPrepareDiagnostic } from "../jikji/diagnostics.ts";
 import {
 	type JikjiAnswerPack,
@@ -64,21 +67,18 @@ import { EVIDENCE_SUPPORT_THRESHOLD, type JudgedEvidenceRecord } from "../memory
 import { RetrievalMemory } from "../memory/memory.ts";
 import { memoryVectorStorePath } from "../memory/similar-queries.ts";
 import { resolveMinSyncBinary } from "../minsync/binary.ts";
-import { MinSyncRequiredError, minSyncBinaryMissingError } from "../minsync/errors.ts";
-import {
-	type MinSyncDiagnostic,
-	type MinSyncEmbedderConfig,
-	type MinSyncFileFailure,
-	MinSyncHybridMethod,
-	type MinSyncSyncResult,
-	MinSyncVectorMethod,
-	type MinSyncVectorMethodOptions,
+import { MinSyncRequiredError } from "../minsync/errors.ts";
+import type {
+	MinSyncDiagnostic,
+	MinSyncEmbedderConfig,
+	MinSyncFileFailure,
+	MinSyncSyncResult,
+	MinSyncVectorMethodOptions,
 } from "../minsync/index.ts";
 import { PARSED_MIRROR_SUBDIR, refreshReadinessPath } from "../mirror/paths.ts";
 import {
 	detectMirrorStaleness,
 	isPathExcluded,
-	MirrorWorkspaceError,
 	type ParsedMirrorDiagnostic,
 	type ParsedMirrorSyncOptions,
 	type ParsedMirrorSyncResult,
@@ -436,6 +436,8 @@ export interface AutoRAGRefreshProgress {
 }
 
 export interface AutoRAGRefreshOptions {
+	/** Detailed native indexing spans. Also persisted locally under .autorag/local-index/runs. */
+	readonly onIndexEvent?: (event: IndexEvent) => void;
 	/** Restrict refresh to specific methods. Defaults to all when undefined. */
 	readonly methods?: readonly RefreshMethod[];
 	/**
@@ -460,6 +462,7 @@ export interface AutoRAGRefreshOptions {
 }
 
 export interface AutoRAGMinSyncRefreshResult {
+	readonly report?: IndexReport;
 	readonly ok: boolean;
 	readonly synced: number;
 	readonly reason?: string;
@@ -517,6 +520,7 @@ export interface AutoRAGRefreshStatus {
 	readonly diagnostics: readonly SearchDocumentDiagnostic[];
 	readonly components: AutoRAGRefreshComponentStatus;
 	readonly progress?: {
+		readonly indexing?: IndexEvent;
 		readonly phase: RefreshProgressPhase;
 		readonly sourceFiles?: { readonly total: number };
 		readonly parsedCounts?: RefreshProgressCounts;
@@ -583,6 +587,8 @@ export interface AutoRAGAgentOptions {
 	workspacePath?: string;
 	tools?: AgentTool[];
 	minSync?: Omit<MinSyncVectorMethodOptions, "root">;
+	/** Native local indexing. minSync.embedder remains the shared embedding configuration. */
+	localIndex?: Omit<LocalIndexOptions, "root" | "embedder">;
 	jikji?: JikjiOptions | false;
 	/**
 	 * Windows-only instant file/folder name search through the bundled
@@ -907,7 +913,7 @@ export class AutoRAGAgent {
 	private readonly reranker: Reranker | undefined;
 	private readonly rerankTopN: number | undefined;
 
-	private readonly minSyncMethod: MinSyncVectorMethod;
+	private readonly minSyncMethod: LocalIndexMethod;
 	private readonly minSyncEmbedderConfig: MinSyncEmbedderConfig | undefined;
 	private readonly minSyncBinaryPath: string | undefined;
 	private readonly jikjiClient: JikjiClient | undefined;
@@ -1017,21 +1023,43 @@ export class AutoRAGAgent {
 				? undefined
 				: (options.rerank.topN ?? DEFAULT_RERANK_TOP_N);
 
-		// MinSync is required: there is no option to turn it off and no degraded mode.
+		// Retain the saved MinSync configuration key for the built-in index and its embedding settings.
 		if ((options.minSync as unknown) === false) {
 			throw new MinSyncRequiredError(
-				"MinSync is required and cannot be disabled; remove `minSync: false` and install the `minsync` binary.",
+				"MinSync is required and cannot be disabled; remove `minSync: false`. Local indexing is built into AutoRAG; MinSync supplies the default embeddings.",
 			);
 		}
-		const minSyncDefaults = {
-			...(options.minSync ?? { autoInstall: true }),
+		this.embedder = options.embedder ?? createEmbedderFromConfig({ embedder: options.minSync?.embedder });
+		const configuredEmbedder = options.minSync?.embedder;
+		const native =
+			configuredEmbedder?.baseUrl === undefined &&
+			(configuredEmbedder?.id === undefined || configuredEmbedder.id.startsWith("native:"));
+		const minSyncDefaults: LocalIndexOptions & { defaultTopK: number } = {
+			...options.localIndex,
 			root: this.workspaceProjectRoot,
+			embedder: this.embedder,
+			identity:
+				options.localIndex?.identity ??
+				(native && options.embedder === undefined
+					? {
+							provider: "minsync",
+							model: configuredEmbedder?.id?.slice("native:".length) ?? "Qwen/Qwen3-Embedding-0.6B",
+							dimension: configuredEmbedder?.dimension ?? 1024,
+						}
+					: undefined),
+			embeddingFingerprint: JSON.stringify({
+				id: configuredEmbedder?.id,
+				baseUrl: configuredEmbedder?.baseUrl,
+				passagePrefix: configuredEmbedder?.passagePrefix,
+				revision: options.localIndex?.embeddingFingerprint,
+			}),
 			defaultTopK: this.limits.minSyncTopK,
-			scopedTopK: this.limits.minSyncScopedQueryTopK,
 		};
-		this.minSyncMethod = new MinSyncVectorMethod(minSyncDefaults);
+		this.minSyncMethod = new LocalIndexMethod(minSyncDefaults);
 		this.methodRegistry.register(this.minSyncMethod);
-		this.methodRegistry.register(new MinSyncHybridMethod(minSyncDefaults));
+		this.methodRegistry.register(
+			new LocalIndexMethod({ ...minSyncDefaults, index: this.minSyncMethod.index, mode: "hybrid" }),
+		);
 		const registeredDatasourceIds = new Set<string>();
 		for (const skill of this.datasourceSkills) {
 			const datasourceId = skill.describe().datasourceId;
@@ -1072,7 +1100,6 @@ export class AutoRAGAgent {
 		this.memoryVectorPath = memoryVectorStorePath(memPath);
 		this.minSyncEmbedderConfig = options.minSync?.embedder;
 		this.minSyncBinaryPath = options.minSync?.binaryPath;
-		this.embedder = options.embedder ?? createEmbedderFromConfig({ embedder: options.minSync?.embedder });
 		this.memoryEmbedder = options.memoryEmbedder === false ? undefined : (options.memoryEmbedder ?? this.embedder);
 		this.runLogger = new AutoRAGRunLogger(join(dirname(memPath), "logs", "runs.jsonl"));
 
@@ -2027,9 +2054,7 @@ export class AutoRAGAgent {
 			throw new Error("AutoRAG agent is busy; await the in-flight searchDocuments() call before starting another");
 		}
 
-		// MinSync is required: a run that cannot reach it fails here, before any
-		// model call, instead of answering from the retrieval paths that remain.
-		if (this.minSyncMethod.isBinaryMissing()) throw minSyncBinaryMissingError();
+		// Local indexing uses library calls; only embedding may use a MinSync daemon/addon.
 
 		const sessionId = randomUUID();
 		const trimmedQuery = query.trim();
@@ -3255,7 +3280,8 @@ export class AutoRAGAgent {
 	}
 
 	async refresh(force = false, opts?: AutoRAGRefreshOptions): Promise<AutoRAGRefreshResult> {
-		const signal = opts?.signal;
+		const indexAbort = new AbortController();
+		const signal = opts?.signal ? AbortSignal.any([opts.signal, indexAbort.signal]) : indexAbort.signal;
 		signal?.throwIfAborted();
 		const emitProgress = (event: AutoRAGRefreshProgress): void => {
 			try {
@@ -3288,9 +3314,34 @@ export class AutoRAGAgent {
 			inFlight: true,
 			lastStartedAt: startedAt,
 		};
+		const documents = wants("minsync") ? new DocumentChannel<IndexDocument>() : undefined;
+		let lastIndexUpdate = 0;
+		const observeIndex = (event: IndexEvent): void => {
+			if (
+				Date.now() - lastIndexUpdate >= 500 ||
+				progress.indexing?.phase !== event.phase ||
+				event.state === "error" ||
+				event.phase === "done"
+			) {
+				progress = updateRefreshProgress(progress, { indexing: event });
+				writeRefreshProgress(this.workspaceProjectRoot, progress);
+				lastIndexUpdate = Date.now();
+			}
+			opts?.onIndexEvent?.(event);
+		};
+		const indexing = documents
+			? this.syncMinSync(force, signal, documents, observeIndex).catch((error) => {
+					documents.fail(error);
+					indexAbort.abort(error);
+					throw error;
+				})
+			: undefined;
+		// A worker can fail while a parser is still running. Observe it immediately, then await it below.
+		void indexing?.catch(() => {});
 		try {
 			const summary = needsParsed
 				? await this.syncParsedMirrors(force, {
+						onDocument: documents ? (entry) => documents.push(entry) : undefined,
 						...(opts?.retrySkipped === true ? { retrySkipped: true } : {}),
 						...(signal === undefined ? {} : { signal }),
 						onProgress: (parsedProgress) => {
@@ -3333,7 +3384,8 @@ export class AutoRAGAgent {
 				},
 			});
 			writeRefreshProgress(this.workspaceProjectRoot, progress);
-			const minsync = wants("minsync") ? await this.syncMinSync(force, signal) : undefined;
+			documents?.close();
+			const minsync = await indexing;
 			signal?.throwIfAborted();
 			if (minsync !== undefined) {
 				progress = updateRefreshProgress(progress, {
@@ -3392,7 +3444,7 @@ export class AutoRAGAgent {
 				.filter((diag): diag is JikjiDiagnostic => diag !== undefined);
 			this.refreshState = {
 				...this.refreshState,
-				lastOutcome: "success",
+				lastOutcome: minsync?.ok === false ? "failed" : "success",
 				counts: {
 					scanned: summary.scanned,
 					written: summary.written,
@@ -3405,7 +3457,7 @@ export class AutoRAGAgent {
 				datasources,
 				everything,
 				fsearch,
-				lastError: undefined,
+				lastError: minsync?.ok === false ? minsync.reason : undefined,
 			};
 			if (needsParsed) {
 				mkdirSync(dirname(refreshReadinessPath(this.workspaceProjectRoot)), { recursive: true });
@@ -3415,16 +3467,19 @@ export class AutoRAGAgent {
 				);
 			}
 			progress = updateRefreshProgress(progress, {
-				state: "success",
+				state: minsync?.ok === false ? "failed" : "success",
 				finishedAt: new Date().toISOString(),
 			});
 			writeRefreshProgress(this.workspaceProjectRoot, progress);
 			const minsyncDiagnostics = minSyncRefreshDiagnostics(minsync);
 			const publicMinsync: AutoRAGMinSyncRefreshResult | undefined = minsync
 				? {
+						report: minsync.report,
 						ok: minsync.ok,
 						synced: minsync.synced,
-						...(minsync.reason !== undefined ? { reason: sanitizeDiagnosticMessage(minsync.reason) } : {}),
+						...(minsync.reason !== undefined
+							? { reason: minsync.report ? minsync.reason : sanitizeDiagnosticMessage(minsync.reason) }
+							: {}),
 						...(minsyncDiagnostics.length > 0 ? { diagnostics: minsyncDiagnostics } : {}),
 						...(minsync.stagingExcluded !== undefined && minsync.stagingExcluded.length > 0
 							? { stagingExcludedCount: minsync.stagingExcluded.length }
@@ -3450,15 +3505,12 @@ export class AutoRAGAgent {
 				...(fsearch !== undefined ? { fsearch } : {}),
 			};
 		} catch (error) {
+			documents?.fail(error);
+			await indexing?.catch(() => {});
 			this.refreshState = {
 				...this.refreshState,
 				lastOutcome: "failed",
-				lastError:
-					error instanceof MirrorWorkspaceError
-						? `Refresh failed: workspace not writable${error.code === undefined ? "" : ` (${error.code})`}`
-						: error instanceof Error
-							? `Refresh failed: ${error.name}`
-							: "Refresh failed.",
+				lastError: `Refresh failed: ${error instanceof Error ? error.message : String(error)}`,
 			};
 			progress = updateRefreshProgress(progress, {
 				state: "failed",
@@ -3580,7 +3632,7 @@ export class AutoRAGAgent {
 		const effectiveProgress = this.refreshState.inFlight || persistedRunning ? persistedProgress : undefined;
 		return {
 			state,
-			inFlight: this.refreshState.inFlight,
+			inFlight: this.refreshState.inFlight || (persistedRunning && ownerAlive),
 			lastStartedAt: this.refreshState.lastStartedAt ?? persistedProgress?.startedAt,
 			lastFinishedAt: this.refreshState.lastFinishedAt ?? persistedProgress?.finishedAt,
 			counts: this.refreshState.counts,
@@ -3592,6 +3644,7 @@ export class AutoRAGAgent {
 							sourceFiles: effectiveProgress.sourceFiles,
 							parsedCounts: effectiveProgress.parsedCounts,
 							minsync: effectiveProgress.minsync,
+							indexing: effectiveProgress.indexing,
 							ownerAlive,
 						},
 			stale: !parsedMirrorReady || staleDiagnostics.length > 0,
@@ -3605,19 +3658,13 @@ export class AutoRAGAgent {
 
 	/**
 	 * Synchronous per-component readiness snapshot (minsync/jikji/datasources/everything).
-	 * `minsync` is "ready" only after a successful sync wrote its cursor;
-	 * "configured" means the binary resolved but no index exists yet.
+	 * `minsync` is the compatibility name for AutoRAG's built-in index; ready requires a successful run.
+	 * "configured" means a matching index has not been built yet.
 	 */
 	refreshComponentStatus(): AutoRAGRefreshComponentStatus {
 		const status: { minsync?: string; jikji?: string; datasources?: string; everything?: string; fsearch?: string } =
 			{};
-		status.minsync = this.minSyncMethod.isExplicitBinaryMissing()
-			? "unavailable"
-			: this.refreshState.minsync?.ok === false
-				? "degraded"
-				: this.minSyncMethod.isReady()
-					? "ready"
-					: "configured";
+		status.minsync = this.refreshState.minsync?.ok === false ? "degraded" : this.minSyncMethod.index.status();
 		if (this.jikjiClient !== undefined) {
 			status.jikji = this.refreshState.jikjiDiagnostics.length > 0 ? "degraded" : "configured";
 		}
@@ -3687,7 +3734,7 @@ export class AutoRAGAgent {
 
 	async syncParsedMirrors(
 		force = false,
-		options: Pick<ParsedMirrorSyncOptions, "signal" | "onProgress" | "retrySkipped"> = {},
+		options: Pick<ParsedMirrorSyncOptions, "signal" | "onProgress" | "onDocument" | "retrySkipped"> = {},
 	): Promise<ParsedMirrorSyncResult> {
 		const duplicateFilter = await this.exactDuplicateExclusions();
 		return syncParsedMirrors({
@@ -3747,8 +3794,13 @@ export class AutoRAGAgent {
 		return { excluded };
 	}
 
-	async syncMinSync(force = false, signal?: AbortSignal): Promise<MinSyncSyncResult> {
-		const result = await this.minSyncMethod.sync(force, signal);
+	async syncMinSync(
+		force = false,
+		signal?: AbortSignal,
+		documents?: AsyncIterable<IndexDocument>,
+		onEvent?: (event: IndexEvent) => void,
+	): Promise<MinSyncSyncResult> {
+		const result = await this.minSyncMethod.sync(force, signal, documents, onEvent);
 		this.refreshState = { ...this.refreshState, minsync: result };
 		return result;
 	}
@@ -4460,6 +4512,13 @@ function fsearchRefreshDiagnostics(fsearch: AutoRAGFSearchRefreshResult | undefi
  */
 function minSyncRefreshDiagnostics(minsync: MinSyncSyncResult | undefined): SearchDocumentDiagnostic[] {
 	if (!minsync) return [];
+	if (minsync.report)
+		return minsync.report.failures.map((failure) => ({
+			code: "minsync-sync-failed",
+			severity: "error",
+			source: failure.path,
+			message: `AutoRAG local index ${failure.stage}: ${failure.error}`,
+		}));
 	const diagnostics: SearchDocumentDiagnostic[] = [];
 	if (minsync.diagnostic) diagnostics.push(toMinSyncDiagnostic(minsync.diagnostic, minsync.ok));
 	else if (!minsync.ok && minsync.reason) diagnostics.push(toMinSyncReasonDiagnostic(minsync.reason));

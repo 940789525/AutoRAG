@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AutoRAGAgent, type AutoRAGWatchRefreshHandle } from "../../src/index.ts";
 import { parsedOutputPath } from "../../src/mirror/paths.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
 
 let root: string;
 let docs: string;
@@ -24,6 +25,7 @@ afterEach(() => {
 describe("AutoRAGAgent watch refresh", () => {
 	it("updates parsed mirrors when a watched source file is created, then stops cleanly", async () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,

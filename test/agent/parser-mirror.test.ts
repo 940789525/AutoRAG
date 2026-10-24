@@ -13,6 +13,7 @@ import {
 	createXlsxFixture,
 } from "../fixtures/document-formats.ts";
 import { createMinimalPdfBuffer } from "../fixtures/minimal-pdf.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
 
 let root: string;
 
@@ -32,6 +33,7 @@ describe("AutoRAGAgent parsed mirror integration", () => {
 		mkdirSync(docs, { recursive: true });
 		writeFileSync(join(docs, "note.txt"), "Mirror me\n");
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -61,6 +63,7 @@ describe("AutoRAGAgent parsed mirror integration", () => {
 		utimesSync(oldFile, new Date(1_000), new Date(1_000));
 		utimesSync(newFile, new Date(2_000), new Date(2_000));
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -101,6 +104,7 @@ describe("AutoRAGAgent parsed mirror integration", () => {
 		utimesSync(internalNewest, new Date(1_000), new Date(1_000));
 		utimesSync(fsNewest, new Date(2_000), new Date(2_000));
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -159,6 +163,7 @@ describe("AutoRAGAgent parsed mirror integration", () => {
 		writeFileSync(join(docs, "old.txt"), "same canonical content\n");
 		writeFileSync(join(docs, "new.txt"), "same canonical content\n");
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -181,6 +186,7 @@ describe("AutoRAGAgent parsed mirror integration", () => {
 		mkdirSync(docs, { recursive: true });
 		writeFileSync(join(docs, "report.pdf"), createMinimalPdfBuffer(pdfMarker));
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -211,6 +217,7 @@ describe("AutoRAGAgent parsed mirror integration", () => {
 		writeFileSync(join(docs, "note.txt"), "Plain text survives bad PDF\n");
 		writeFileSync(join(docs, "broken.pdf"), Buffer.from("not a pdf"));
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -246,6 +253,7 @@ describe("AutoRAGAgent parsed mirror integration", () => {
 		writeFileSync(join(docs, "korean.txt"), Buffer.from([0xc7, 0xd1, 0xb1, 0xdb]));
 		writeFileSync(join(docs, "legacy.hwp"), Buffer.from("unsupported hwp"));
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,

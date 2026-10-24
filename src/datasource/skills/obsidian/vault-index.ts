@@ -1,14 +1,11 @@
-import { existsSync } from "node:fs";
 import { basename, extname, join } from "node:path";
-import { resolveMinSyncBinary } from "../../../minsync/binary.ts";
-import type { MinSyncQueryMode } from "../../../minsync/client.ts";
-import { MinSyncClient } from "../../../minsync/client.ts";
-import { MinSyncRequiredError } from "../../../minsync/errors.ts";
+import { createEmbedderFromConfig, type Embedder } from "../../../embedding/index.ts";
+import { LocalDocumentIndex } from "../../../indexing/pipeline.ts";
+import type { IndexDocument, LocalIndexOptions } from "../../../indexing/types.ts";
 import type { MinSyncVectorMethodOptions } from "../../../minsync/method.ts";
 import { runWorkspaceQuery, runWorkspaceSync } from "../../../minsync/workspace-lock.ts";
 import type { RetrievalResult } from "../../../retrieval/types.ts";
 import { boundDiagnosticText } from "../../connector.ts";
-import { matchesDatasourceScope } from "../../scope.ts";
 import type { DatasourceDiagnostic, DatasourceDiagnosticCode } from "../../types.ts";
 import {
 	OBSIDIAN_DATASOURCE_ID,
@@ -18,11 +15,11 @@ import {
 } from "./paths.ts";
 import { listVaultNotes, loadStagingState, stageNotes, VaultUnavailableError } from "./staging.ts";
 
-/** The MinSync settings a vault shares with the rest of the install: binary, embedder, chunking. */
+/** Embedding settings shared with the local index; legacy binary options remain accepted. */
 export type ObsidianMinSyncOptions = Pick<
 	MinSyncVectorMethodOptions,
 	"binaryPath" | "autoInstall" | "installer" | "embedder" | "maxChunkSize"
->;
+> & { readonly sharedEmbedder?: Embedder; readonly localIndex?: Omit<LocalIndexOptions, "root" | "embedder"> };
 
 export interface ObsidianVaultIndexOptions {
 	readonly instanceId: string;
@@ -44,21 +41,45 @@ export type VaultSyncOutcome =
 	| { readonly ok: false; readonly code: DatasourceDiagnosticCode; readonly message: string };
 
 const DEFAULT_TOP_K = 20;
-/** A folder scope cannot be pushed into MinSync, so the fetch grows until enough in-scope notes turn up. */
-const MIN_SCOPED_FETCH = 50;
-const MAX_SCOPED_FETCH = 1000;
-const QUERY_MODES: Readonly<Record<ObsidianSearchMode, MinSyncQueryMode>> = { bm25: "bm25", semantic: "vector" };
-
 /**
- * One vault, indexed by MinSync in a workspace of its own. Notes are staged under the workspace's
- * `files/` folder (see `staging.ts`), `minsync sync` embeds and indexes them incrementally, and a
- * query runs against that index and maps each chunk back to its note.
+ * One vault indexed by the AutoRAG native pipeline. Staging retains unreadable notes;
+ * vector and BM25 results keep source-native identities rather than filesystem paths.
  */
 export class ObsidianVaultIndex {
 	private readonly instanceId: string;
 	private readonly vaultPath: string | undefined;
 	private readonly workspaceRoot: string | undefined;
 	private readonly minSync: ObsidianMinSyncOptions;
+	private nativeIndex: LocalDocumentIndex | undefined;
+
+	private native(workspace: string): LocalDocumentIndex {
+		const configured = this.minSync.embedder;
+		const local =
+			!this.minSync.sharedEmbedder &&
+			configured?.baseUrl === undefined &&
+			(configured?.id === undefined || configured.id.startsWith("native:"));
+		this.nativeIndex ??= new LocalDocumentIndex({
+			...this.minSync.localIndex,
+			root: workspace,
+			embedder: this.minSync.sharedEmbedder ?? createEmbedderFromConfig({ embedder: this.minSync.embedder }),
+			identity:
+				this.minSync.localIndex?.identity ??
+				(local
+					? {
+							provider: "minsync",
+							model: configured?.id?.slice("native:".length) ?? "Qwen/Qwen3-Embedding-0.6B",
+							dimension: configured?.dimension ?? 1024,
+						}
+					: undefined),
+			embeddingFingerprint: JSON.stringify({
+				id: configured?.id,
+				baseUrl: configured?.baseUrl,
+				passagePrefix: configured?.passagePrefix,
+				revision: this.minSync.localIndex?.embeddingFingerprint,
+			}),
+		});
+		return this.nativeIndex;
+	}
 
 	constructor(options: ObsidianVaultIndexOptions) {
 		this.instanceId = options.instanceId;
@@ -67,7 +88,7 @@ export class ObsidianVaultIndex {
 		this.minSync = options.minSync ?? {};
 	}
 
-	/** Mirror the vault's notes into the MinSync workspace and sync it. Never throws except on abort. */
+	/** Stage the vault's notes and run the AutoRAG index pipeline. Never throws except on abort. */
 	sync(signal?: AbortSignal): Promise<VaultSyncOutcome> {
 		const { vaultPath, workspaceRoot } = this;
 		if (vaultPath === undefined) {
@@ -100,32 +121,28 @@ export class ObsidianVaultIndex {
 			if (listing.notes.size === 0) {
 				return failure("datasource-empty", "the Obsidian vault has no markdown notes; the previous index was kept");
 			}
-			const binaryPath = await resolveMinSyncBinary({
-				root: workspaceRoot,
-				binaryPath: this.minSync.binaryPath,
-				autoInstall: this.minSync.autoInstall,
-				installer: this.minSync.installer,
-			});
 			const staged = stageNotes(
 				join(workspace, "files"),
 				obsidianStagingStatePath(workspaceRoot, this.instanceId),
 				listing,
 			);
-			const client = new MinSyncClient({
-				binaryPath,
-				workspacePath: workspace,
-				embedder: this.minSync.embedder,
-				maxChunkSize: this.minSync.maxChunkSize,
-			});
-			const result = await client.sync(false, signal);
-			if (!result.ok) {
-				const detail = result.diagnostic?.message ?? result.reason ?? "MinSync sync failed";
-				const code =
-					result.diagnostic?.code === "embedder-unavailable"
-						? "datasource-unavailable"
-						: "datasource-index-failed";
-				return failure(code, `${result.reason ?? "sync-failed"}: ${detail}`);
+			const state = loadStagingState(obsidianStagingStatePath(workspaceRoot, this.instanceId));
+			const instanceId = this.instanceId;
+			async function* documents(): AsyncIterable<IndexDocument> {
+				for (const [path, note] of Object.entries(state.entries))
+					yield {
+						virtualPath: obsidianNoteSource(instanceId, path),
+						sourcePath: note.sourcePath,
+						outputPath: join(workspace, "files", path),
+						updatedAt: `${note.mtimeNs}:${note.size}`,
+					};
 			}
+			const result = await this.native(workspace).sync(documents(), { signal });
+			if (!result.ok)
+				return failure(
+					"datasource-index-failed",
+					result.failures.map((item) => `${item.path}: ${item.error}`).join("\n"),
+				);
 			const diagnostics: DatasourceDiagnostic[] = [];
 			const warn = (message: string): void => {
 				diagnostics.push({
@@ -145,13 +162,10 @@ export class ObsidianVaultIndex {
 				warn(`${listing.collisions.length} note(s) share a normalized path with another note and were not indexed`);
 			}
 			if (staged.failed.length > 0) warn(`${staged.failed.length} note(s) could not be copied for indexing`);
-			if ((result.filesFailed?.length ?? 0) > 0) {
-				warn(`MinSync skipped ${result.filesFailed?.length} note(s); the next refresh retries them`);
-			}
 			return { ok: true, notes: staged.staged, diagnostics };
 		} catch (error) {
 			if (signal?.aborted) throw error;
-			if (error instanceof VaultUnavailableError || error instanceof MinSyncRequiredError) {
+			if (error instanceof VaultUnavailableError) {
 				return failure("datasource-unavailable", error.message);
 			}
 			return failure("datasource-index-failed", error instanceof Error ? error.message : String(error));
@@ -179,63 +193,46 @@ export class ObsidianVaultIndex {
 		workspaceRoot: string,
 		workspace: string,
 	): Promise<RetrievalResult[]> {
-		if (!existsSync(join(workspace, ".minsync", "cursor.json"))) {
+		const index = this.native(workspace);
+		if (!index.isReady())
 			throw new Error(
-				`The Obsidian vault "${this.instanceId}" is not indexed yet: run \`autorag refresh --method datasources\` first.`,
+				`The Obsidian vault "${this.instanceId}" is not indexed yet: run autorag refresh --method datasources first.`,
 			);
-		}
-		// Queries never install: they use an existing binary or fail, so a turn never waits on a download.
-		const binaryPath = await resolveMinSyncBinary({
-			root: workspaceRoot,
-			binaryPath: this.minSync.binaryPath,
-			autoInstall: this.minSync.autoInstall,
-			installer: this.minSync.installer,
-			install: false,
+		const state = loadStagingState(obsidianStagingStatePath(workspaceRoot, this.instanceId));
+		const bySource = new Map(
+			Object.entries(state.entries).map(([path, note]) => [
+				obsidianNoteSource(this.instanceId, path),
+				{ path, note },
+			]),
+		);
+		const hits = await index.search(query, {
+			mode: mode === "semantic" ? "vector" : "bm25",
+			topK: options.topK ?? DEFAULT_TOP_K,
+			scope: options.scope,
+			signal: options.signal,
 		});
-		const client = new MinSyncClient({
-			binaryPath,
-			workspacePath: workspace,
-			embedder: this.minSync.embedder,
-			maxChunkSize: this.minSync.maxChunkSize,
-		});
-		const staged = loadStagingState(obsidianStagingStatePath(workspaceRoot, this.instanceId));
-		const topK = options.topK ?? DEFAULT_TOP_K;
-		const scope = options.scope?.normalize("NFC");
-		let fetch = scope === undefined ? topK : Math.max(topK * 5, MIN_SCOPED_FETCH);
-		for (;;) {
-			const hits = await client.query(query, fetch, QUERY_MODES[mode], options.signal);
-			const results: RetrievalResult[] = [];
-			for (const hit of hits) {
-				const relativePath = hit.path.startsWith("files/")
-					? hit.path.slice("files/".length).normalize("NFC")
-					: undefined;
-				const note = relativePath === undefined ? undefined : staged.entries[relativePath];
-				if (relativePath === undefined || note === undefined) continue;
-				const source = obsidianNoteSource(this.instanceId, relativePath);
-				if (!matchesDatasourceScope(source, scope)) continue;
-				results.push({
-					id: `obsidian:${this.instanceId}:${relativePath}:${hit.docId ?? results.length}`,
-					content: hit.text,
-					source,
-					score: hit.score,
+		return hits.flatMap(({ row, score }) => {
+			const entry = bySource.get(row.source_id);
+			if (!entry) return [];
+			return [
+				{
+					id: `obsidian:${this.instanceId}:${row.id}`,
+					content: row.text,
+					source: row.source_id,
+					score,
 					metadata: {
 						method: `obsidian-${mode}`,
 						datasourceId: OBSIDIAN_DATASOURCE_ID,
 						instanceId: this.instanceId,
 						mode,
-						file: relativePath,
-						title: basename(relativePath, extname(relativePath)),
-						path: note.sourcePath,
+						file: entry.path,
+						title: basename(entry.path, extname(entry.path)),
+						path: entry.note.sourcePath,
+						indexBackend: "autorag",
 					},
-				});
-				if (results.length >= topK) break;
-			}
-			// MinSync cannot filter by folder, so a narrow scope may find too few notes in the first window.
-			if (results.length >= topK || scope === undefined || hits.length < fetch || fetch >= MAX_SCOPED_FETCH) {
-				return results;
-			}
-			fetch = Math.min(fetch * 2, MAX_SCOPED_FETCH);
-		}
+				},
+			];
+		});
 	}
 }
 

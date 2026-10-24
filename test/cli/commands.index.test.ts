@@ -1,9 +1,20 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runIndex } from "../../src/cli/commands/index.ts";
 import type { CommandContext } from "../../src/cli/commands/types.ts";
+import type { CliConfig } from "../../src/cli/config.ts";
+import { saveMirrorIndex } from "../../src/mirror/index-store.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
+
+vi.mock("../../src/cli/config.ts", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("../../src/cli/config.ts")>();
+	return {
+		...actual,
+		buildAgentOptions: (config: CliConfig) => ({ ...actual.buildAgentOptions(config), ...nativeIndexFixture() }),
+	};
+});
 
 let tmpDir: string;
 let previousHome: string | undefined;
@@ -70,7 +81,9 @@ function seedWorkspace(): WorkspaceFixture {
 	mkdirSync(autorag, { recursive: true });
 
 	const parsed = join(autorag, "parsed");
-	const minsync = join(autorag, "minsync");
+	const minsync = join(autorag, "local-index");
+	mkdirSync(join(autorag, "minsync"), { recursive: true });
+	writeFileSync(join(autorag, "minsync", "legacy.bin"), "keep legacy data");
 	const bin = join(autorag, "bin");
 	const datasources = join(autorag, "datasources");
 
@@ -129,6 +142,7 @@ describe("runIndex", () => {
 
 		expect(existsSync(fx.parsed)).toBe(false);
 		expect(existsSync(fx.minsync)).toBe(false);
+		expect(existsSync(join(fx.workspace, ".autorag", "minsync", "legacy.bin"))).toBe(true);
 
 		expect(existsSync(fx.bin)).toBe(true);
 		expect(existsSync(fx.datasources)).toBe(true);
@@ -265,6 +279,7 @@ describe("runIndex --method scoped reset", () => {
 		expect(code).toBe(0);
 
 		expect(existsSync(fx.minsync)).toBe(false);
+		expect(existsSync(join(fx.workspace, ".autorag", "minsync", "legacy.bin"))).toBe(true);
 		expect(existsSync(fx.parsed)).toBe(true);
 
 		const parsed = JSON.parse(stdout[0]);
@@ -285,8 +300,71 @@ describe("runIndex --method scoped reset", () => {
 
 		expect(existsSync(fx.parsed)).toBe(false);
 		expect(existsSync(fx.minsync)).toBe(false);
+		expect(existsSync(join(fx.workspace, ".autorag", "minsync", "legacy.bin"))).toBe(true);
 
 		const parsed = JSON.parse(stdout[0]);
 		expect(parsed.removed).toEqual(["parsed", "minsync"]);
 	});
+});
+
+it("inspects actual chunk inputs with a workspace-relative tokenizer and passage prefix", async () => {
+	const workspace = join(tmpDir, "inspect-workspace");
+	const assets = join(workspace, "assets");
+	mkdirSync(assets, { recursive: true });
+	writeFileSync(
+		join(assets, "tokenizer.json"),
+		JSON.stringify({
+			version: "1.0",
+			truncation: null,
+			padding: null,
+			added_tokens: [],
+			normalizer: null,
+			pre_tokenizer: { type: "WhitespaceSplit" },
+			post_processor: null,
+			decoder: null,
+			model: { type: "WordLevel", vocab: { "[UNK]": 0 }, unk_token: "[UNK]" },
+		}),
+	);
+	writeFileSync(join(assets, "tokenizer_config.json"), JSON.stringify({ unk_token: "[UNK]" }));
+	const source = join(workspace, "policy.md");
+	const text = "# Refunds\n\nDirector approval is required before payout.";
+	writeFileSync(source, text);
+	saveMirrorIndex(workspace, {
+		version: 1,
+		entries: {
+			"/docs/policy.md": {
+				virtualPath: "/docs/policy.md",
+				sourcePath: source,
+				outputPath: source,
+				parserName: "fixture",
+				sourceMtimeNs: 0,
+				sourceSizeBytes: text.length,
+				updatedAt: "1",
+			},
+		},
+	});
+	const config = join(workspace, "config.json");
+	writeFileSync(
+		config,
+		JSON.stringify({
+			workspacePath: workspace,
+			searchPaths: [workspace],
+			localIndex: { tokenizerPath: "assets" },
+			minSync: { embedder: { passagePrefix: "passage: " } },
+		}),
+	);
+	const { ctx, stdout, stderr } = makeCtx({
+		positionals: ["inspect", "/docs/policy.md"],
+		flags: { config },
+		json: true,
+	});
+	expect(await runIndex(ctx), stderr.join("\n")).toBe(0);
+	const result = JSON.parse(stdout[0]);
+	expect(result.virtualPath).toBe("/docs/policy.md");
+	expect(result.chunks.length).toBeGreaterThan(0);
+	for (const chunk of result.chunks) {
+		expect(chunk.embeddingInput).toBe(`passage: ${chunk.embeddingText}`);
+		expect(chunk.inputTokens).toBeGreaterThan(0);
+		expect(chunk.text).toBe(text.slice(chunk.start, chunk.end));
+	}
 });

@@ -32,6 +32,8 @@ export interface MinSyncOptions {
 }
 
 export interface MinSyncSyncResult {
+	/** AutoRAG's native index report; absent for legacy datasource MinSync clients. */
+	readonly report?: import("../indexing/types.ts").IndexReport;
 	readonly ok: boolean;
 	readonly synced: number;
 	readonly workspacePath: string;

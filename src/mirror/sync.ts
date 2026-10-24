@@ -100,6 +100,8 @@ export interface ParsedMirrorSyncOptions {
 	readonly signal?: AbortSignal;
 	/** Called before each file and once more with `processed === total` when the parse phase ends. */
 	readonly onProgress?: (progress: ParsedMirrorProgress) => void;
+	/** Backpressured completion outlet. Emits every retained mirror, including unchanged/preserved entries. */
+	readonly onDocument?: (entry: ParsedMirrorEntry & { readonly parseDurationMs?: number }) => Promise<void>;
 	/**
 	 * Largest share of previously indexed documents one refresh may delete because their source
 	 * disappeared. A larger deletion (above 100 documents) is suppressed with `mass-delete-suppressed`
@@ -458,7 +460,9 @@ async function syncWithRegistry(
 			previousEntry?.sourceMtimeNs === entry.mtimeNs &&
 			previousEntry.sourceSizeBytes === entry.sizeBytes &&
 			previousEntry.parserName === parser.name &&
+			previousEntry.parserVersion === parser.version &&
 			existsSync(outputPath);
+		const parseStarted = performance.now();
 
 		if (!unchanged) {
 			// Every failure below is isolated to this one file. Only a workspace-level write failure
@@ -505,7 +509,7 @@ async function syncWithRegistry(
 							message:
 								error.cause instanceof ParseIsolationError
 									? `${PARSER_FAILURE_MESSAGE} ${error.cause.message}.`
-									: PARSER_FAILURE_MESSAGE,
+									: `${PARSER_FAILURE_MESSAGE} ${error.cause instanceof Error ? error.cause.message : error.message}`,
 						},
 						"parser-failed",
 						parser,
@@ -515,7 +519,7 @@ async function syncWithRegistry(
 					skipFile(entry, {
 						code: "parser-crashed",
 						severity: "warning",
-						message: PARSER_CRASH_MESSAGE,
+						message: `${PARSER_CRASH_MESSAGE} ${error instanceof Error ? error.message : String(error)}`,
 						...(error instanceof Error ? { reason: error.name } : {}),
 					});
 				}
@@ -560,10 +564,15 @@ async function syncWithRegistry(
 			sourcePath: entry.sourcePath,
 			outputPath,
 			parserName: parser.name,
+			parserVersion: parser.version,
 			sourceMtimeNs: entry.mtimeNs,
 			sourceSizeBytes: entry.sizeBytes,
 			updatedAt: unchanged ? (previousEntry?.updatedAt ?? new Date().toISOString()) : new Date().toISOString(),
 		};
+		await options.onDocument?.({
+			...nextEntries[entry.virtualPath],
+			parseDurationMs: unchanged ? 0 : performance.now() - parseStarted,
+		});
 		handledPrevious.add(entry.virtualPath);
 
 		if (sinceCheckpoint >= MIRROR_CHECKPOINT_EVERY) checkpoint();
@@ -624,6 +633,10 @@ async function syncWithRegistry(
 	options.onProgress?.({ processed: current.length, total: current.length, written, deleted, skipped });
 	const index: ParsedMirrorIndex = { version: 1, entries: nextEntries, skipped: nextSkipped };
 	saveMirrorIndex(options.root, index);
+	// A partial/unreliable scan preserves these sources; absence must never become an index deletion.
+	for (const [virtualPath, entry] of Object.entries(nextEntries)) {
+		if (!handledPrevious.has(virtualPath)) await options.onDocument?.(entry);
+	}
 	return {
 		scanned: current.length,
 		written,

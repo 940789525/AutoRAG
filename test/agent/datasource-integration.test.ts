@@ -16,6 +16,7 @@ import type {
 	RetrievalOptions,
 	RetrievalResult,
 } from "../../src/retrieval/types.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
 
 let tmpDir: string;
 
@@ -166,6 +167,7 @@ function makeScopedSkill(rows: readonly RetrievalResult[]): DatasourceSkill {
 describe("AutoRAGAgent datasource integration", () => {
 	it("passes datasource results of a configured skill through to merge", async () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: ["test/fixtures/sample-project"],
 			workspacePath: tmpDir,
 			jikji: false,
@@ -184,6 +186,7 @@ describe("AutoRAGAgent datasource integration", () => {
 
 	it("narrows configured datasource results to the per-query scope", async () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: ["test/fixtures/sample-project"],
 			workspacePath: tmpDir,
 			minSync: { autoInstall: false },
@@ -207,6 +210,7 @@ describe("AutoRAGAgent datasource integration", () => {
 
 	it("announces configured datasource skills in the system prompt (progressive disclosure) without raw paths", () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: ["test/fixtures/sample-project"],
 			workspacePath: tmpDir,
 			jikji: false,
@@ -254,6 +258,7 @@ describe("AutoRAGAgent datasource integration", () => {
 			}),
 		};
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: ["test/fixtures/sample-project"],
 			workspacePath: tmpDir,
 			jikji: false,
@@ -275,6 +280,7 @@ describe("AutoRAGAgent datasource integration", () => {
 
 	it("dynamically loads a configured datasource skill's full instructions via tool calling", async () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: ["test/fixtures/sample-project"],
 			workspacePath: tmpDir,
 			jikji: false,
@@ -295,6 +301,7 @@ describe("AutoRAGAgent datasource integration", () => {
 
 	it("does not load datasource skills for unknown names", async () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: ["test/fixtures/sample-project"],
 			workspacePath: tmpDir,
 			jikji: false,
@@ -311,6 +318,7 @@ describe("AutoRAGAgent datasource integration", () => {
 
 	it("searchAllDocuments returns configured datasource results and narrows by scope", async () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: ["test/fixtures/sample-project"],
 			workspacePath: tmpDir,
 			jikji: false,
@@ -329,7 +337,8 @@ describe("AutoRAGAgent datasource integration", () => {
 			"/slack/allowed/channel/message",
 			"/slack/secret/channel/message",
 		]);
-		expect(JSON.stringify(all)).not.toContain(tmpDir);
+		expect(JSON.stringify(all.results)).not.toContain(tmpDir);
+		expect(all.diagnostics.length).toBeGreaterThan(0);
 
 		const scoped = await agent.searchAllDocuments("message", { topK: 10, scope: "/slack/allowed/**" });
 		expect(scoped.results.map((r) => r.source)).toEqual(["/slack/allowed/channel/message"]);

@@ -23,7 +23,7 @@ export interface ObsidianSkillOptions {
 	readonly lastIndexedAt?: number;
 	/** Where `.autorag/datasources/obsidian/<instance>` is kept. Required to index or search. */
 	readonly workspaceRoot?: string;
-	/** The install's MinSync binary, embedder and chunking, shared with the local-file index. */
+	/** The install's embedding settings and local indexing options, shared with the local-file index. */
 	readonly minSync?: ObsidianMinSyncOptions;
 	readonly connectorOptions?: { readonly vaultPath?: string };
 }
@@ -33,7 +33,7 @@ const DEFAULT_POLLING_INTERVAL_MS = 15 * 60 * 1000;
 const DEFAULT_OBSIDIAN_TAGS = ["obsidian", "notes"] as const;
 
 /**
- * An Obsidian vault as a datasource: its markdown notes are indexed by MinSync (BM25 and
+ * An Obsidian vault as a datasource: its markdown notes are indexed by AutoRAG (BM25 and
  * semantic) in a workspace of their own, and a note's source is its vault-relative path, so a
  * folder is an ordinary `scope`.
  */
@@ -66,7 +66,7 @@ export class ObsidianSkill implements DatasourceSkill {
 			name: OBSIDIAN_DATASOURCE_ID,
 			id: OBSIDIAN_DATASOURCE_ID,
 			type: OBSIDIAN_SKILL_TYPE,
-			description: "Obsidian vault datasource, indexed by MinSync",
+			description: "Obsidian vault datasource, indexed by AutoRAG",
 			capabilities: ["notes", "polling", "lexical", "semantic", "incremental", "scoped"],
 			tags: this.tags,
 			status: "active",
@@ -153,7 +153,7 @@ export class ObsidianSkill implements DatasourceSkill {
 			content: [
 				`# Obsidian vault datasource (${OBSIDIAN_SKILL_TYPE})`,
 				"",
-				"The vault's markdown notes are indexed by MinSync in a workspace of their own, separate from the local-file index. Hidden folders (`.obsidian`, `.trash`), non-markdown attachments, and symlinks are not indexed.",
+				"The vault's markdown notes are indexed by AutoRAG in a workspace of their own, separate from the local-file index. Hidden folders (`.obsidian`, `.trash`), non-markdown attachments, and symlinks are not indexed.",
 				"",
 				"## When to use",
 				"Use this skill when the question is about Obsidian notes, vault folders, or knowledge-base content.",

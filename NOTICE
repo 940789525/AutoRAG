@@ -18,6 +18,12 @@ License: MIT
 @earendil-works/pi-tui@1.2.0
 License: MIT
 
+@huggingface/tokenizers@0.2.0
+License: Apache-2.0
+
+@lancedb/lancedb@0.40.0
+License: Apache-2.0
+
 @llblab/pi-telegram@0.57.2
 License: MIT
 
@@ -26,6 +32,9 @@ License: Apache-2.0
 
 @parcel/watcher@2.6.0
 License: MIT
+
+apache-arrow@18.1.0
+License: Apache-2.0
 
 chardet@2.2.0
 License: MIT
@@ -42,8 +51,14 @@ License: MIT
 jev-use@0.8.0
 License: MIT
 
+js-tiktoken@1.0.21
+License: MIT
+
 jszip@3.10.2
 License: (MIT OR GPL-3.0-or-later)
+
+kiwi-nlp@0.24.1
+License: Apache-2.0
 
 kordoc@4.21.30
 License: MIT

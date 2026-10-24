@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AutoRAGAgent } from "../../src/agent/agent.ts";
 import type { DatasourceIndexResult, DatasourceSkill } from "../../src/datasource/types.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
 
 let tmpDir: string;
 
@@ -63,6 +64,7 @@ const SUCCESS: DatasourceIndexResult = {
 
 function agentWith(skill: DatasourceSkill, maxRetries?: number): AutoRAGAgent {
 	return new AutoRAGAgent({
+		...nativeIndexFixture(),
 		searchPaths: ["test/fixtures/sample-project"],
 		workspacePath: tmpDir,
 		jikji: false,
@@ -91,6 +93,7 @@ describe("refresh datasource retry", () => {
 		const bad = flaky([failed("timeout a"), failed("timeout b"), failed("timeout c"), SUCCESS]);
 		const good = flaky([SUCCESS]);
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: ["test/fixtures/sample-project"],
 			workspacePath: tmpDir,
 			jikji: false,

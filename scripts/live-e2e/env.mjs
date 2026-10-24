@@ -23,7 +23,7 @@ const E2E_DIR = join(REPO_ROOT, ".autorag-e2e");
 // ── Schema version — bump when the fingerprint contract changes ──────
 
 /** @type {number} */
-export const RUNNER_SCHEMA_VERSION = 1;
+export const RUNNER_SCHEMA_VERSION = 2;
 
 // ── Environment descriptor (JSDoc types for docs, not enforced at runtime) ──
 
@@ -148,7 +148,7 @@ export function buildEnv(root) {
 		embeddingDimension: 1024,
 		embeddingService: "minsync:qwen3-embedding-0.6b",
 		parserConfig: "default",
-		minSyncConfig: "default",
+		minSyncConfig: "autorag-native-index-v1",
 	};
 
 	return {

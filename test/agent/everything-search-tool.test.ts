@@ -6,6 +6,7 @@ import { AutoRAGAgent } from "../../src/agent/agent.ts";
 import { createEverythingSearchTool, EVERYTHING_SEARCH_TOOL_NAME } from "../../src/agent/everything-search-tool.ts";
 import { buildSystemPrompt } from "../../src/agent/system-prompt.ts";
 import type { EverythingRunner, EverythingSearchRequest } from "../../src/everything/index.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
 
 const FIXTURE_DIR = "test/fixtures/sample-project";
 let tmpDir: string;
@@ -107,6 +108,7 @@ describe("system prompt Everything guidance", () => {
 
 	it("does not steer a jikji-less agent toward jikji_find in the search prompt", () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [FIXTURE_DIR],
 			workspacePath: tmpDir,
 			memoryPath: join(tmpDir, "memory.json"),
@@ -140,6 +142,7 @@ describe("AutoRAGAgent Everything wiring", () => {
 
 	function windowsAgent(options: { readonly excludePaths?: readonly string[]; readonly run?: EverythingRunner } = {}) {
 		return new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [FIXTURE_DIR],
 			excludePaths: options.excludePaths,
 			workspacePath: tmpDir,
@@ -192,6 +195,7 @@ describe("AutoRAGAgent Everything wiring", () => {
 
 	it("omits Everything on non-Windows hosts and when disabled", () => {
 		const mac = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [FIXTURE_DIR],
 			workspacePath: tmpDir,
 			memoryPath: join(tmpDir, "memory.json"),
@@ -204,6 +208,7 @@ describe("AutoRAGAgent Everything wiring", () => {
 		expect(mac.getSystemPrompt()).not.toContain("Everything");
 
 		const disabled = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [FIXTURE_DIR],
 			workspacePath: tmpDir,
 			memoryPath: join(tmpDir, "memory.json"),
@@ -225,6 +230,7 @@ describe("AutoRAGAgent Everything wiring", () => {
 	it("exits the workspace Everything instance via stopEverything", async () => {
 		const calls: string[][] = [];
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [FIXTURE_DIR],
 			workspacePath: tmpDir,
 			memoryPath: join(tmpDir, "memory.json"),
@@ -253,6 +259,7 @@ describe("AutoRAGAgent Everything wiring", () => {
 
 	it("surfaces an Everything indexing failure as a refresh error diagnostic", async () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [FIXTURE_DIR],
 			workspacePath: tmpDir,
 			memoryPath: join(tmpDir, "memory.json"),

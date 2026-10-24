@@ -13,6 +13,7 @@ const STDERR_LIMIT = 4_000;
 const STOP_TIMEOUT_MS = 15_000;
 
 export interface MinSyncDaemon {
+	readonly maxInputTokens?: number;
 	/** `http://127.0.0.1:<port>`; the OpenAI route lives under `/v1`, TEI at `/embed`. */
 	readonly baseUrl: string;
 	readonly model: string;
@@ -53,6 +54,7 @@ export function minSyncServeStateRoot(home: string = resolveUserHome()): string 
 }
 
 interface Health {
+	readonly max_length?: number;
 	readonly status?: string;
 	readonly model_id?: string;
 	readonly dimension?: number;
@@ -81,11 +83,14 @@ export async function probeMinSyncDaemon(options: ProbeOptions = {}): Promise<Mi
 			if (!response.ok) continue;
 			const health = (await response.json()) as Health;
 			if (health.status !== "ok" || health.model_id?.toLowerCase() !== wanted.toLowerCase()) continue;
-			if (typeof health.dimension !== "number") continue;
+			if (!Number.isInteger(health.dimension) || health.dimension! <= 0) continue;
+			if (health.max_length !== undefined && (!Number.isInteger(health.max_length) || health.max_length <= 0))
+				continue;
 			return {
+				maxInputTokens: health.max_length,
 				baseUrl,
 				model: health.model_id,
-				dimension: health.dimension,
+				dimension: health.dimension!,
 				instance: health.instance ?? instance,
 				started: false,
 				...(typeof health.pid === "number" ? { pid: health.pid } : {}),

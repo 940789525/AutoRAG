@@ -33,6 +33,7 @@ import {
 import type { MinSyncEmbedderConfig } from "../../src/minsync/types.ts";
 import { saveMirrorIndex } from "../../src/mirror/index.ts";
 import { RetrievalEngine } from "../../src/retrieval/engine.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
 
 let root: string;
 let source: string;
@@ -528,7 +529,7 @@ describe("MinSyncVectorMethod", () => {
 		}
 	});
 
-	it("reports staging exclusions through refresh diagnostics instead of dropping them silently", async () => {
+	it("indexes filenames that needed exclusion from the legacy MinSync staging format", async () => {
 		// Given: a file name that cannot become a canonical source id (a POSIX
 		// backslash) — parseable, but not representable as a virtual id.
 		// Windows reserves the backslash as a path separator, so such a file
@@ -538,6 +539,7 @@ describe("MinSyncVectorMethod", () => {
 		writeFileSync(join(source, trickyName), "raw policy source\n");
 		writeFakeMinSync(JSON.stringify({ results: [] }));
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [source],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -550,9 +552,13 @@ describe("MinSyncVectorMethod", () => {
 		// When
 		const result = await agent.refresh(false, { methods: ["minsync"] });
 
-		// Then: the excluded document is named in the refresh diagnostics.
+		// The native store accepts this source identity without a MinSync staging conversion.
 		const excluded = result.diagnostics.filter((diagnostic) => diagnostic.code === "minsync-staging-excluded");
-		expect(excluded.map((diagnostic) => diagnostic.source)).toEqual(["/docs/policy\\note.txt"]);
+		expect(excluded).toEqual([]);
+		expect(result.minsync?.report?.backend).toBe("autorag");
+		expect(
+			(await agent.retrieve("policy", { topK: 10 })).some((hit) => hit.source === join(source, trickyName)),
+		).toBe(true);
 	});
 
 	it("ignores traversal entries in a corrupt staging state", async () => {
@@ -1884,6 +1890,7 @@ describe("MinSync lexical (BM25) tokenizer", () => {
 
 	function agentWith(languages?: readonly ("ko" | "en" | "ja")[]): AutoRAGAgent {
 		return new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [source],
 			memoryPath: join(root, "memory.json"),
 			workspacePath: root,
@@ -1909,15 +1916,13 @@ describe("MinSync lexical (BM25) tokenizer", () => {
 		expect(result.lexicalFallback).toBeUndefined();
 	});
 
-	it("uses the multilingual tokenizer whatever languages the agent is configured with", async () => {
+	it("uses the native local index whatever languages the agent is configured with", async () => {
 		writeFakeMinSync(JSON.stringify({ results: [] }));
-		await agentWith().refresh(false, { methods: ["minsync"] });
-		expect(languageFlag(callArgs("init"))).toBe("multilingual");
-
-		rmSync(join(minsyncWorkspace, ".minsync"), { recursive: true, force: true });
-		rmSync(logPath);
-		await agentWith(["en"]).refresh(false, { methods: ["minsync"] });
-		expect(languageFlag(callArgs("init"))).toBe("multilingual");
+		for (const languages of [undefined, ["en"] as const]) {
+			const result = await agentWith(languages).refresh(false, { methods: ["minsync"] });
+			expect(result.minsync?.report?.backend).toBe("autorag");
+		}
+		expect(existsSync(logPath)).toBe(false);
 	});
 
 	it("falls back to whitespace tokenization when the Kiwi library the tokenizer needs is missing", async () => {
@@ -1942,15 +1947,12 @@ describe("MinSync lexical (BM25) tokenizer", () => {
 		expect(result.lexicalFallback).toBeUndefined();
 	});
 
-	it("reports the fallback as a refresh warning naming what to install", async () => {
+	it("does not depend on the legacy Kiwi native-library discovery during native refresh", async () => {
 		vi.stubEnv("KIWI_LIBRARY_PATH", join(root, "no-such-libkiwi"));
-		writeFakeMinSync(JSON.stringify({ results: [] }));
-
-		const refresh = await agentWith().refresh(false, { methods: ["minsync"] });
-
-		const warning = refresh.diagnostics.find((diagnostic) => diagnostic.code === "lexical-tokenizer-unavailable");
-		expect(warning).toMatchObject({ severity: "warning", source: "minsync" });
-		expect(warning?.message).toContain("KIWI_LIBRARY_PATH");
+		const result = await agentWith().refresh(false, { methods: ["minsync"] });
+		expect(result.minsync?.report?.backend).toBe("autorag");
+		expect(result.diagnostics.some((diagnostic) => diagnostic.code === "lexical-tokenizer-unavailable")).toBe(false);
+		expect(existsSync(logPath)).toBe(false);
 	});
 
 	it("points an existing workspace at the multilingual tokenizer without re-initializing it", async () => {

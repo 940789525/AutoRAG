@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AutoRAGAgent } from "../../src/agent/agent.ts";
 import type { ParsedMirrorSyncResult } from "../../src/mirror/sync.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
 
 const FIXTURE_DIR = "test/fixtures/sample-project";
 const fakeSummary: ParsedMirrorSyncResult = {
@@ -22,6 +23,7 @@ beforeEach(() => {
 	vi.useFakeTimers();
 	tmpDir = mkdtempSync(join(tmpdir(), "autorag-auto-refresh-test-"));
 	agent = new AutoRAGAgent({
+		...nativeIndexFixture(),
 		searchPaths: [FIXTURE_DIR],
 		memoryPath: join(tmpDir, "memory.json"),
 		workspacePath: tmpDir,
@@ -138,17 +140,15 @@ describe("AutoRAGAgent auto-refresh scheduler", () => {
 		start.mockRestore();
 	});
 	it("captures a background refresh failure in getRefreshStatus instead of swallowing it (#22)", async () => {
+		vi.useRealTimers();
 		// Let the real refresh() run its status lifecycle, but force a step to fail.
 		vi.spyOn(agent, "syncParsedMirrors").mockRejectedValue(new Error("boom /Users/secret"));
-		agent.startAutoRefresh(1000);
-
-		await vi.advanceTimersByTimeAsync(1000);
-		// Give the swallowed rejection a tick to settle.
-		await Promise.resolve();
+		agent.startAutoRefresh(1000, { immediate: true });
+		await vi.waitFor(async () => expect((await agent.getRefreshStatus()).state).toBe("failed"));
 
 		const status = await agent.getRefreshStatus();
 		expect(status.state).toBe("failed");
 		expect(status.lastError).toBeDefined();
-		expect(status.lastError).not.toContain("/Users/");
+		expect(status.lastError).toContain("/Users/");
 	});
 });

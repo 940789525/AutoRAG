@@ -33,6 +33,7 @@ import { discrawlEmbeddingRuntimeFor } from "../datasource/skills/discrawl/embed
 import { buildDatasourceSkills, type DatasourcesConfig } from "../datasource/skills/factory.ts";
 import { createEmbedderFromConfig } from "../embedding/index.ts";
 import { acquireFileLock, type FileLockHandle } from "../filesystem/file-lock.ts";
+import { type LocalIndexConfig, normalizeLocalIndex } from "../indexing/config.ts";
 import { LanguageError, type LanguageTag, normalizeLanguages } from "../language.ts";
 import type { EnsureMinSyncBinaryOptions, MinSyncEmbedderConfig } from "../minsync/index.ts";
 import {
@@ -196,6 +197,7 @@ export interface CliConfig {
 	languages?: string[];
 	model?: AgentModelConfig;
 	minSync?: MinSyncMethodConfig;
+	localIndex?: LocalIndexConfig;
 	jikji?: Record<string, unknown> | false;
 	/** Windows-only bundled Everything file-name search. Default enabled on Windows; `false` disables. */
 	everything?: { enabled?: boolean; timeoutMs?: number; startupTimeoutMs?: number; indexTimeoutMs?: number } | false;
@@ -1010,6 +1012,22 @@ export function resolveConfig(input: ResolveConfigInput): CliConfig {
 		throw new ConfigError("Config field 'excludeExactDuplicates' must be a boolean");
 	}
 	config.excludeExactDuplicates = file.excludeExactDuplicates ?? true;
+	try {
+		config.localIndex = normalizeLocalIndex(file.localIndex);
+		if (flags.debug === true) config.localIndex = { ...config.localIndex, debug: true };
+		if (config.localIndex?.tokenizerPath)
+			config.localIndex = {
+				...config.localIndex,
+				tokenizerPath: resolve(config.workspacePath, config.localIndex.tokenizerPath),
+			};
+		if (config.localIndex?.koreanModelPath)
+			config.localIndex = {
+				...config.localIndex,
+				koreanModelPath: resolve(config.workspacePath, config.localIndex.koreanModelPath),
+			};
+	} catch (error) {
+		throw new ConfigError(error instanceof Error ? error.message : String(error));
+	}
 	if (file.datasources !== undefined) {
 		if (typeof file.datasources !== "object" || file.datasources === null || Array.isArray(file.datasources)) {
 			throw new ConfigError("Config field 'datasources' must be an object mapping skill names to their config");
@@ -1390,12 +1408,30 @@ export function buildAgentOptions(config: CliConfig, agentDir?: string): Omit<Au
 	// remote endpoint) decides where all of AutoRAG's text is embedded.
 	const embedder = createEmbedderFromConfig({ embedder: config.minSync?.embedder });
 	opts.embedder = embedder;
+	const localEmbedder = config.minSync?.embedder;
+	let localIndexOptions: AutoRAGAgentOptions["localIndex"] = config.localIndex;
+	if (
+		localEmbedder?.baseUrl === undefined &&
+		(localEmbedder?.id === undefined || localEmbedder.id.startsWith("native:"))
+	) {
+		localIndexOptions = {
+			...config.localIndex,
+			identity: {
+				provider: "minsync",
+				model: localEmbedder?.id?.slice("native:".length) ?? "Qwen/Qwen3-Embedding-0.6B",
+				dimension: localEmbedder?.dimension ?? 1024,
+			},
+		};
+	}
+	opts.localIndex = localIndexOptions;
 	if (config.datasources !== undefined) {
 		const { skills, unknown } = buildDatasourceSkills(config.datasources, config.workspacePath, {
 			embedder,
 			discrawl: async () => discrawlEmbeddingRuntimeFor(await embedder.describeEndpoint()),
 			cliEndpoint: embeddingEndpointSource(embedder),
 			minSync: {
+				sharedEmbedder: embedder,
+				localIndex: localIndexOptions,
 				...(config.minSync?.autoInstall === undefined ? {} : { autoInstall: config.minSync.autoInstall }),
 				...(config.minSync?.installer === undefined ? {} : { installer: config.minSync.installer }),
 				...(config.minSync?.embedder === undefined ? {} : { embedder: config.minSync.embedder }),
@@ -2056,6 +2092,7 @@ export function writeDefaultConfig(
 	full.jikji = partial.jikji ?? {};
 	full.dupey = partial.dupey ?? { enabled: true };
 	full.excludeExactDuplicates = partial.excludeExactDuplicates ?? true;
+	full.localIndex = normalizeLocalIndex(partial.localIndex);
 	if (partial.excludePaths !== undefined) full.excludePaths = resolveExcludePaths(partial.excludePaths, workspacePath);
 	if (partial.limits !== undefined) full.limits = normalizeLimitsConfig(partial.limits);
 	if (partial.refresh !== undefined) full.refresh = normalizeRefreshConfig(partial.refresh);

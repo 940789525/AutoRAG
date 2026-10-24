@@ -22,7 +22,7 @@ export function buildLiveStackOptions(root, workspace) {
 		// trigger a jikji/cargo install mid-run: the corpus root is immutable.
 		jikji: false,
 		// AutoRAG owns no embedding model. MinSync's native Qwen3 does the embedding: through a running
-		// `minsync serve` daemon when one answers (refresh starts one), in-process otherwise.
+		// `minsync serve` daemon started by this runner, in-process otherwise.
 		minSync: {
 			workspacePath: resolve(workspace),
 			autoInstall: true,
@@ -33,7 +33,7 @@ export function buildLiveStackOptions(root, workspace) {
 export function assertAbsoluteReadableSource(source) { if (!isAbsolute(source)) throw new Error("source-not-absolute"); accessSync(source, constants.R_OK); return realpathSync(source); }
 
 /**
- * `minsync query --mode bm25 --format json` for a bare Korean stem. The fixture only contains suffixed forms of the
+ * Native LanceDB BM25 retrieval for a bare Korean stem. The fixture only contains suffixed forms of the
  * stem (인증서를, 인증서는), so a whitespace-only tokenizer finds nothing; reaching the fixture proves the Korean
  * analyzer was applied to the index the agent built.
  */
@@ -182,14 +182,20 @@ async function startMinSyncDaemon(env) {
 	const reportPath = join(E2E_DIR, "daemon-ready.json");
 	rmSync(reportPath, { force: true });
 	const out = openSync(reportPath, "w");
-	const child = spawn("minsync", ["serve", "--format", "json", "--idle-timeout", "0"], { env, stdio: ["ignore", out, "ignore"], detached: true });
+	const stderrPath = join(E2E_DIR, "daemon-stderr.log");
+	const err = openSync(stderrPath, "w");
+	const child = spawn("minsync", ["serve", "--format", "json", "--idle-timeout", "0"], { env, stdio: ["ignore", out, err], detached: true });
+	closeSync(err);
 	child.unref();
 	closeSync(out);
 	const deadline = Date.now() + 600_000;
 	let exited;
+	let spawnError;
+	child.once("error", (error) => { spawnError = error; });
 	child.once("exit", (code) => { exited = code; });
 	while (Date.now() < deadline) {
-		if (exited !== undefined) throw new Error(`live-e2e-daemon-exited:${exited}`);
+		if (spawnError) throw spawnError;
+		if (exited !== undefined) throw new Error(`live-e2e-daemon-exited:${exited}: ${readFileSync(stderrPath, "utf8")}`);
 		for (const line of readFileSync(reportPath, "utf8").split("\n")) {
 			try {
 				const event = JSON.parse(line);
@@ -199,7 +205,7 @@ async function startMinSyncDaemon(env) {
 		await new Promise((resolve) => setTimeout(resolve, 200));
 	}
 	child.kill("SIGTERM");
-	throw new Error("live-e2e-daemon-readiness-timeout");
+	throw new Error(`live-e2e-daemon-readiness-timeout: ${readFileSync(stderrPath, "utf8")}`);
 }
 function finish(evidence, diagnostic, evidencePath, exitCode) { if (diagnostic && !evidence.diagnostics.includes(diagnostic)) evidence.diagnostics.push(diagnostic); evidence.finishedAt = new Date().toISOString(); evidence.exitCode = exitCode; writeFileSync(join(evidencePath, "result.json"), `${JSON.stringify(evidence, null, 2)}\n`); const taskEvidencePath = join(REPO_ROOT, ".omo", "evidence", "task-6-fixed-live-e2e-environment.json"); mkdirSync(join(REPO_ROOT, ".omo", "evidence"), { recursive: true }); writeFileSync(taskEvidencePath, `${JSON.stringify({ ...evidence, task: "6", scenario: "fixed-live-e2e-environment", cleanupReceipt: "runner lock released; native stores untouched" }, null, 2)}\n`); return { ...evidence, evidencePath }; }
 export { REPO_ROOT };

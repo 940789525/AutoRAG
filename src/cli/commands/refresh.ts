@@ -15,15 +15,22 @@ import type { CommandContext } from "./types.ts";
 export async function runRefresh(ctx: CommandContext): Promise<number> {
 	try {
 		const config = resolveConfig({ flags: ctx.flags, cwd: ctx.cwd });
-		const agent = new AutoRAGAgent(buildAgentOptions(config));
+		const agentOptions = buildAgentOptions(config);
+		const agent = new AutoRAGAgent({
+			...agentOptions,
+			localIndex: { ...agentOptions.localIndex, debug: ctx.debug || agentOptions.localIndex?.debug },
+		});
 		const methods = parseMethodFlag(ctx.flags.method);
 		const options = {
+			onIndexEvent: ctx.debug
+				? (event: import("../../indexing/types.ts").IndexEvent) => ctx.stderr(JSON.stringify(event))
+				: undefined,
 			...(methods ? { methods } : {}),
 			...(ctx.flags["retry-failed"] === true ? { retrySkipped: true } : {}),
 		};
 		const result = await agent.refresh(ctx.flags.force === true, options);
 		ctx.stdout(renderRefresh(result, { json: ctx.json, debug: ctx.debug }));
-		return 0;
+		return result.minsync?.ok === false ? 1 : 0;
 	} catch (error) {
 		ctx.stderr(renderError(error, { json: ctx.json, debug: ctx.debug }));
 		return error instanceof ConfigError ? 2 : 1;
@@ -44,6 +51,7 @@ export function parseMethodFlag(flag: string | boolean | undefined): readonly Re
 	const entries = raw
 		.split(",")
 		.map((entry) => entry.trim().toLowerCase())
+		.map((entry) => (entry === "local" ? "minsync" : entry))
 		.filter((entry) => entry.length > 0);
 	if (entries.length === 0) return undefined;
 	const valid = new Set<string>(ALL_METHOD_NAMES);

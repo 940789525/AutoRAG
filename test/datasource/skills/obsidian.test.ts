@@ -17,17 +17,15 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ObsidianSkill } from "../../../src/datasource/skills/obsidian/index.ts";
 import type { RetrievalMethod } from "../../../src/retrieval/types.ts";
-import { type FakeMinSync, installFakeMinSync } from "../../fixtures/fake-minsync.ts";
+import { nativeIndexFixture } from "../../helpers/native-index.ts";
 
 let root: string;
 let vault: string;
-let fake: FakeMinSync;
 
 beforeEach(() => {
 	root = realpathSync(mkdtempSync(join(tmpdir(), "autorag-obsidian-")));
 	vault = join(root, "vault");
 	mkdirSync(vault, { recursive: true });
-	fake = installFakeMinSync(join(root, "bin"));
 });
 
 afterEach(() => {
@@ -45,7 +43,7 @@ function makeSkill(options: { readonly instanceId?: string } = {}): ObsidianSkil
 		instanceId: options.instanceId ?? "vault-1",
 		vaultPath: vault,
 		workspaceRoot: root,
-		minSync: { binaryPath: fake.binaryPath, autoInstall: false },
+		minSync: { sharedEmbedder: nativeIndexFixture().embedder, localIndex: nativeIndexFixture().localIndex },
 	});
 }
 
@@ -79,7 +77,7 @@ function minsyncCalls(): { args: string[]; cwd: string }[] {
 		: [];
 }
 
-describe("ObsidianSkill indexing through MinSync", () => {
+describe("ObsidianSkill indexing through the native AutoRAG pipeline", () => {
 	it("stages only markdown notes into its own MinSync workspace and leaves the vault untouched", async () => {
 		note("Projects/Roadmap.md", "# Roadmap\nThe mobile app beta launches in October.");
 		note("Daily/2026-10-01.markdown", "# Daily\nRead about postgres.");
@@ -95,8 +93,8 @@ describe("ObsidianSkill indexing through MinSync", () => {
 
 		expect(result).toMatchObject({ ok: true, instanceId: "vault-1", skill: "obsidian", chunkCount: 2 });
 		expect(stagedFiles().sort()).toEqual(["Daily/2026-10-01.markdown", "Projects/Roadmap.md"]);
-		expect(minsyncCalls().map((call) => call.args[0])).toEqual(expect.arrayContaining(["init", "check", "sync"]));
-		expect(new Set(minsyncCalls().map((call) => call.cwd))).toEqual(new Set([workspace()]));
+		expect(minsyncCalls()).toEqual([]);
+		expect(existsSync(join(workspace(), ".autorag", "local-index", "ready.json"))).toBe(true);
 		expect(readdirSync(vault, { recursive: true }).sort()).toEqual(before);
 	});
 
@@ -166,29 +164,42 @@ describe("ObsidianSkill indexing through MinSync", () => {
 		}
 	});
 
-	it("reports a missing minsync binary as an unavailable datasource instead of throwing", async () => {
+	it("indexes without a MinSync binary", async () => {
 		note("Projects/Roadmap.md", "# Roadmap");
+		const fixture = nativeIndexFixture();
 		const skill = new ObsidianSkill({
 			instanceId: "vault-1",
 			vaultPath: vault,
 			workspaceRoot: root,
-			minSync: { binaryPath: join(root, "no-such-minsync"), autoInstall: false },
+			minSync: {
+				binaryPath: join(root, "missing"),
+				autoInstall: false,
+				sharedEmbedder: fixture.embedder,
+				localIndex: fixture.localIndex,
+			},
 		});
-
-		const result = await skill.index();
-
-		expect(result).toMatchObject({ ok: false, code: "datasource-unavailable" });
-		expect(result.diagnostics[0]?.message).toContain("minsync");
+		expect((await skill.index()).ok).toBe(true);
 	});
-
-	it("reports a failing MinSync sync with MinSync's own reason", async () => {
+	it("reports the underlying native embedding error", async () => {
 		note("Projects/Roadmap.md", "# Roadmap");
-		fake.breakSync();
-
-		const result = await makeSkill().index();
-
+		const fixture = nativeIndexFixture();
+		const skill = new ObsidianSkill({
+			instanceId: "vault-1",
+			vaultPath: vault,
+			workspaceRoot: root,
+			minSync: {
+				sharedEmbedder: {
+					...fixture.embedder!,
+					embed: async () => {
+						throw new Error("provider boom");
+					},
+				},
+				localIndex: fixture.localIndex,
+			},
+		});
+		const result = await skill.index();
 		expect(result).toMatchObject({ ok: false, code: "datasource-index-failed" });
-		expect(result.diagnostics[0]?.message).toContain("boom");
+		expect(result.diagnostics[0]?.message).toContain("provider boom");
 	});
 
 	it("fails clearly when no vaultPath is configured", async () => {
@@ -270,16 +281,14 @@ describe("ObsidianSkill retrieval", () => {
 		expect(scoped.map((hit) => hit.source)).toEqual(["/obsidian/vault-1/Daily/2026-10-01.md"]);
 	});
 
-	it("queries MinSync in the mode each method names, against its own workspace", async () => {
+	it("queries native BM25 and vectors without invoking the MinSync CLI", async () => {
 		const skill = makeSkill();
 		await skill.index();
 
 		await method(skill, "obsidian-bm25").retrieve("mobile", { topK: 4 });
 		await method(skill, "obsidian-semantic").retrieve("mobile", { topK: 4 });
 
-		const queries = minsyncCalls().filter((call) => call.args[0] === "query");
-		expect(queries.map((call) => call.args[call.args.indexOf("--mode") + 1])).toEqual(["bm25", "vector"]);
-		expect(new Set(queries.map((call) => call.cwd))).toEqual(new Set([workspace()]));
+		expect(minsyncCalls()).toEqual([]);
 		expect(method(skill, "obsidian-bm25").describe()).toMatchObject({
 			type: "bm25",
 			datasourceId: "obsidian",

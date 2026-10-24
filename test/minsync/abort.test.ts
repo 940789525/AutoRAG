@@ -3,7 +3,6 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, wr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { AutoRAGAgent } from "../../src/agent/agent.ts";
 import { MinSyncClient, MinSyncVectorMethod, minSyncConfigPath } from "../../src/minsync/index.ts";
 import { spawnProcess } from "../../src/minsync/process.ts";
 
@@ -282,83 +281,6 @@ process.exit(6);
 		const result = await new MinSyncClient({ binaryPath: binary, workspacePath: workspace }).sync();
 
 		expect(result).toMatchObject({ ok: false, reason: "sync-failed" });
-	});
-});
-
-posixOnly("refresh cancellation", () => {
-	it("stops a running minsync sync when the refresh signal aborts", async () => {
-		writeHangingSyncBinary();
-		const agent = new AutoRAGAgent({
-			searchPaths: [join(root, "docs")],
-			memoryPath: join(root, "memory.json"),
-			workspacePath: root,
-			minSync: { binaryPath: binary, autoInstall: false },
-			jikji: false,
-			fsearch: false,
-		});
-		const controller = new AbortController();
-
-		const refreshing = agent.refresh(false, { methods: ["minsync"], signal: controller.signal });
-		const pid = await descendantPid();
-		controller.abort();
-
-		await expect(refreshing).rejects.toThrow(/aborted/i);
-		await expectDead(pid);
-	});
-
-	it("surfaces a held lock through refresh diagnostics as minsync-lock-held", async () => {
-		writeLockHeldBinary();
-		const agent = new AutoRAGAgent({
-			searchPaths: [join(root, "docs")],
-			memoryPath: join(root, "memory.json"),
-			workspacePath: root,
-			minSync: { binaryPath: binary, autoInstall: false },
-			jikji: false,
-			fsearch: false,
-		});
-
-		const result = await agent.refresh(false, { methods: ["minsync"] });
-
-		expect(result.minsync).toMatchObject({ ok: false });
-		const codes = result.diagnostics.map((diagnostic) => diagnostic.code);
-		expect(codes).toContain("minsync-lock-held");
-		expect(codes).not.toContain("minsync-sync-failed");
-	});
-
-	it("reports a partial MinSync sync as ok with one minsync-file-skipped warning per skipped file", async () => {
-		writeFileSync(
-			binary,
-			`#!/usr/bin/env node
-import { mkdirSync, writeFileSync } from "node:fs";
-const args = process.argv.slice(2);
-if (args[0] === "init") {
-  mkdirSync(".minsync", { recursive: true });
-  writeFileSync(".minsync/config.toml", "[embedder]\\nid = \\"openai\\"\\n");
-  process.exit(0);
-}
-if (args[0] === "check") { console.log(JSON.stringify({ vectorstore_ok: true, embedder_ok: true })); process.exit(0); }
-writeFileSync(".minsync/cursor.json", "{}");
-console.log(JSON.stringify({ files_processed: 1, partial: true, files_failed: [{ path: "files/docs/a.txt.md", stage: "read", error: "Permission denied" }] }));
-process.exit(6);
-`,
-		);
-		chmodSync(binary, 0o755);
-		const agent = new AutoRAGAgent({
-			searchPaths: [join(root, "docs")],
-			memoryPath: join(root, "memory.json"),
-			workspacePath: root,
-			jikji: false,
-			everything: false,
-			minSync: { binaryPath: binary, autoInstall: false, embedder: { id: "native:Qwen/Qwen3-Embedding-0.6B" } },
-			fsearch: false,
-		});
-
-		const result = await agent.refresh(false, { methods: ["minsync"] });
-
-		expect(result.minsync).toMatchObject({ ok: true });
-		const skipped = result.diagnostics.filter((diagnostic) => diagnostic.code === "minsync-file-skipped");
-		expect(skipped).toEqual([expect.objectContaining({ severity: "warning", source: "files/docs/a.txt.md" })]);
-		expect(result.diagnostics.map((diagnostic) => diagnostic.code)).not.toContain("minsync-sync-failed");
 	});
 });
 

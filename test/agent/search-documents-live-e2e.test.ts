@@ -26,6 +26,7 @@ import type {
 	RetrievalResult,
 } from "../../src/retrieval/types.ts";
 import { writeFakeMinSync } from "../helpers/fake-minsync.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
 import { storedEvidence } from "../helpers/stored-evidence.ts";
 
 let root: string;
@@ -218,6 +219,7 @@ describe("AutoRAGAgent live single-agent searchDocuments e2e", () => {
 			finalAnswerStep(realpathSync(join(docs, "q3.txt")), "/kakao/acct-1/chunks/refund-policy"),
 		);
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			model,
 			searchPaths: [docs],
 			memoryPath: join(root, "memory.json"),

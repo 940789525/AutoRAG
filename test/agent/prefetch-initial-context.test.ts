@@ -17,6 +17,7 @@ import { registerFauxProvider } from "@earendil-works/pi-ai/compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AutoRAGAgent } from "../../src/agent/agent.ts";
 import { writeFakeMinSync } from "../helpers/fake-minsync.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
 
 let root: string;
 let docs: string;
@@ -108,6 +109,7 @@ describe("AutoRAGAgent prefetchInitialRetrievalContext", () => {
 		const source = realpathSync(join(docs, "refund-policy.txt"));
 		const prompts: string[] = [];
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			model: emitModel((text) => prompts.push(text)),
 			searchPaths: [docs],
 			workspacePath: root,
@@ -142,6 +144,7 @@ console.log(JSON.stringify(process.argv[2] === "find"
 		chmodSync(join(root, "fake-jikji.mjs"), 0o755);
 		writeFakeMinSync(join(root, "fake-minsync.mjs"), minSyncLog);
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			model: emitModel(),
 			searchPaths: [docs],
 			workspacePath: root,
@@ -182,6 +185,7 @@ console.log(JSON.stringify({ prepared: true }));
 		mkdirSync(second, { recursive: true });
 		writeFileSync(join(second, "memo.txt"), "memo\n");
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: [docs, second],
 			workspacePath: root,
 			memoryPath: join(root, "memory.json"),
@@ -191,17 +195,11 @@ console.log(JSON.stringify({ prepared: true }));
 			fsearch: false,
 		});
 
-		await agent.refresh(false);
-		await agent.refresh(false);
-
-		const syncs = readFileSync(minSyncLog, "utf8")
-			.trim()
-			.split("\n")
-			.map((line) => (JSON.parse(line) as { args: string[] }).args)
-			.filter((args) => args[0] === "sync");
-		expect(syncs).toHaveLength(2);
-		// The first refresh builds the index; the second only syncs changes.
-		expect(syncs[1]).not.toContain("--full");
+		const first = await agent.refresh(false);
+		const secondRefresh = await agent.refresh(false);
+		expect(first.minsync?.report?.embedded).toBeGreaterThan(0);
+		expect(secondRefresh.minsync?.report).toMatchObject({ ok: true, embedded: 0, unchanged: 2 });
+		expect(existsSync(minSyncLog)).toBe(false);
 		const prepares = readFileSync(jikjiLog, "utf8").trim().split("\n");
 		expect(prepares.filter((line) => line.startsWith("prepare"))).toHaveLength(4);
 		expect(new Set(prepares.map((line) => line.split(" ")[1]))).toEqual(
@@ -212,6 +210,7 @@ console.log(JSON.stringify({ prepared: true }));
 		// CDC chunking can surface the same (source, content) pair more than once.
 		// Deduplication must drop only the repeat, never the whole candidate set.
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			model: emitModel(),
 			searchPaths: [docs],
 			workspacePath: root,
@@ -250,6 +249,7 @@ console.log(JSON.stringify({ prepared: true }));
 
 	it("keeps a full-length chunk instead of truncating it to a fixed character budget", async () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			model: emitModel(),
 			searchPaths: [docs],
 			workspacePath: root,
@@ -282,6 +282,7 @@ console.log(JSON.stringify({ prepared: true }));
 
 	it("still emits structured results when Jikji prefetch throws", async () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			model: emitModel(),
 			searchPaths: [docs],
 			workspacePath: root,

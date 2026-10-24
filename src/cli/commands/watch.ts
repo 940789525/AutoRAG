@@ -27,7 +27,7 @@ export async function runWatch(ctx: CommandContext): Promise<number> {
 		if (once) {
 			const result = await agent.refresh(force);
 			ctx.stdout(renderRefresh(result, { json: ctx.json, debug: ctx.debug }));
-			return 0;
+			return result.minsync?.ok === false ? 1 : 0;
 		}
 
 		const debounceMs = parsePositiveInt(ctx.flags["debounce-ms"], 1500);

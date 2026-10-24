@@ -11,8 +11,8 @@ import { buildDatasourceSkills } from "../../src/datasource/skills/factory.ts";
 import { GitHubSkill } from "../../src/datasource/skills/github/index.ts";
 import { RssSkill } from "../../src/datasource/skills/rss/index.ts";
 import { SlackSkill } from "../../src/datasource/skills/slack/index.ts";
-import { installFakeMinSync } from "../fixtures/fake-minsync.ts";
 import { createMockFetch } from "../fixtures/mock-fetch.ts";
+import { createTestEmbedder, nativeIndexFixture } from "../helpers/native-index.ts";
 
 let tmpDir: string;
 
@@ -90,6 +90,7 @@ function githubSkill(): GitHubSkill {
 describe("AutoRAGAgent with connector-backed datasource skills", () => {
 	it("indexes during refresh and searches each connection through its own generated tool", async () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: ["test/fixtures/sample-project"],
 			workspacePath: tmpDir,
 			minSync: { autoInstall: false },
@@ -120,6 +121,7 @@ describe("AutoRAGAgent with connector-backed datasource skills", () => {
 
 	it("announces configured connector skills in the system prompt and loads them on demand", async () => {
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: ["test/fixtures/sample-project"],
 			workspacePath: tmpDir,
 			minSync: { autoInstall: false },
@@ -145,6 +147,7 @@ describe("AutoRAGAgent with connector-backed datasource skills", () => {
 			client: slackClient(true),
 		});
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: ["test/fixtures/sample-project"],
 			workspacePath: tmpDir,
 			minSync: { autoInstall: false },
@@ -161,7 +164,7 @@ describe("AutoRAGAgent with connector-backed datasource skills", () => {
 		expect(serialized).not.toContain(tmpDir);
 	});
 
-	it("indexes a factory-built Obsidian vault through MinSync and filters a folder through the agent", async () => {
+	it("indexes a factory-built Obsidian vault through the native index and filters a folder through the agent", async () => {
 		const vault = join(tmpDir, "vault");
 		mkdirSync(join(vault, "Decisions"), { recursive: true });
 		mkdirSync(join(vault, "Daily"), { recursive: true });
@@ -170,18 +173,18 @@ describe("AutoRAGAgent with connector-backed datasource skills", () => {
 			"# Decisions\nWe chose Postgres over MySQL for the core database.",
 		);
 		writeFileSync(join(vault, "Daily", "2026-10-01.md"), "# Daily\nRead about Postgres vacuum tuning.");
-		const fake = installFakeMinSync(join(tmpDir, "bin"));
 
 		const { skills, unknown } = buildDatasourceSkills(
 			{ obsidian: { instanceId: "vault-1", connector: { vaultPath: vault } }, slack: false },
 			tmpDir,
-			{ minSync: { binaryPath: fake.binaryPath, autoInstall: false } },
+			{ minSync: { sharedEmbedder: nativeIndexFixture().embedder, localIndex: nativeIndexFixture().localIndex } },
 		);
 		expect(unknown).toEqual([]);
 		expect(skills.map((skill) => skill.describe().name)).toEqual(["obsidian"]);
 		expect(skills[0]?.describe().requiresExternalCli).toBeUndefined();
 
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: ["test/fixtures/sample-project"],
 			workspacePath: tmpDir,
 			minSync: { autoInstall: false },
@@ -196,7 +199,7 @@ describe("AutoRAGAgent with connector-backed datasource skills", () => {
 		});
 
 		const everywhere = await agent.searchSingleDatasourceDocuments("obsidian", "postgres");
-		expect(everywhere.results.map((result) => result.source).sort()).toEqual([
+		expect([...new Set(everywhere.results.map((result) => result.source))].sort()).toEqual([
 			"/obsidian/vault-1/Daily/2026-10-01.md",
 			"/obsidian/vault-1/Decisions/database.md",
 		]);
@@ -204,18 +207,19 @@ describe("AutoRAGAgent with connector-backed datasource skills", () => {
 		const decisions = await agent.searchSingleDatasourceDocuments("obsidian", "postgres", {
 			scope: "/obsidian/vault-1/Decisions",
 		});
-		expect(decisions.results.map((result) => result.source)).toEqual(["/obsidian/vault-1/Decisions/database.md"]);
+		expect([...new Set(decisions.results.map((result) => result.source))]).toEqual([
+			"/obsidian/vault-1/Decisions/database.md",
+		]);
 		expect(decisions.results[0]?.metadata.path).toBe(join(vault, "Decisions", "database.md"));
 	});
 
-	it("serves two vaults and an aliased connection from separate MinSync workspaces", async () => {
+	it("serves two vaults and an aliased connection from separate native indexes", async () => {
 		const work = join(tmpDir, "work-vault");
 		const home = join(tmpDir, "home-vault");
 		mkdirSync(join(work, "obsidian"), { recursive: true });
 		mkdirSync(home, { recursive: true });
 		writeFileSync(join(work, "obsidian", "plan.md"), "# Plan\nquarterly planning notes");
 		writeFileSync(join(home, "recipes.md"), "# Recipes\nquarterly sourdough planning");
-		const fake = installFakeMinSync(join(tmpDir, "bin"));
 
 		const { skills, unknown } = buildDatasourceSkills(
 			{
@@ -223,10 +227,11 @@ describe("AutoRAGAgent with connector-backed datasource skills", () => {
 				"home-notes": { type: "obsidian", connector: { vaultPath: home } },
 			},
 			tmpDir,
-			{ minSync: { binaryPath: fake.binaryPath, autoInstall: false } },
+			{ minSync: { sharedEmbedder: nativeIndexFixture().embedder, localIndex: nativeIndexFixture().localIndex } },
 		);
 		expect(unknown).toEqual([]);
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: ["test/fixtures/sample-project"],
 			workspacePath: tmpDir,
 			minSync: { autoInstall: false },
@@ -237,23 +242,36 @@ describe("AutoRAGAgent with connector-backed datasource skills", () => {
 		await agent.refresh(true, { methods: ["datasources"] });
 
 		const workHits = await agent.searchSingleDatasourceDocuments("work-notes", "quarterly");
-		expect(workHits.results.map((result) => result.source)).toEqual(["/work-notes/work-notes/obsidian/plan.md"]);
+		expect([...new Set(workHits.results.map((result) => result.source))]).toEqual([
+			"/work-notes/work-notes/obsidian/plan.md",
+		]);
 		const scoped = await agent.searchSingleDatasourceDocuments("work-notes", "quarterly", {
 			scope: "/work-notes/work-notes/obsidian",
 		});
-		expect(scoped.results).toHaveLength(1);
+		expect(new Set(scoped.results.map((result) => result.source)).size).toBe(1);
 		const homeHits = await agent.searchSingleDatasourceDocuments("home-notes", "quarterly");
-		expect(homeHits.results.map((result) => result.source)).toEqual(["/home-notes/home-notes/recipes.md"]);
+		expect([...new Set(homeHits.results.map((result) => result.source))]).toEqual([
+			"/home-notes/home-notes/recipes.md",
+		]);
 	});
 
-	it("reports an Obsidian vault with no MinSync binary as degraded without failing the other refresh methods", async () => {
+	it("reports an Obsidian embedding failure as degraded without failing the other refresh methods", async () => {
 		const vault = join(tmpDir, "vault");
 		mkdirSync(vault, { recursive: true });
 		writeFileSync(join(vault, "note.md"), "# Note\nsomething");
 		const { skills } = buildDatasourceSkills({ obsidian: { connector: { vaultPath: vault } } }, tmpDir, {
-			minSync: { binaryPath: join(tmpDir, "missing-minsync"), autoInstall: false },
+			minSync: {
+				sharedEmbedder: {
+					...createTestEmbedder(),
+					embed: async () => {
+						throw new Error("fixture embedding failure");
+					},
+				},
+				localIndex: nativeIndexFixture().localIndex,
+			},
 		});
 		const agent = new AutoRAGAgent({
+			...nativeIndexFixture(),
 			searchPaths: ["test/fixtures/sample-project"],
 			workspacePath: tmpDir,
 			minSync: { autoInstall: false },
@@ -264,7 +282,12 @@ describe("AutoRAGAgent with connector-backed datasource skills", () => {
 
 		const refresh = await agent.refresh(true, { methods: ["datasources"] });
 
-		expect(refresh.datasources?.[0]).toMatchObject({ ok: false, code: "datasource-unavailable" });
+		expect(refresh.datasources?.[0]).toMatchObject({
+			ok: false,
+			diagnostics: expect.arrayContaining([
+				expect.objectContaining({ message: expect.stringContaining("fixture embedding failure") }),
+			]),
+		});
 		expect((await agent.getRefreshStatus()).components.datasources).toBe("degraded");
 	});
 

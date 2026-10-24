@@ -7,6 +7,7 @@ export interface ParsedMirrorEntry {
 	readonly sourcePath: string;
 	readonly outputPath: string;
 	readonly parserName: string;
+	readonly parserVersion?: string;
 	readonly sourceMtimeNs: number;
 	readonly sourceSizeBytes: number;
 	readonly updatedAt: string;

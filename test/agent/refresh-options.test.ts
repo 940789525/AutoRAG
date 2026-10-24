@@ -10,6 +10,7 @@ import {
 	type DatasourceIndexResult,
 	type DatasourceSkill,
 } from "../../src/index.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
 
 let root: string;
 let docs: string;
@@ -27,6 +28,7 @@ afterEach(() => {
 
 function makeAgent(overrides: Record<string, unknown> = {}) {
 	return new AutoRAGAgent({
+		...nativeIndexFixture(),
 		searchPaths: [docs],
 		memoryPath: join(root, "memory.json"),
 		workspacePath: root,
@@ -54,37 +56,6 @@ async function waitFor(condition: () => boolean, label: string): Promise<void> {
 		await new Promise((resolve) => setTimeout(resolve, 20));
 	}
 	throw new Error(`timed out waiting for ${label}`);
-}
-
-/** A MinSync stand-in whose `sync` records its pid and then hangs until killed. */
-function writeHangingMinSync(binaryPath: string, pidPath: string): void {
-	writeFileSync(
-		binaryPath,
-		`#!/usr/bin/env node
-import { mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-
-const args = process.argv.slice(2);
-const config = join(process.cwd(), ".minsync", "config.toml");
-if (args[0] === "init") {
-  mkdirSync(dirname(config), { recursive: true });
-  writeFileSync(config, '[embedder]\\nid = "fixture"\\n');
-  console.log(JSON.stringify({ initialized: true }));
-  process.exit(0);
-}
-if (args[0] === "check") {
-  console.log(JSON.stringify({ vectorstore_ok: true, embedder_ok: true }));
-  process.exit(0);
-}
-if (args[0] === "sync") {
-  writeFileSync(${JSON.stringify(pidPath)}, String(process.pid));
-  setInterval(() => {}, 1000);
-} else {
-  process.exit(2);
-}
-`,
-	);
-	chmodSync(binaryPath, 0o755);
 }
 
 function datasourceSkill(
@@ -198,28 +169,30 @@ describe("AutoRAGRefreshOptions.signal", () => {
 		expect(status.state).toBe("failed");
 	});
 
-	it("kills the in-flight MinSync sync and rejects with the reason", async () => {
-		const binary = join(root, "hanging-minsync.mjs");
-		const pidPath = join(root, "minsync.pid");
-		writeHangingMinSync(binary, pidPath);
+	it("cancels an in-flight embedding request and rejects with the operator's reason", async () => {
+		const fixture = nativeIndexFixture();
+		let started!: () => void;
+		const began = new Promise<void>((resolve) => {
+			started = resolve;
+		});
 		const agent = makeAgent({
-			minSync: { binaryPath: binary, workspacePath: join(root, ".autorag", "minsync"), autoInstall: false },
+			embedder: {
+				...fixture.embedder,
+				embed: async (_texts: readonly string[], options?: { signal?: AbortSignal }) => {
+					started();
+					return new Promise((_, reject) =>
+						options?.signal?.addEventListener("abort", () => reject(options.signal?.reason), { once: true }),
+					);
+				},
+			},
 		});
 		const controller = new AbortController();
 		const reason = new Error("stop the sync");
 		const refresh = agent.refresh(true, { methods: ["minsync"], signal: controller.signal });
-		const settled = refresh.then(
-			() => "resolved",
-			(error: unknown) => error,
-		);
-
-		await waitFor(() => existsSync(pidPath), "minsync sync to start");
-		const pid = Number(readFileSync(pidPath, "utf8"));
-		expect(isAlive(pid)).toBe(true);
+		const settled = refresh.catch((error: unknown) => error);
+		await began;
 		controller.abort(reason);
-
 		expect(await settled).toBe(reason);
-		await waitFor(() => !isAlive(pid), "minsync child to exit");
 		expect((await agent.getRefreshStatus()).inFlight).toBe(false);
 	});
 
@@ -252,8 +225,10 @@ describe("AutoRAGRefreshOptions.signal", () => {
 			(error: unknown) => error,
 		);
 		await startedPromise;
-		expect(received).toBe(controller.signal);
+		expect(received?.aborted).toBe(false);
 		controller.abort(reason);
+		expect(received?.aborted).toBe(true);
+		expect(received?.reason).toBe(reason);
 
 		expect(await settled).toBe(reason);
 		expect(secondRan).toBe(false);
