@@ -67,4 +67,3 @@ verification reports were retained.
 No representative user-corpus recall/latency benchmark, macOS/Windows native run,
 release, deployment, or merge has been performed. Existing legacy MinSync index
 data is preserved; the first native refresh builds a separate store.
-
