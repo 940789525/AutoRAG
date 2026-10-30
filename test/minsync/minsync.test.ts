@@ -1227,6 +1227,11 @@ describe("MinSyncVectorMethod embedder plumbing", () => {
 					}),
 					assetInstaller: async (_asset, destination) => {
 						copyFileSync(minsyncBinary, destination);
+						// Removing a real MinSync directory from PATH can also remove Node in containers.
+						writeFileSync(
+							destination,
+							readFileSync(destination, "utf8").replace("#!/usr/bin/env node", `#!${process.execPath}`),
+						);
 					},
 				},
 			});

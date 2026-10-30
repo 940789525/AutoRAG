@@ -1,0 +1,9 @@
+{
+  "root": "/documents",
+  "workspace": "/data/workspace/research-inbox",
+  "runtimeConfig": "/dev-home/.autorag/config.json",
+  "agentDir": "/dev-home/.pi/agent",
+  "databaseUrlEnv": "AUTORAG_RESEARCH_DATABASE_URL",
+  "allowModelProcessing": false,
+  "port": 8765
+}

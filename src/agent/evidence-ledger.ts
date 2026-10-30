@@ -3,6 +3,12 @@ import { closeSync, openSync, readSync, statSync } from "node:fs";
 import { isAbsolute } from "node:path";
 import { type Static, Type } from "typebox";
 import { Value } from "typebox/value";
+import {
+	type LocalEvidenceResult,
+	type LocalReadHandle,
+	localEvidence,
+	localReadHandleSchema,
+} from "../indexing/evidence.ts";
 import type { RetrievalResult } from "../retrieval/types.ts";
 import type { AutoRAGEvidenceRef } from "./results.ts";
 
@@ -42,6 +48,8 @@ const ledgerEntrySchema = Type.Object({
 	documentArea: Type.Optional(Type.String()),
 	evidenceType: Type.Optional(Type.String()),
 	evidenceLocation: Type.Optional(Type.String()),
+	localReadHandle: Type.Optional(localReadHandleSchema),
+	localReadAmbiguous: Type.Optional(Type.Boolean()),
 });
 
 /** One recorded piece of evidence: what a retrieval tool returned, under the id it printed. */
@@ -57,7 +65,16 @@ const persistedEvidenceSchema = Type.Object({ entries: Type.Array(Type.Unknown()
  */
 export function parseLedgerEntries(data: unknown): LedgerEntry[] {
 	if (!Value.Check(persistedEvidenceSchema, data)) return [];
-	return data.entries.filter((entry): entry is LedgerEntry => Value.Check(ledgerEntrySchema, entry));
+	return data.entries.flatMap((entry): LedgerEntry[] => {
+		if (Value.Check(ledgerEntrySchema, entry)) return [entry];
+		// A corrupt optional locator must not destroy an otherwise valid historical citation.
+		if (entry && typeof entry === "object") {
+			const withoutLocator = { ...entry } as Record<string, unknown>;
+			delete withoutLocator.localReadHandle;
+			if (Value.Check(ledgerEntrySchema, withoutLocator)) return [withoutLocator];
+		}
+		return [];
+	});
 }
 
 /** Highest evidence id ordinal among `entries` (`e12` is 12); 0 when there are none. */
@@ -139,6 +156,9 @@ function toEvidenceRef(entry: LedgerEntry): AutoRAGEvidenceRef {
  * ledger with {@link restore} when a conversation is resumed.
  */
 export class EvidenceLedger {
+	/** Internal observer only; signals and full vectors are never persisted in ledger entries. */
+	onLocalResult?: (id: string, result: RetrievalResult) => void;
+	onClear?: () => void;
 	private entries: LedgerEntry[] = [];
 	private readonly byKey = new Map<string, LedgerEntry>();
 	private readonly byId = new Map<string, LedgerEntry>();
@@ -150,6 +170,38 @@ export class EvidenceLedger {
 	 * at e1 would let a stale id silently resolve to a different chunk.
 	 */
 	private lastOrdinal = 0;
+	private readonly localReadIds = new Set<string>();
+	localReadEntry(id: string): LedgerEntry | undefined {
+		const entry = this.byId.get(id);
+		return entry?.localReadHandle ? structuredClone(entry) : undefined;
+	}
+	localReadEntries(): readonly LedgerEntry[] {
+		return [...this.localReadIds].flatMap((id) => {
+			const entry = this.localReadEntry(id);
+			return entry ? [entry] : [];
+		});
+	}
+	private attachLocalReadHandle(id: string, handle: LocalReadHandle | undefined): void {
+		if (!handle || !Value.Check(localReadHandleSchema, handle)) return;
+		const entry = this.byId.get(id)!;
+		if (entry.localReadAmbiguous) return;
+		if (entry.localReadHandle && JSON.stringify(entry.localReadHandle) !== JSON.stringify(handle)) {
+			delete entry.localReadHandle;
+			entry.localReadAmbiguous = true;
+			this.localReadIds.delete(id);
+		} else {
+			entry.localReadHandle = { ...handle };
+			this.localReadIds.add(id);
+		}
+		this.unsaved.add(entry);
+		while (this.localReadIds.size > 1024) {
+			const oldest = this.localReadIds.values().next().value!;
+			this.localReadIds.delete(oldest);
+			const evicted = this.byId.get(oldest)!;
+			delete evicted.localReadHandle;
+			this.unsaved.add(evicted);
+		}
+	}
 
 	/** Record evidence and return its id. The same chunk always gets the same id. */
 	register(input: LedgerEvidenceInput): string {
@@ -191,7 +243,7 @@ export class EvidenceLedger {
 		const documentArea = metadataString(metadata, "documentArea");
 		const evidenceType = metadataString(metadata, "evidenceType");
 		const evidenceLocation = metadataString(metadata, "evidenceLocation");
-		return this.register({
+		const id = this.register({
 			method: metadataString(metadata, "method") ?? tool,
 			source: result.source,
 			content: result.content,
@@ -204,6 +256,9 @@ export class EvidenceLedger {
 			...(evidenceType !== undefined ? { evidenceType } : {}),
 			...(evidenceLocation !== undefined ? { evidenceLocation } : {}),
 		});
+		this.onLocalResult?.(id, result);
+		this.attachLocalReadHandle(id, (result as LocalEvidenceResult)[localEvidence]?.readHandle);
+		return id;
 	}
 
 	/**
@@ -228,10 +283,12 @@ export class EvidenceLedger {
 
 	/** Forget every recorded entry. Ids are never reissued, so a previous conversation's id stays unresolvable. */
 	clear(): void {
+		this.onClear?.();
 		this.entries = [];
 		this.byKey.clear();
 		this.byId.clear();
 		this.unsaved.clear();
+		this.localReadIds.clear();
 	}
 
 	/** Entries recorded or changed since the last call, for the hosting session to persist. */
@@ -256,6 +313,12 @@ export class EvidenceLedger {
 			this.entries.push(entry);
 			this.byKey.set(entry.key, entry);
 			this.byId.set(entry.id, entry);
+			if (entry.localReadHandle) this.localReadIds.add(entry.id);
+		}
+		while (this.localReadIds.size > 1024) {
+			const oldest = this.localReadIds.values().next().value!;
+			this.localReadIds.delete(oldest);
+			delete this.byId.get(oldest)!.localReadHandle;
 		}
 		this.lastOrdinal = Math.max(this.lastOrdinal, ordinalFloor, highestOrdinal(this.entries));
 	}

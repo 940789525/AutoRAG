@@ -1,0 +1,14 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "AutoRAG：等待论文研读服务",
+      "type": "process",
+      "command": "node",
+      "args": ["${workspaceFolder}/scripts/dev/wait-research.mjs"],
+      "options": {"cwd": "${workspaceFolder}"},
+      "problemMatcher": [],
+      "presentation": {"reveal": "silent", "panel": "dedicated"}
+    }
+  ]
+}

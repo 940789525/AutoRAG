@@ -107,6 +107,7 @@ function jevRouting(route: QueryRoute | "config"): MockBackend {
 
 function agentWith(options: Partial<AutoRAGAgentOptions> & Pick<AutoRAGAgentOptions, "model">): AutoRAGAgent {
 	return new AutoRAGAgent({
+		answerMode: "progressive",
 		searchPaths: [docs],
 		memoryPath: join(root, "memory.json"),
 		workspacePath: root,

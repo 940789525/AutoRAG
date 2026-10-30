@@ -232,8 +232,11 @@ export async function runSearch(ctx: CommandContext, deps: SearchDeps = {}): Pro
 		for await (const event of agent.searchDocumentsStream(query, options)) {
 			switch (event.type) {
 				case "progress":
-					if (event.text.trim() === "") break;
-					ctx.stdout(ctx.json ? JSON.stringify({ type: "progress", text: event.text }) : event.text);
+					// JSON keeps its structured event contract. Human output stays
+					// answer-only; detailed progress is opt-in and goes to stderr.
+					if (event.text.trim() === "" || (!ctx.json && !ctx.debug)) break;
+					if (ctx.json) ctx.stdout(JSON.stringify({ type: "progress", text: event.text }));
+					else ctx.stderr(event.text);
 					break;
 				case "preliminary":
 					ctx.stdout(renderPreliminary(event.response, { json: ctx.json, debug: ctx.debug }));

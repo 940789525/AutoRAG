@@ -1,0 +1,20 @@
+{
+  "searchPaths": [
+    "/documents"
+  ],
+  "workspacePath": "/data/workspace/index-debug",
+  "memoryPath": "/data/workspace/index-debug/memory.json",
+  "minSync": {
+    "autoInstall": false
+  },
+  "jikji": false,
+  "everything": false,
+  "fsearch": false,
+  "dupey": {
+    "enabled": false
+  },
+  "contextSelection": {
+    "mode": "adaptive",
+    "evidenceBudgetTokens": 6000
+  }
+}

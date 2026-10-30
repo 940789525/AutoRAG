@@ -126,11 +126,7 @@ function agentFor(m: AutoRAGAgentOptions["model"]) {
 describe("evidence refs through the real agent loop", () => {
 	it("stores the harness-recorded source and chunk, not what the model wrote", async () => {
 		const agent = agentFor(
-			model(
-				fauxAssistantMessage("Initial pass.", { stopReason: "stop" }),
-				search(),
-				fauxAssistantMessage("Director approval is required [e1].", { stopReason: "stop" }),
-			),
+			model(search(), fauxAssistantMessage("Director approval is required [e1].", { stopReason: "stop" })),
 		);
 
 		const response = await agent.searchDocuments("refund approval");
@@ -151,10 +147,7 @@ describe("evidence refs through the real agent loop", () => {
 		writeFileSync(real, CHUNK);
 		const invented = join(root, "docs", "invented.txt");
 		const agent = agentFor(
-			model(
-				fauxAssistantMessage("Initial pass.", { stopReason: "stop" }),
-				fauxAssistantMessage(`Note [file:${invented}] and [file:${real}].`, { stopReason: "stop" }),
-			),
+			model(fauxAssistantMessage(`Note [file:${invented}] and [file:${real}].`, { stopReason: "stop" })),
 		);
 
 		const response = await agent.searchDocuments("refund approval");
@@ -169,10 +162,8 @@ describe("evidence refs through the real agent loop", () => {
 	it("forgets a previous run's ids, so a stale id cannot resolve in the next run", async () => {
 		const agent = agentFor(
 			model(
-				fauxAssistantMessage("Initial pass.", { stopReason: "stop" }),
 				search(),
 				fauxAssistantMessage("First run [e1].", { stopReason: "stop" }),
-				fauxAssistantMessage("Initial pass.", { stopReason: "stop" }),
 				fauxAssistantMessage("Second run [e1].", { stopReason: "stop" }),
 			),
 		);
@@ -219,10 +210,8 @@ describe("evidence refs through the real agent loop", () => {
 		};
 		const agent = new AutoRAGAgent({
 			model: model(
-				fauxAssistantMessage("Initial pass.", { stopReason: "stop" }),
 				search(),
 				fauxAssistantMessage("Run one [e1].", { stopReason: "stop" }),
-				fauxAssistantMessage("Initial pass.", { stopReason: "stop" }),
 				search(),
 				fauxAssistantMessage("Stale [e1]. Fresh [e2].", { stopReason: "stop" }),
 			),

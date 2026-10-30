@@ -1,7 +1,26 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import type { ContextSelectionReport } from "../agent/context-selection-projector.ts";
 
 export type AutoRAGRunEvent =
+	| {
+			event: "model_usage";
+			timestamp: string;
+			sessionId: string;
+			scope: "answer_session" | "pi_compaction";
+			model: string;
+			usageReported?: boolean;
+			stopReason?: string;
+			inputTokens: number | null;
+			outputTokens: number | null;
+			cacheReadTokens: number | null;
+			cacheWriteTokens?: number | null;
+			totalTokens?: number | null;
+			cost?: number | null;
+			latencyMs?: number;
+			firstTokenMs?: number | null;
+	  }
+	| { event: "context_selection"; timestamp: string; sessionId: string; report: ContextSelectionReport }
 	| {
 			event: "search_started";
 			timestamp: string;

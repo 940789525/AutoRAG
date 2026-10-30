@@ -131,10 +131,14 @@ describe("buildSystemPrompt single-agent contract", () => {
 		expect(text).toContain("Prefer recent truth");
 	});
 
-	it("explains the fast answer first into deeper exploration two-phase workflow", () => {
+	it("requires one complete answer after necessary checks, not a draft followed by verification", () => {
 		const text = prompt();
-		expect(text).toContain("two-phase loop");
-		expect(text).toContain("PLAN & FAST ANSWER");
+		expect(text).toContain("one complete answer after necessary checks");
+		expect(text).not.toContain("PLAN & FAST ANSWER");
+		expect(text).not.toContain("Immediately following the fast answer");
+		expect(text).toContain("Stop when the evidence settles the question");
+		expect(text).toContain("After two consecutive failures");
+		expect(text).toContain("Never claim an uncompleted check succeeded");
 		expect(text).toContain("EXPLORE & RETRIEVE");
 	});
 

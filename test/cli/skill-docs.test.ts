@@ -115,6 +115,14 @@ const searchResponse: SearchDocumentsResponse = {
 };
 
 describe("parent-agent skill docs", () => {
+	it("documents single-answer delivery as default and progressive delivery as opt-in", () => {
+		for (const name of ["autorag", "autorag-setup"]) {
+			const text = readSkill(name);
+			expect(text).toContain('answerMode: "single"');
+			expect(text).toContain('answerMode: "progressive"');
+			expect(text).not.toContain("Every search is two-phase");
+		}
+	});
 	it("keeps skill folder names aligned with frontmatter", () => {
 		for (const name of SKILL_NAMES) {
 			expect(readSkill(name)).toMatch(new RegExp(`^---\\nname: ${name}\\n`, "m"));

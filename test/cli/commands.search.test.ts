@@ -155,7 +155,24 @@ describe("runSearch", () => {
 		expect(options).toMatchObject({ topK: 3, scope: "/docs" });
 	});
 
-	it("renders progress events before the final response", async () => {
+	it.each([false, true])("keeps human stdout answer-only (debug=%s)", async (debug) => {
+		const { ctx, stdout, stderr } = context(["query"]);
+		ctx.json = false;
+		ctx.debug = debug;
+		await runSearch(ctx, {
+			agentFactory: () => ({
+				async *searchDocumentsStream() {
+					yield { type: "progress" as const, sessionId: "session", query: "query", text: "checking evidence" };
+					yield { type: "complete" as const, response };
+				},
+			}),
+		});
+		expect(stdout).toHaveLength(1);
+		expect(stdout.join("\n")).not.toContain("checking evidence");
+		expect(stderr.join("\n").includes("checking evidence")).toBe(debug);
+	});
+
+	it("renders structured progress events before the final JSON response", async () => {
 		const { ctx, stdout } = context(["query"]);
 		await runSearch(ctx, {
 			agentFactory: () => ({

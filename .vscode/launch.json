@@ -1,0 +1,161 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "AutoRAG：TUI（连接论文研读服务）",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "program": "${workspaceFolder}/src/cli/index.ts",
+      "args": [
+        "tui",
+        "--config",
+        "${workspaceFolder}/.vscode/index-debug.config.json",
+        "--research-url",
+        "http://127.0.0.1:8765"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "autoAttachChildProcesses": true,
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "env": {
+        "HOME": "/dev-home",
+        "AUTORAG_HOME": "/dev-home/.autorag-index-debug",
+        "AUTORAG_CONFIG": "${workspaceFolder}/.vscode/index-debug.config.json",
+        "PI_CODING_AGENT_DIR": "/dev-home/.pi/agent"
+      },
+      "preLaunchTask": "AutoRAG：等待论文研读服务",
+      "presentation": {
+        "hidden": true
+      }
+    },
+    {
+      "name": "AutoRAG：调试论文研读服务",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "program": "${workspaceFolder}/src/research/index.ts",
+      "args": [
+        "${workspaceFolder}/.vscode/research-debug.config.json"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "autoAttachChildProcesses": true,
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "env": {
+        "HOME": "/dev-home",
+        "AUTORAG_HOME": "/dev-home/.autorag-research-dev",
+        "AUTORAG_CONFIG": "${workspaceFolder}/.vscode/index-debug.config.json",
+        "PI_CODING_AGENT_DIR": "/dev-home/.pi/agent",
+        "AUTORAG_RESEARCH_DATABASE_URL": "postgresql://research@research-db:5432/autorag_research",
+        "AUTORAG_RESEARCH_DATABASE_PASSWORD_FILE": "/dev-home/.autorag-research-dev/postgres-password"
+      },
+      "presentation": {
+        "group": "AutoRAG",
+        "order": 1
+      }
+    },
+    {
+      "name": "AutoRAG：仅调试 TUI（无论文收件箱）",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "program": "${workspaceFolder}/src/cli/index.ts",
+      "args": [
+        "tui",
+        "--config",
+        "${workspaceFolder}/.vscode/index-debug.config.json"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "autoAttachChildProcesses": true,
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "env": {
+        "HOME": "/dev-home",
+        "AUTORAG_HOME": "/dev-home/.autorag-index-debug",
+        "AUTORAG_CONFIG": "${workspaceFolder}/.vscode/index-debug.config.json",
+        "PI_CODING_AGENT_DIR": "/dev-home/.pi/agent"
+      },
+      "presentation": {
+        "group": "AutoRAG",
+        "order": 2
+      }
+    },
+    {
+      "name": "AutoRAG：调试索引（逐条向量化）",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "program": "${workspaceFolder}/src/cli/index.ts",
+      "args": [
+        "refresh",
+        "--method",
+        "local",
+        "--force",
+        "--debug",
+        "--config",
+        "${workspaceFolder}/.vscode/index-debug.config.json"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "autoAttachChildProcesses": true,
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "env": {
+        "HOME": "/dev-home",
+        "AUTORAG_HOME": "/dev-home/.autorag-index-debug",
+        "AUTORAG_CONFIG": "${workspaceFolder}/.vscode/index-debug.config.json",
+        "PI_CODING_AGENT_DIR": "/dev-home/.pi/agent"
+      }
+    },
+    {
+      "name": "AutoRAG：索引测速（正常批处理）",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "node",
+      "program": "${workspaceFolder}/src/cli/index.ts",
+      "args": [
+        "refresh",
+        "--method",
+        "local",
+        "--force",
+        "--json",
+        "--config",
+        "${workspaceFolder}/.vscode/index-debug.config.json"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "autoAttachChildProcesses": true,
+      "skipFiles": [
+        "<node_internals>/**"
+      ],
+      "env": {
+        "HOME": "/dev-home",
+        "AUTORAG_HOME": "/dev-home/.autorag-index-debug",
+        "AUTORAG_CONFIG": "${workspaceFolder}/.vscode/index-debug.config.json",
+        "PI_CODING_AGENT_DIR": "/dev-home/.pi/agent"
+      }
+    }
+  ],
+  "compounds": [
+    {
+      "name": "AutoRAG：调试 TUI",
+      "configurations": [
+        "AutoRAG：调试论文研读服务",
+        "AutoRAG：TUI（连接论文研读服务）"
+      ],
+      "stopAll": true,
+      "presentation": {
+        "group": "AutoRAG",
+        "order": 0
+      }
+    }
+  ]
+}

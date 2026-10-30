@@ -125,6 +125,30 @@ vector profiles; changing only the query prefix does not force re-embedding.
 
 ## Migration and recovery
 
+### Container debugging
+
+When opening this checkout inside the development container, the configurations
+in `.vscode/launch.json` use the source CLI, the same explicit
+`.vscode/index-debug.config.json`, and `/data/workspace/index-debug` as the
+workspace. Run **AutoRAG：索引测速（正常批处理）** once to build the local index,
+then start **AutoRAG：调试 TUI**. Use **AutoRAG：调试索引（逐条向量化）** to step
+through individual embedding requests. The latter forces a refresh and uses
+single-input batches; matching cached vectors can still be reused. All three
+configurations use the existing container Pi authentication directory and attach
+to child processes. They require the existing local MinSync daemon or native
+addon; they do not start or restart an embedding service.
+
+An index marked `native-index-fixture` is a deterministic test index, not a real
+semantic model. Queries using Qwen3 must reject it. Refresh with the same explicit
+config to build a separate matching embedding profile; do not edit `ready.json`
+or change the query model to the test fixture. The old profile remains available
+for diagnosis. The error reports both models and dimensions when they differ.
+
+Vitest's shared setup clears inherited `AUTORAG_CONFIG` and `AUTORAG_HOME` and
+provides a temporary `HOME`. Tests that set their own config must keep it inside
+their temporary root, including in child processes. Changing only `HOME` cannot
+isolate a test from a caller's explicit `AUTORAG_CONFIG`.
+
 The first refresh builds the new store from parsed mirrors. Existing MinSync
 files are preserved and are not automatically imported or deleted. Legacy
 `minSync.workspacePath`, binary and installer options no longer select the local

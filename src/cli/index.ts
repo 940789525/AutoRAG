@@ -30,6 +30,7 @@ const BOOLEAN_FLAGS = new Set([
 	"sync-hister",
 ]);
 const VALUE_FLAGS = new Set([
+	"research-url",
 	"config",
 	"search-paths",
 	"exclude",
@@ -109,6 +110,10 @@ Commands:
   memory inspect       Inspect the retrieval memory snapshot
   index reset          Remove parsed/minsync indexes (--method)
   index rebuild        Reset then re-run a refresh (--method minsync|all)
+  index remove <source>
+                       Delete every index built from one source file and free its space
+  index inspect <source>
+                       Show the exact chunks and embedding input for one parsed source
   health               Check model/provider auth and completion access (no index check)
   lite init|refresh|watch|status|index|duplicates|health
                        Model-free setup, indexing, status, and datasource lifecycle
@@ -119,6 +124,7 @@ Commands:
   lite report <query>   Persist a structured report (--input FILE)
   duplicates [DIR]     Scan exact/near duplicate document families; never deletes files
   tui                  Open an interactive Pi-powered librarian terminal UI
+						 (--research-url http://127.0.0.1:8765: enable the paper inbox)
                        (--whatsapp [--whatsapp-group JID]: also take questions from WhatsApp)
   models list          List chat models from the pi runtime (--provider ID --available)
   update-check         Compare the running autorag against the published npm version

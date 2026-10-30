@@ -73,7 +73,6 @@ describe("AutoRAGAgent actively uses the web tools", () => {
 		});
 
 		const model = fauxModel(
-			fauxAssistantMessage("Initial pass.", { stopReason: "stop" }),
 			fauxAssistantMessage([fauxToolCall(WEB_SEARCH_TOOL_NAME, { query: "refund director approval policy 2026" })], {
 				stopReason: "toolUse",
 			}),

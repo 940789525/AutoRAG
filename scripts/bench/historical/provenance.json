@@ -1,0 +1,16 @@
+{
+  "source": ".omo/evidence/context-append-v2-task.patch",
+  "sourcePatchSha256": "6e50c3dbd68c67bbb9c4fbbe52ebf6dbe66892d482f76595370da13a6a4b1c57",
+  "recovery": "Projector old-side hunks cover lines 12\u2013376 except unchanged gaps 19\u201333, 58\u201372 and 142. Those gaps and imports were recovered from unchanged current sections and checked against overlapping hunk context. Selector differs only in its recorded v1 version constant. This is a recovered algorithm snapshot, not a complete historical application checkout.",
+  "adaptations": "Only projector imports are relocated; current non-projector harness and capacity guard are shared across all arms. Adapter restores v1 memory prepending; v2 commit/compaction hooks are deliberately absent.",
+  "files": {
+    "context-selection-projector.ts": {
+      "recoveredOriginalSha256": "303324a29707abf3841bdf5316b2a5b2a0ceb464e6bc61c85883338531601011",
+      "runtimeSha256": "c6fad66992dced241293454448b95c7d4c1693b3d937e27c149219654d6fbfa8"
+    },
+    "context-selection.ts": {
+      "recoveredOriginalSha256": "8dff79c8b34b277e3b960ca5776cadf6ba5c6d05d397e559fa01006554da6a36",
+      "runtimeSha256": "8dff79c8b34b277e3b960ca5776cadf6ba5c6d05d397e559fa01006554da6a36"
+    }
+  }
+}

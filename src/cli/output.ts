@@ -308,25 +308,51 @@ export function renderMemory(schema: MemorySchema, opts: RenderOptions): string 
 	return renderMemoryHuman(schema, opts.debug ?? false);
 }
 
-function indexEnvelope(result: { action: "reset" | "rebuild"; removed: string[]; rebuilt?: AutoRAGRefreshResult }) {
+/**
+ * Result of an `autorag index` mutation. `remove` deletes every index entry built
+ * from one source file; `reset` and `rebuild` operate on whole indexes.
+ */
+export interface IndexCommandResult {
+	readonly action: "reset" | "rebuild" | "remove";
+	/** Index names removed by `reset`/`rebuild`; absent for `remove`, which names its target in `source`. */
+	readonly removed?: readonly string[];
+	/** Virtual path of the source whose indexes `remove` deleted; never an absolute filesystem path. */
+	readonly source?: string;
+	/** Whether `remove` appended the source to the persisted `excludePaths` list. */
+	readonly excluded?: boolean;
+	readonly rebuilt?: AutoRAGRefreshResult;
+}
+
+function indexEnvelope(result: IndexCommandResult) {
 	const envelope: Record<string, unknown> = {
 		ok: true,
 		action: result.action,
-		removed: result.removed,
 	};
+	if (result.removed !== undefined) {
+		envelope.removed = result.removed;
+	}
+	if (result.source !== undefined) {
+		envelope.source = result.source;
+	}
+	if (result.excluded !== undefined) {
+		envelope.excluded = result.excluded;
+	}
 	if (result.rebuilt) {
 		envelope.rebuilt = refreshEnvelope(result.rebuilt);
 	}
 	return envelope;
 }
 
-function renderIndexHuman(
-	result: { action: "reset" | "rebuild"; removed: string[]; rebuilt?: AutoRAGRefreshResult },
-	debug: boolean,
-): string {
+function renderIndexHuman(result: IndexCommandResult, debug: boolean): string {
 	const lines: string[] = [];
 	lines.push(`index: ${result.action}`);
-	if (result.removed.length > 0) {
+	if (result.source !== undefined) {
+		lines.push(`  source: ${result.source}`);
+	}
+	if (result.excluded !== undefined) {
+		lines.push(`  excluded: ${result.excluded} (a later refresh will not re-index this source)`);
+	}
+	if (result.removed !== undefined && result.removed.length > 0) {
 		lines.push(`  removed: ${result.removed.join(", ")}`);
 	}
 	if (result.rebuilt) {
@@ -335,10 +361,7 @@ function renderIndexHuman(
 	return lines.join("\n");
 }
 
-export function renderIndex(
-	result: { action: "reset" | "rebuild"; removed: string[]; rebuilt?: AutoRAGRefreshResult },
-	opts: RenderOptions,
-): string {
+export function renderIndex(result: IndexCommandResult, opts: RenderOptions): string {
 	if (opts.json) {
 		return JSON.stringify(indexEnvelope(result), null, 2);
 	}

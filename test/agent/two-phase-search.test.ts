@@ -173,6 +173,7 @@ function makeSkill(rows: readonly RetrievalResult[]): DatasourceSkill {
 
 function agentOptions(model: ReturnType<typeof fauxModel>): AutoRAGAgentOptions {
 	return {
+		answerMode: "progressive",
 		model,
 		searchPaths: [docs],
 		memoryPath: join(root, "memory.json"),
@@ -188,7 +189,85 @@ async function collectEvents(agent: AutoRAGAgent, query: string): Promise<Search
 	return events;
 }
 
-describe("two-phase progressive answers (minimal-thinking fast → high-thinking final)", () => {
+describe("single-answer delivery by default", () => {
+	function defaults(model: ReturnType<typeof fauxModel>): AutoRAGAgentOptions {
+		const { answerMode: _legacy, ...options } = agentOptions(model);
+		return options;
+	}
+
+	it("makes one answer turn with final thinking, no draft event, and no automatic verification", async () => {
+		const prompts: string[] = [];
+		const reasoning: (string | undefined)[] = [];
+		let requests = 0;
+		const model = fauxModel(true, (context, options) => {
+			requests++;
+			reasoning.push(options?.reasoning);
+			const last = context.messages.filter((message) => message.role === "user").at(-1);
+			prompts.push(typeof last?.content === "string" ? last.content : JSON.stringify(last?.content));
+			return finalAnswer("Complete answer: director approval is required.") as AssistantMessage;
+		});
+		const events = await collectEvents(new AutoRAGAgent(defaults(model)), "refund approval?");
+		expect(requests).toBe(1);
+		expect(reasoning).toEqual(["high"]);
+		expect(events.filter((event) => event.type === "preliminary")).toHaveLength(0);
+		const complete = events.filter((event) => event.type === "complete");
+		expect(complete).toHaveLength(1);
+		expect(complete[0]?.type === "complete" && complete[0].response.answer).toContain("Complete answer");
+		expect(prompts[0]).toContain("Baseline retrieval has completed");
+		expect(prompts[0]).toContain("one complete, self-contained final answer");
+		expect(prompts[0]).not.toContain("DELTA ONLY");
+		expect(prompts[0]).not.toContain("until its next message arrives");
+	});
+
+	it("still searches with tools before delivering a cited complete answer", async () => {
+		const rows: RetrievalResult[] = [
+			{
+				id: "msg-1",
+				source: "/kakao/acct-1/chunks/msg-1",
+				content: "Director approval is required.",
+				score: 1,
+				metadata: {},
+			},
+		];
+		const model = fauxModel(
+			true,
+			fauxAssistantMessage([fauxToolCall("search_datasource_kakao", { query: "refund approval", topK: 5 })], {
+				stopReason: "toolUse",
+			}),
+			(context) => {
+				const transcript = JSON.stringify(context.messages);
+				const id = transcript.match(/\[(e\d+)\] \/kakao\/acct-1\/chunks\/msg-1/)?.[1];
+				if (id === undefined) throw new Error("search returned no citable evidence");
+				return fauxAssistantMessage(`Director approval is required [${id}].`, { stopReason: "stop" });
+			},
+		);
+		const events = await collectEvents(
+			new AutoRAGAgent({ ...defaults(model), datasourceSkills: [makeSkill(rows)] }),
+			"refund approval?",
+		);
+		expect(events.some((event) => event.type === "preliminary")).toBe(false);
+		const complete = events.find((event) => event.type === "complete");
+		expect(complete?.type === "complete" && complete.response.answer).toContain("Director approval is required [1]");
+		expect(complete?.type === "complete" && complete.response.results[0]?.source).toBe(rows[0]?.source);
+	});
+
+	it("preserves source failures instead of claiming the answer was verified", async () => {
+		const model = fauxModel(
+			true,
+			fauxAssistantMessage("", { stopReason: "error", errorMessage: "provider unavailable" }),
+		);
+		const result = await new AutoRAGAgent(defaults(model)).searchDocuments("refund approval?");
+		expect(result.diagnostics?.some((entry) => entry.code === "model-request-failed")).toBe(true);
+		expect(result.answer).not.toContain("confirmed as-is");
+	});
+
+	it("rejects an invalid library answer mode instead of silently enabling a pipeline", () => {
+		const model = fauxModel(true, finalAnswer("answer"));
+		expect(() => new AutoRAGAgent({ ...defaults(model), answerMode: "invalid" as "single" })).toThrow(/answerMode/);
+	});
+});
+
+describe("explicit two-phase progressive answers (minimal-thinking fast → high-thinking final)", () => {
 	it("yields the fast preliminary answer before the verified complete response", async () => {
 		const model = fauxModel(
 			true,

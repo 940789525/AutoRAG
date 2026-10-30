@@ -158,9 +158,9 @@ export type SearchDocumentsStreamEvent =
 	  }
 	| {
 			/**
-			 * Immediate first answer from the minimal-thinking fast phase. Always
-			 * yielded before `complete` when the two-phase flow produced one; the
-			 * `complete` event's response remains the verified final answer.
+			 * Legacy progressive-mode draft. Emitted only when `answerMode` is
+			 * explicitly `progressive`; the default single-answer flow never
+			 * emits this event. `complete` carries the final, self-contained answer.
 			 */
 			readonly type: "preliminary";
 			readonly response: SearchDocumentsResponse;

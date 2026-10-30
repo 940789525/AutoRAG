@@ -52,6 +52,7 @@ function fauxModel(...responses: FauxResponseStep[]): Model<string> {
 
 function agentOptions(model: Model<string>): AutoRAGAgentOptions {
 	return {
+		answerMode: "progressive",
 		model,
 		searchPaths: [docs],
 		memoryPath: join(root, "memory.json"),

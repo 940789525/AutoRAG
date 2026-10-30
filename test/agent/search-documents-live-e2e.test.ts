@@ -205,7 +205,6 @@ describe("AutoRAGAgent live single-agent searchDocuments e2e", () => {
 			},
 		];
 		const model = fauxModel(
-			fauxAssistantMessage("Initial pass.", { stopReason: "stop" }),
 			fauxAssistantMessage(
 				[
 					fauxToolCall(JIKJI_FIND_TOOL_NAME, { query: "refund director approval" }),

@@ -1,0 +1,22 @@
+{
+    "searchPaths": [
+      "/documents"
+    ],
+    "workspacePath": "/workspace/myself_dev/qwen-workspace",
+    "minSync": {
+      "autoInstall": true,
+      "embedder": {
+        "id": "openai:qwen3.7-text-embedding-flash",
+        "baseUrl": "https://llm-yy0bv7cwi719gn80.cn-beijing.maas.aliyuncs.com/compatible-mode",
+        "apiKeyEnv": "DASHSCOPE_API_KEY",
+        "dimension": 1024,
+        "batchSize": 10,
+        "maxConcurrent": 2,
+        "timeoutMs": 120000,
+        "maxRetries": 3
+      }
+    },
+    "jikji": false,
+    "everything": false,
+    "fsearch": false
+  }

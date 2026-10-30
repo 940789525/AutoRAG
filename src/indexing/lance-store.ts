@@ -1,7 +1,9 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { Table } from "@lancedb/lancedb";
 import { reciprocalRankFusion } from "../datasource/sidecar/fusion.ts";
 import { normalizeVirtualPathScope, virtualPathScopeToRegExp } from "../retrieval/scope.ts";
-import type { IndexHit, IndexRow, IndexStore } from "./types.ts";
+import type { IndexEvidenceChunk, IndexHit, IndexRow, IndexStore } from "./types.ts";
 
 export function sqlString(value: string): string {
 	return `'${value.replaceAll("'", "''")}'`;
@@ -21,6 +23,35 @@ export class LanceIndexStore implements IndexStore {
 	private readonly table: Table;
 	private constructor(table: Table) {
 		this.table = table;
+	}
+	/** Opens only an existing table: no schema creation, maintenance, or embedding runtime. */
+	static async openExisting(directory: string): Promise<LanceIndexStore> {
+		if (!existsSync(join(directory, "chunks.lance")))
+			throw new Error(`Local evidence index is missing: ${directory}`);
+		const lance = await import("@lancedb/lancedb");
+		const db = await lance.connect(directory, { readConsistencyInterval: 0 });
+		return new LanceIndexStore(await db.openTable("chunks"));
+	}
+	async readChunk(sourceId: string, chunkId: string): Promise<IndexEvidenceChunk | undefined> {
+		const rows = await this.table
+			.query()
+			.where(`source_id = ${sqlString(sourceId)} AND id = ${sqlString(chunkId)}`)
+			.select(["id", "source_id", "source_path", "text", "heading", "kind", "start", "end", "tokens"])
+			.limit(1)
+			.toArray();
+		return rows[0] as IndexEvidenceChunk | undefined;
+	}
+	async hasSource(sourceId: string): Promise<boolean> {
+		return (
+			(
+				await this.table
+					.query()
+					.where(`source_id = ${sqlString(sourceId)}`)
+					.select(["id"])
+					.limit(1)
+					.toArray()
+			).length > 0
+		);
 	}
 	static async open(directory: string, dimension: number): Promise<LanceIndexStore> {
 		const [lance, arrow] = await Promise.all([import("@lancedb/lancedb"), import("apache-arrow")]);
@@ -84,8 +115,9 @@ export class LanceIndexStore implements IndexStore {
 			.execute([...rows]);
 	}
 	async search(options: Parameters<IndexStore["search"]>[0]): Promise<readonly IndexHit[]> {
+		if (options.sourceIds?.length === 0) return [];
 		if ((await this.table.countRows()) === 0) return [];
-		const where = scopePredicate(options.scope);
+		const where = `(${scopePredicate(options.scope)})${options.sourceIds === undefined ? "" : ` AND source_id IN (${options.sourceIds.map(sqlString).join(",")})`}`;
 		const pool = Math.max(1, options.topK);
 		const rankings: IndexHit[][] = [];
 		if (options.vector) {
@@ -98,7 +130,13 @@ export class LanceIndexStore implements IndexStore {
 				.refineFactor(4)
 				.limit(pool)
 				.toArray();
-			rankings.push(result.map((row) => ({ row: decodeRow(row), score: 1 - Number(row._distance) })));
+			rankings.push(
+				result.map((row) => ({
+					row: decodeRow(row),
+					score: 1 - Number(row._distance),
+					cosine: 1 - Number(row._distance),
+				})),
+			);
 		}
 		if (options.mode !== "vector" && options.text.trim()) {
 			// The field contains analyzed tokens, not source-position-preserving phrases.
@@ -110,9 +148,15 @@ export class LanceIndexStore implements IndexStore {
 		}
 		if (rankings.length < 2) return rankings[0] ?? [];
 		const byId = new Map(rankings.flat().map((hit) => [hit.row.id, hit.row]));
+		const cosines = new Map(
+			rankings
+				.flat()
+				.filter((hit) => hit.cosine !== undefined)
+				.map((hit) => [hit.row.id, hit.cosine]),
+		);
 		return reciprocalRankFusion(rankings.map((hits) => hits.map((hit) => hit.row.id)))
 			.slice(0, pool)
-			.map((hit) => ({ row: byId.get(hit.key)!, score: hit.score }));
+			.map((hit) => ({ row: byId.get(hit.key)!, score: hit.score, cosine: cosines.get(hit.key) }));
 	}
 	async maintain(): Promise<void> {
 		if ((await this.table.countRows()) === 0) return;

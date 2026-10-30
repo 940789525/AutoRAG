@@ -128,6 +128,15 @@ ID, raw excerpt/content, and any available `chunkIndex`, `lineNumber`,
 the session. Prefer this command whenever the caller wants detailed chunk text
 rather than only the curated summary.
 
+Inside a local librarian conversation, `read_local_evidence({ evidenceId: "e2" })`
+can restore a complete previously retrieved native-index chunk after context
+compaction. It accepts only an ID issued in the current session branch and
+rechecks roots, scope, source and parsed-body fingerprints, and index profile.
+It does not search, embed, refresh, or read arbitrary paths. A changed or
+unverifiable version fails explicitly; refresh and search again when appropriate.
+The persisted evidence excerpt is not the full chunk. This tool is available in
+off, observe, and adaptive modes; remote bridges and Lite MCP do not expose it.
+
 - `--scope` narrows datasource retrieval to a requested sub-path (ordinary
   per-query filtering).
 - `--json` is required for programmatic consumption.
@@ -139,8 +148,9 @@ AutoRAG. The search loop can use Jikji, MinSync lexical/vector/hybrid retrieval,
 direct source reading as appropriate. If search fails because of model,
 provider, auth, or timeout problems, diagnose with `autorag health --json`.
 
-Every search is two-phase: a fast answer, then verification. With Jev on (the
-default, OpenRouter), Jev first routes the question:
+Searches default to `answerMode: "single"`: retrieve and perform necessary checks,
+then deliver one complete, self-contained answer. Do not send a draft followed by
+a separate verification or confirmation-only reply. With Jev on, Jev first routes the question:
 
 - General knowledge or small talk is answered directly.
 - A request to view or change AutoRAG's own settings (model, providers,
@@ -150,16 +160,22 @@ default, OpenRouter), Jev first routes the question:
 - Private-data questions use local search; public current facts use web search.
 - A multi-part question is split into up to five parallel search queries.
 - On local search, Jev also picks which registered datasources (Slack,
-  Discord, KakaoTalk, email, ...) to search before the fast answer, from each
+  Discord, KakaoTalk, email, ...) to search before answering, from each
   datasource's description and where similar past questions were answered;
   their chunks are reranked together with local file evidence.
 
-After the fast answer, Jev ends the run if the answer is complete and
-evidence-backed. So `results` may come straight from the fast answer, with no
-verification phase. `--debug` diagnostics show the decision: `query-routed`
-(branch and queries), `datasources-selected` (datasources searched or skipped,
-with probabilities), `follow-up-skipped` (fast answer final), or
-`query-route-fallback` (Jev unavailable, single local search).
+Default single mode does not run a post-answer follow-up check or emit a
+`preliminary` answer. `--debug` diagnostics show `query-routed` (branch and queries),
+`datasources-selected` (datasources searched or skipped, with probabilities), or
+`query-route-fallback` (Jev unavailable, single local search). Human CLI output
+keeps progress on stderr only with `--debug`; TUI tool details start collapsed.
+JSON progress events remain available to clients and should be displayed as
+status or collapsible run details, not interleaved with the final answer.
+
+Only an explicit `answerMode: "progressive"` restores legacy fast-answer then
+verification delivery. In that mode Jev may skip verification when the draft is
+already complete (`follow-up-skipped`). Do not enable progressive mode just to
+verify sources: default single mode still checks evidence before answering.
 
 ## Maintenance
 

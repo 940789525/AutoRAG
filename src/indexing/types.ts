@@ -72,9 +72,17 @@ export interface IndexRow extends Record<string, unknown> {
 export interface IndexHit {
 	readonly row: IndexRow;
 	readonly score: number;
+	readonly cosine?: number;
+	readonly profile?: string;
 }
 
+export type IndexEvidenceChunk = Pick<
+	IndexRow,
+	"id" | "source_id" | "source_path" | "text" | "heading" | "kind" | "start" | "end" | "tokens"
+>;
+
 export interface IndexStore {
+	readChunk?(sourceId: string, chunkId: string): Promise<IndexEvidenceChunk | undefined>;
 	countRows(): Promise<number>;
 	findVectors(keys: readonly string[]): Promise<ReadonlyMap<string, readonly number[]>>;
 	/** Atomically replaces complete documents, including deletion of their old chunks. */
@@ -85,6 +93,8 @@ export interface IndexStore {
 		mode: "vector" | "bm25" | "hybrid";
 		topK: number;
 		scope?: string;
+		/** Exact source identities allowed before ranking; an empty list matches nothing. */
+		sourceIds?: readonly string[];
 	}): Promise<readonly IndexHit[]>;
 	maintain(): Promise<void>;
 }

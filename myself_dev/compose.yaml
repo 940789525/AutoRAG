@@ -1,0 +1,48 @@
+name: autorag-xsy-dev
+
+services:
+  dev:
+    image: autorag-xsy-dev:2.11.0
+    build:
+      context: ../scripts/ci
+      dockerfile: ../../myself_dev/Dockerfile
+    platform: linux/amd64
+    init: true
+    user: "1000:1000"
+    working_dir: /workspace
+    environment:
+      HOME: /dev-home
+      AUTORAG_HOME: /dev-home/.autorag
+      AUTORAG_CONFIG: /dev-home/.autorag/config.json
+      PI_CODING_AGENT_DIR: /dev-home/.pi/agent
+      XDG_CACHE_HOME: /dev-home/.cache
+      OMP_NUM_THREADS: "4"
+      RAYON_NUM_THREADS: "4"
+    volumes:
+      - ..:/workspace
+      - ./fixtures:/documents:ro
+      - dependencies:/workspace/node_modules
+      - build-output:/workspace/dist
+      - home:/dev-home
+      - cache:/dev-home/.cache
+      - workspace:/data/workspace
+    # Keep the dev shell available when /embedding off stops the daemon.
+    command: ["bash", "-c", "minsync serve --idle-timeout 0 & exec sleep infinity"]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 8g
+    cpus: 4
+    pids_limit: 512
+    healthcheck:
+      test: ["CMD", "node", "/workspace/myself_dev/healthcheck.mjs"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15m
+      retries: 3
+
+volumes:
+  dependencies:
+  build-output:
+  home:
+  cache:
+  workspace:

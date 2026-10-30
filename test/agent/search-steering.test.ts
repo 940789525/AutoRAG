@@ -167,6 +167,7 @@ function jevLocal(followUp: number, datasources: readonly string[] = []): JevBac
 
 function agentWith(options: Partial<AutoRAGAgentOptions> & Pick<AutoRAGAgentOptions, "model">): AutoRAGAgent {
 	const agent = new AutoRAGAgent({
+		answerMode: "progressive",
 		searchPaths: [docs],
 		memoryPath: join(root, "memory.json"),
 		workspacePath: root,
@@ -201,6 +202,41 @@ function answers(events: readonly SearchDocumentsStreamEvent[]) {
 }
 
 describe("steering a searchDocuments() run", () => {
+	it("handles a correction inside the single answer turn without publishing a draft", async () => {
+		const seen: string[][] = [];
+		const check = heldStep(
+			fauxAssistantMessage([fauxToolCall("semantic_search_local_docs", { query: "capital of france" })], {
+				stopReason: "toolUse",
+			}),
+		);
+		const { model, registration } = fauxModel(check.held, seeingStep("Paris, not Lyon.", seen));
+		const agent = agentWith({ model, answerMode: "single" });
+		const run = collect(agent.searchDocumentsStream("What is the capital of France?"));
+		await check.entered;
+		expect(agent.steer("Check Lyon too.")).toBe(true);
+		check.release();
+		const events = await run;
+		expect(seen[0]?.at(-1)).toContain("Check Lyon too.");
+		expect(registration.state.callCount).toBe(2);
+		expect(answers(events)).toEqual({ quick: [], final: ["Paris, not Lyon."] });
+	});
+
+	it("does not start another model turn after a single-answer search is cancelled", async () => {
+		const answer = heldStep(fauxAssistantMessage("Paris.", { stopReason: "stop" }));
+		const { model, registration } = fauxModel(
+			answer.held,
+			fauxAssistantMessage("Must not run.", { stopReason: "stop" }),
+		);
+		const agent = agentWith({ model, answerMode: "single" });
+		const run = collect(agent.searchDocumentsStream("What is the capital of France?"));
+		await answer.entered;
+		agent.abort();
+		answer.release();
+		const events = await run;
+		expect(registration.state.callCount).toBe(1);
+		expect(answers(events).quick).toEqual([]);
+		expect(answers(events).final.join(" ")).not.toContain("Must not run");
+	});
 	it("delivers a steer sent while the fast phase streams to its next model request, in the same search", async () => {
 		const seen: string[][] = [];
 		const fast = heldStep(

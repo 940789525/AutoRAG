@@ -6,6 +6,7 @@ import type {
 	RetrievalOptions,
 	RetrievalResult,
 } from "../retrieval/types.ts";
+import { localEvidence } from "./evidence.ts";
 import { LocalDocumentIndex } from "./pipeline.ts";
 import type { IndexDocument, IndexEvent, IndexHit, LocalIndexOptions } from "./types.ts";
 
@@ -14,12 +15,19 @@ export class LocalIndexMethod implements RetrievalMethod {
 	readonly index: LocalDocumentIndex;
 	private readonly mode: "vector" | "hybrid";
 	private readonly defaultTopK: number;
+	private readonly canReadSource?: (source: string, sourceId: string) => boolean;
 	constructor(
-		options: LocalIndexOptions & { index?: LocalDocumentIndex; mode?: "vector" | "hybrid"; defaultTopK?: number },
+		options: LocalIndexOptions & {
+			index?: LocalDocumentIndex;
+			mode?: "vector" | "hybrid";
+			defaultTopK?: number;
+			canReadSource?: (source: string, sourceId: string) => boolean;
+		},
 	) {
 		this.index = options.index ?? new LocalDocumentIndex(options);
 		this.mode = options.mode ?? "vector";
 		this.defaultTopK = options.defaultTopK ?? 50;
+		this.canReadSource = options.canReadSource;
 	}
 	describe(): RetrievalMethodDescriptor {
 		return {
@@ -73,7 +81,18 @@ export class LocalIndexMethod implements RetrievalMethod {
 			hits = await this.index.search(query, { ...queryOptions, mode: "bm25" });
 			embeddingError = error instanceof Error ? error.message : String(error);
 		}
-		return hits.map(({ row, score }) => ({
+		const handles = this.canReadSource
+			? await this.index.readHandles(hits, this.canReadSource, options.signal)
+			: new Map();
+		return hits.map(({ row, score, cosine, profile }) => ({
+			[localEvidence]: {
+				query,
+				scope: options.scope,
+				profile: profile ?? "",
+				cosine,
+				vector: row.vector,
+				readHandle: handles.get(row.id),
+			},
 			id: row.id,
 			source: realpathSync(row.source_path),
 			content: row.text,

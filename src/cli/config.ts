@@ -5,6 +5,7 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 import { findEnvKeys, getEnvApiKey } from "@earendil-works/pi-ai/compat";
 import { getAgentDir, ModelRuntime, SettingsManager } from "@earendil-works/pi-coding-agent";
 import type { AutoRAGAgentOptions, AutoRAGRefreshLimits, AutoRAGRetrievalLimits } from "../agent/agent.ts";
+import { type ContextSelectionConfig, normalizeContextSelection } from "../agent/context-selection.ts";
 import type { JevBackendName } from "../agent/jev-extension.ts";
 import {
 	type LoadLocalAutoRAGModelOptions,
@@ -189,6 +190,9 @@ export interface AgentModelConfig {
 }
 
 export interface CliConfig {
+	contextSelection?: ContextSelectionConfig;
+	/** `single` (default) delivers one complete answer; `progressive` enables legacy two-phase delivery. */
+	answerMode?: "single" | "progressive";
 	/** Absolute path of the config file this config was resolved from (it may not exist yet). */
 	configPath?: string;
 	searchPaths: string[];
@@ -959,6 +963,10 @@ export function resolveConfig(input: ResolveConfigInput): CliConfig {
 		languages,
 	};
 	if (model) config.model = model;
+	if (file.answerMode !== undefined && file.answerMode !== "single" && file.answerMode !== "progressive") {
+		throw new ConfigError("Config field 'answerMode' must be 'single' or 'progressive'");
+	}
+	config.answerMode = file.answerMode ?? "single";
 	if (fileExcludePaths !== undefined) config.excludePaths = fileExcludePaths;
 	if (file.limits !== undefined) config.limits = normalizeLimitsConfig(file.limits);
 	if (file.refresh !== undefined) config.refresh = normalizeRefreshConfig(file.refresh);
@@ -1035,6 +1043,11 @@ export function resolveConfig(input: ResolveConfigInput): CliConfig {
 		config.datasources = file.datasources as DatasourcesConfig;
 	}
 	if (file.rerank !== undefined) config.rerank = normalizeRerankConfig(file.rerank, "rerank");
+	try {
+		config.contextSelection = normalizeContextSelection(file.contextSelection);
+	} catch (error) {
+		throw new ConfigError(error instanceof Error ? error.message : String(error));
+	}
 	return config;
 }
 
@@ -1338,6 +1351,8 @@ export function buildAgentOptions(config: CliConfig, agentDir?: string): Omit<Au
 	const opts: Record<string, unknown> = {
 		searchPaths: config.searchPaths,
 		languages: config.languages,
+		answerMode: config.answerMode ?? "single",
+		contextSelection: config.contextSelection,
 	};
 	if (config.workspacePath) opts.workspacePath = config.workspacePath;
 	if (config.memoryPath) opts.memoryPath = config.memoryPath;
@@ -2093,6 +2108,8 @@ export function writeDefaultConfig(
 	full.dupey = partial.dupey ?? { enabled: true };
 	full.excludeExactDuplicates = partial.excludeExactDuplicates ?? true;
 	full.localIndex = normalizeLocalIndex(partial.localIndex);
+	if (partial.contextSelection !== undefined)
+		full.contextSelection = normalizeContextSelection(partial.contextSelection);
 	if (partial.excludePaths !== undefined) full.excludePaths = resolveExcludePaths(partial.excludePaths, workspacePath);
 	if (partial.limits !== undefined) full.limits = normalizeLimitsConfig(partial.limits);
 	if (partial.refresh !== undefined) full.refresh = normalizeRefreshConfig(partial.refresh);

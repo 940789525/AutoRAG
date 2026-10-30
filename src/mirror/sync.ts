@@ -1,7 +1,9 @@
+import { createHash } from "node:crypto";
 import { type Dir, existsSync, rmSync } from "node:fs";
 import { opendir, readFile, stat } from "node:fs/promises";
 import { extname, resolve, sep } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
+import { fileSha256 } from "../filesystem/content-fingerprint.ts";
 import { planSourceRoots, type SourceRoot, sourceIdentifier } from "../filesystem/source-paths.ts";
 import { createDefaultParserRegistry, type DefaultParserRegistryOptions } from "../parser/defaults.ts";
 import { ParseError, ParseIsolationError } from "../parser/errors.ts";
@@ -463,12 +465,16 @@ async function syncWithRegistry(
 			previousEntry.parserVersion === parser.version &&
 			existsSync(outputPath);
 		const parseStarted = performance.now();
+		let sourceSha256 = previousEntry?.sourceSha256;
+		let outputSha256 = previousEntry?.outputSha256;
 
 		if (!unchanged) {
 			// Every failure below is isolated to this one file. Only a workspace-level write failure
 			// (full volume, unwritable workspace) aborts the refresh.
 			let bytes: Awaited<ReturnType<typeof readFile>>;
+			let sourceBefore: Awaited<ReturnType<typeof stat>>;
 			try {
+				sourceBefore = await stat(entry.sourcePath);
 				bytes = await withTransientRetry(() => readFile(entry.sourcePath), transientRetries, transientBackoffMs);
 			} catch (error) {
 				// A vanished source has nothing to retry; an unreadable one is honored like a parser failure
@@ -478,6 +484,7 @@ async function syncWithRegistry(
 				continue;
 			}
 
+			sourceSha256 = createHash("sha256").update(bytes).digest("hex");
 			// A page image inside a PDF stays on the provider. Only a standalone image below leptonica's
 			// minimum is a per-file skip, recorded the same way as the max-size gate.
 			const tooSmallImage = standaloneImageTooSmallMessage(entry.virtualPath, bytes);
@@ -526,7 +533,25 @@ async function syncWithRegistry(
 				continue;
 			}
 			try {
+				// Some parsers stream sourcePath instead of bytes; bind their output to the same source revision.
+				const sourceAfter = await stat(entry.sourcePath);
+				if (
+					sourceBefore.ino !== sourceAfter.ino ||
+					sourceBefore.dev !== sourceAfter.dev ||
+					sourceBefore.ctimeMs !== sourceAfter.ctimeMs ||
+					sourceBefore.mtimeMs !== sourceAfter.mtimeMs ||
+					sourceBefore.size !== sourceAfter.size ||
+					(await fileSha256(entry.sourcePath, options.signal)) !== sourceSha256
+				)
+					throw new Error(`Source changed during parsing: ${entry.sourcePath}`);
+			} catch (error) {
+				if (options.signal?.aborted) throw error;
+				skipFile(entry, sourceReadFailure(error));
+				continue;
+			}
+			try {
 				const markdown = normalizeMarkdown(parsed.markdown);
+				outputSha256 = createHash("sha256").update(markdown).digest("hex");
 				await withTransientRetry(() => writeFileAtomic(outputPath, markdown), transientRetries, transientBackoffMs);
 			} catch (error) {
 				const code = errorCode(error);
@@ -568,6 +593,8 @@ async function syncWithRegistry(
 			sourceMtimeNs: entry.mtimeNs,
 			sourceSizeBytes: entry.sizeBytes,
 			updatedAt: unchanged ? (previousEntry?.updatedAt ?? new Date().toISOString()) : new Date().toISOString(),
+			...(sourceSha256 === undefined ? {} : { sourceSha256 }),
+			...(outputSha256 === undefined ? {} : { outputSha256 }),
 		};
 		await options.onDocument?.({
 			...nextEntries[entry.virtualPath],

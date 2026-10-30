@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SettingsManager } from "@earendil-works/pi-coding-agent";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { resolveInteractiveTuiMode } from "../../src/agent/pi-session.ts";
+import { applyReadableTuiDefaults, resolveInteractiveTuiMode } from "../../src/agent/pi-session.ts";
 
 let root: string;
 let agentDir: string;
@@ -26,6 +26,25 @@ function managerWith(global?: Record<string, unknown>, project?: Record<string, 
 	}
 	return SettingsManager.create(root, agentDir);
 }
+
+describe("readable TUI defaults", () => {
+	it("hides thinking by default without creating a shared settings file", async () => {
+		const manager = managerWith();
+		applyReadableTuiDefaults(manager);
+		expect(manager.getHideThinkingBlock()).toBe(true);
+		await manager.flush();
+		expect(existsSync(join(agentDir, "settings.json"))).toBe(false);
+	});
+
+	it("respects an explicit display preference without rewriting it", async () => {
+		const manager = managerWith({ hideThinkingBlock: false });
+		const before = readFileSync(join(agentDir, "settings.json"), "utf8");
+		applyReadableTuiDefaults(manager);
+		expect(manager.getHideThinkingBlock()).toBe(false);
+		await manager.flush();
+		expect(readFileSync(join(agentDir, "settings.json"), "utf8")).toBe(before);
+	});
+});
 
 describe("resolveInteractiveTuiMode", () => {
 	it("keeps the scrollback UI AutoRAG shipped with instead of pi 1.x's fullscreen default", () => {

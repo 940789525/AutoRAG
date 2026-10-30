@@ -87,12 +87,6 @@ function emitModel(onPrompt?: (text: string) => void) {
 	registration.setResponses([
 		(context) => {
 			onPrompt?.(extractUserText(context));
-			return fauxAssistantMessage([{ type: "text", text: "초기 후보를 확인하고 있습니다." }], {
-				stopReason: "stop",
-			});
-		},
-		(context) => {
-			onPrompt?.(extractUserText(context));
 			return fauxAssistantMessage(`Refund exceptions require director approval. [file:${refundRef}]`, {
 				stopReason: "stop",
 			});

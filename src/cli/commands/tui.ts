@@ -2,6 +2,7 @@ import { InteractiveMode } from "@earendil-works/pi-coding-agent";
 import { TuiAltScreen } from "@earendil-works/pi-tui";
 import { AutoRAGAgent, type AutoRAGAgentOptions, type AutoRAGThinkingLevel } from "../../agent/agent.ts";
 import { resolveInteractiveTuiMode } from "../../agent/pi-session.ts";
+import { createResearchInbox } from "../../agent/research-inbox.ts";
 import { warmFileeBinary } from "../../convert/index.ts";
 import { buildAgentOptions, resolveConfig, resolveQueryDecompositionModel, resolveTuiAgentModel } from "../config.ts";
 import { openCitationTarget } from "../open-target.ts";
@@ -97,7 +98,10 @@ async function createTuiAgent(ctx: CommandContext): Promise<AutoRAGAgent> {
 export async function runTui(ctx: CommandContext): Promise<number> {
 	try {
 		const agent = await createTuiAgent(ctx);
-		const hosted = await agent.createPiInteractiveRuntime();
+		const researchUrl = ctx.flags["research-url"];
+		const hosted = await agent.createPiInteractiveRuntime({
+			extensionFactories: typeof researchUrl === "string" ? [createResearchInbox({ baseUrl: researchUrl })] : [],
+		});
 		try {
 			const interactive = new InteractiveMode(hosted.runtime, {
 				verbose: ctx.debug,

@@ -57,6 +57,18 @@ export function withBoundedOutput<T extends Model<any> | undefined>(model: T): T
 	return { ...model, maxTokens: MAX_OUTPUT_TOKENS };
 }
 
+/** Shared capacity basis for the guard and the append-only context high/low watermarks. */
+export function safeContextInputBudget(model: Model<any> | undefined): number | undefined {
+	if (!model || !Number.isFinite(model.contextWindow) || model.contextWindow <= 0) return undefined;
+	const usableContext = Math.floor(model.contextWindow / CONTEXT_HEADROOM);
+	const outputReserve = Math.min(
+		Math.floor(usableContext / 4),
+		MAX_OUTPUT_TOKENS,
+		Number.isFinite(model.maxTokens) ? Math.max(0, model.maxTokens) : 0,
+	);
+	return Math.max(0, usableContext - outputReserve);
+}
+
 /**
  * Keep complete retrieval candidates while the assembled request fits the
  * model budget. Removing a per-chunk cut is only safe because this drops whole
@@ -77,13 +89,7 @@ export function guardAgentContextMessages(
 		return messages;
 	}
 
-	const usableContext = Math.floor(model.contextWindow / CONTEXT_HEADROOM);
-	const outputReserve = Math.min(
-		Math.floor(usableContext / 4),
-		MAX_OUTPUT_TOKENS,
-		Number.isFinite(model.maxTokens) ? Math.max(0, model.maxTokens) : 0,
-	);
-	const inputBudget = Math.max(0, usableContext - outputReserve);
+	const inputBudget = safeContextInputBudget(model)!;
 	// The context event's messages exclude the system prompt and tool declarations, and
 	// provider-reported usage counts them while a plain estimate does not. Every
 	// post-edit estimate is a plain one, so the overhead comes off the budget.

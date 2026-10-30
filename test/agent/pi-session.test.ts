@@ -68,7 +68,7 @@ function jevRoute(route: QueryRoute, followUp = 0.9): JevBackend {
 async function tuiAgent(
 	responses: FauxResponseStep[],
 	jev: JevBackend = jevRoute("direct"),
-	extra: Pick<AutoRAGAgentOptions, "datasourceSkills"> = {},
+	extra: Pick<AutoRAGAgentOptions, "datasourceSkills" | "answerMode"> = {},
 	ui: Partial<ExtensionUIContext> = {},
 ) {
 	const registration = registerFauxProvider({ api: `faux-tui-${randomUUID()}`, models: [{ id: "tui-model" }] });
@@ -81,6 +81,7 @@ async function tuiAgent(
 		JSON.stringify({ defaultProvider: model.provider, defaultModel: model.id }),
 	);
 	const agent = new AutoRAGAgent({
+		answerMode: "progressive",
 		model,
 		apiKey: "test-key",
 		searchPaths: [root],
@@ -119,6 +120,35 @@ async function tuiAgent(
 		},
 	};
 }
+
+it("delivers one complete local answer in single mode with readable session display defaults", async () => {
+	const expanded = vi.fn();
+	let requests = 0;
+	const hosted = await tuiAgent(
+		[
+			() => {
+				requests++;
+				return fauxAssistantMessage("Complete checked answer.", { stopReason: "stop" });
+			},
+		],
+		jevRoute("local"),
+		{ answerMode: "single" },
+		{ setToolsExpanded: expanded },
+	);
+	try {
+		const events = [];
+		for await (const event of hosted.agent.searchDocumentsStream("find the approval policy")) events.push(event);
+		expect(requests).toBe(1);
+		expect(events.filter((event) => event.type === "preliminary")).toHaveLength(0);
+		expect(events.filter((event) => event.type === "complete")).toHaveLength(1);
+		expect(hosted.session.settingsManager.getHideThinkingBlock()).toBe(true);
+		expect(expanded).toHaveBeenCalledWith(false);
+		const messages = hosted.session.messages.filter((message) => message.role === "assistant");
+		expect(messages).toHaveLength(1);
+	} finally {
+		await hosted.dispose();
+	}
+});
 
 /** The interactive UI surface the TUI binds, with no visible effect. */
 function noUi(): ExtensionUIContext {

@@ -274,6 +274,23 @@ describe("AutoRAG-owned indexing pipeline", () => {
 		assert.equal(next.index.isReady(), false);
 		await assert.rejects(next.index.search("query"), /not ready/);
 	});
+	it("explains model mismatches before query embedding and preserves the ready marker", async () => {
+		const f = fixture();
+		await f.index.sync(input([document(f.root, "a.txt", "Valid.")]));
+		const before = readFileSync(join(f.index.directory, "ready.json"), "utf8");
+		const next = fixture(f.root, f.store, undefined, {
+			identity: { provider: "minsync", model: "Qwen/Qwen3-Embedding-0.6B", dimension: 1024 },
+		});
+		assert.equal(next.index.status(), "configured");
+		await assert.rejects(next.index.search("query"), (error: Error) => {
+			assert.match(error.message, /indexed: fixture, 2 dimensions/);
+			assert.match(error.message, /configured: Qwen\/Qwen3-Embedding-0.6B, 1024 dimensions/);
+			assert.match(error.message, /same --config/);
+			return true;
+		});
+		assert.equal(next.calls.length, 0);
+		assert.equal(readFileSync(join(f.index.directory, "ready.json"), "utf8"), before);
+	});
 	it("rejects zero query vectors and identifies lexical failures by stage", async () => {
 		const f = fixture();
 		await f.index.sync(input([document(f.root, "a.txt", "Valid.")]));

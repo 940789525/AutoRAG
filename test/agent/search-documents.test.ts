@@ -27,14 +27,11 @@ function groundedSource(answer: string): string {
 	return source;
 }
 
-/** Two-phase script: a fast plain answer, then a verified answer citing the local file it grounded on. */
+/** A single tool-enabled answer citing the local file it grounded on. */
 function modelFor(answer = "grounded answer") {
 	const source = groundedSource(answer);
 	const registration = registerFauxProvider({ api: `faux-${randomUUID()}`, models: [{ id: "single-agent" }] });
-	registration.setResponses([
-		fauxAssistantMessage("Initial pass.", { stopReason: "stop" }),
-		fauxAssistantMessage(`${answer} [file:${source}]`, { stopReason: "stop" }),
-	]);
+	registration.setResponses([fauxAssistantMessage(`${answer} [file:${source}]`, { stopReason: "stop" })]);
 	registrations.push(registration);
 	return registration.getModel();
 }
@@ -68,7 +65,6 @@ describe("AutoRAGAgent searchDocuments", () => {
 			models: [{ id: "credential-model" }],
 		});
 		registration.setResponses([
-			fauxAssistantMessage("Initial pass.", { stopReason: "stop" }),
 			(_context, options) => {
 				expect(options?.apiKey).toBe(apiKey);
 				return fauxAssistantMessage(`authenticated [file:${authSource}]`, { stopReason: "stop" });
@@ -149,8 +145,6 @@ describe("AutoRAGAgent searchDocuments", () => {
 		const source = groundedSource("확인된 답변");
 		const registration = registerFauxProvider({ api: `faux-${randomUUID()}`, models: [{ id: "streaming-agent" }] });
 		registration.setResponses([
-			// The fast phase ends in a plain answer (never progress).
-			fauxAssistantMessage("초기 확인 중입니다.", { stopReason: "stop" }),
 			// A message that ends on a tool call is a progress note, not an answer.
 			fauxAssistantMessage(
 				[
@@ -183,7 +177,6 @@ describe("AutoRAGAgent searchDocuments", () => {
 		const source = groundedSource("확인된 답변");
 		const registration = registerFauxProvider({ api: `faux-${randomUUID()}`, models: [{ id: "intent-agent" }] });
 		registration.setResponses([
-			fauxAssistantMessage("초기 확인 중입니다.", { stopReason: "stop" }),
 			fauxAssistantMessage(
 				[
 					{ type: "text", text: "이 메모는 intent가 있으므로 진행 상황으로 보내지 않는다." },

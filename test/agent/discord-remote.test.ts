@@ -100,6 +100,7 @@ async function discordAgent(
 		JSON.stringify({ defaultProvider: model.provider, defaultModel: model.id }),
 	);
 	const agent = new AutoRAGAgent({
+		answerMode: "progressive",
 		model,
 		apiKey: "test-key",
 		searchPaths: [root],

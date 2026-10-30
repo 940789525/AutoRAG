@@ -19,6 +19,8 @@ export interface RetrievalMethodDescriptor {
 export interface RetrievalOptions {
 	topK?: number;
 	scope?: string;
+	/** Local-index allowlist, applied before top-k. */
+	sourceIds?: readonly string[];
 	filters?: Record<string, unknown>;
 	signal?: AbortSignal;
 }

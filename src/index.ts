@@ -11,6 +11,7 @@ export {
 	type AutoRefreshOptions,
 	type RefreshMethod,
 } from "./agent/agent.ts";
+export type { ContextSelectionConfig } from "./agent/context-selection.ts";
 export {
 	type AutoRAGResultsDetails,
 	reportSchema,

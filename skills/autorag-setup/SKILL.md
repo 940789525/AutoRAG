@@ -238,20 +238,22 @@ fast and multi-part questions thorough.
 
 - **Jev** (`jev`, default `{ "backend": "dazzi" }` when signed in to Dazzi
   Models, else `{ "backend": "openrouter" }`; model `jev-1.13` on Dazzi,
-  `typesafe/jev-1.13` on OpenRouter) runs before the fast answer. It routes each question to
+  `typesafe/jev-1.13` on OpenRouter) runs before answering. It routes each question to
   local search, web search, a direct answer (general knowledge or small
   talk skips retrieval entirely), or the `config` branch, and decides whether
   to decompose it. On
   local search it also decides, per registered datasource, whether to search
-  it before the fast answer, using each datasource's `description` and where
+  it before answering, using each datasource's `description` and where
   similar past questions were answered (retrieval memory). When setting up a
   datasource, always write a `description` from what it actually holds:
   channels or rooms, people, topics, time range (for example `"Team Slack,
   2024-2026: #release and #on-call channels, dependabot notifications"`).
   Jev is told descriptions are short, non-exhaustive summaries, so list the
-  main content and do not try to list everything. After the fast answer it
-  decides whether verification is needed, so a complete, evidence-backed fast
-  answer ends the run.
+  main content and do not try to list everything. Default `answerMode: "single"`
+  performs necessary checks and delivers one complete answer, without a draft or
+  a post-answer verification request. Keep this default unless the user explicitly
+  wants legacy `answerMode: "progressive"`; only that mode uses the post-draft
+  follow-up check.
 - **Question decomposition** (`queryDecomposition`, default model
   `dazzi/openai/gpt-6-luna` when signed in to Dazzi Models, else
   `openrouter/qwen/qwen3.7-flash`) splits a multi-part question into at most
@@ -261,7 +263,7 @@ Both need a credential for the chosen backend: a Dazzi Models `/login` (check wi
 `autorag models list --provider dazzi --available`), or the user's
 `OPENROUTER_API_KEY` (`test -n "$OPENROUTER_API_KEY"`, never print it). Tell the
 user Jev routing is on. Without a credential, routing falls back to a single
-local search and the run always verifies, so searches still work. A
+local search; the answering turn still checks evidence before delivering its answer. A
 `query-route-fallback` diagnostic (`autorag search --debug`) shows that state.
 
 ```json

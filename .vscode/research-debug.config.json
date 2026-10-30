@@ -1,0 +1,10 @@
+{
+  "root": "/documents",
+  "workspace": "/data/workspace/research-inbox",
+  "runtimeConfig": "/workspace/.vscode/index-debug.config.json",
+  "agentDir": "/dev-home/.pi/agent",
+  "databaseUrlEnv": "AUTORAG_RESEARCH_DATABASE_URL",
+  "databasePasswordFileEnv": "AUTORAG_RESEARCH_DATABASE_PASSWORD_FILE",
+  "allowModelProcessing": true,
+  "port": 8765
+}

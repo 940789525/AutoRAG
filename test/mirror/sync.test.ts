@@ -65,6 +65,30 @@ class DeleteNextFileParser extends PlainTextParser {
 }
 
 describe("syncParsedMirrors", () => {
+	it("does not stamp a parsed body with a source revision changed by its parser", async () => {
+		const path = join(source, "changing.txt");
+		writeFileSync(path, "original body");
+		class ChangingParser extends PlainTextParser {
+			override async parse(input: ParseInput): Promise<ParseOutput> {
+				const result = await super.parse(input);
+				writeFileSync(path, "different body");
+				return result;
+			}
+		}
+		const registry = new ParserRegistry();
+		registry.register(new ChangingParser());
+		const result = await syncParsedMirrors({ root, searchPaths: [source], registry });
+		expect(result.written).toBe(0);
+		expect(result.diagnostics).toEqual(
+			expect.arrayContaining([
+				expect.objectContaining({
+					code: "source-read-failed",
+					message: expect.stringContaining("Source changed during parsing"),
+				}),
+			]),
+		);
+		expect(loadMirrorIndex(root).entries["/docs/changing.txt"]).toBeUndefined();
+	});
 	it("writes legacy XLS worksheet text to the parsed mirror", async () => {
 		writeFileSync(join(source, "legacy.xls"), createXlsFixture("Mirror legacy XLS marker"));
 

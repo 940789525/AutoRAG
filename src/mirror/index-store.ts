@@ -11,6 +11,9 @@ export interface ParsedMirrorEntry {
 	readonly sourceMtimeNs: number;
 	readonly sourceSizeBytes: number;
 	readonly updatedAt: string;
+	/** Optional on older mirrors; hashes bind the parsed text to the exact source bytes. */
+	readonly sourceSha256?: string;
+	readonly outputSha256?: string;
 }
 
 /** Why refresh deliberately left a source out of the parsed mirror. */
@@ -110,7 +113,11 @@ function isParsedMirrorEntry(value: unknown): value is ParsedMirrorEntry {
 		typeof value.parserName === "string" &&
 		typeof value.sourceMtimeNs === "number" &&
 		typeof value.sourceSizeBytes === "number" &&
-		typeof value.updatedAt === "string"
+		typeof value.updatedAt === "string" &&
+		(value.sourceSha256 === undefined ||
+			(typeof value.sourceSha256 === "string" && /^[a-f0-9]{64}$/u.test(value.sourceSha256))) &&
+		(value.outputSha256 === undefined ||
+			(typeof value.outputSha256 === "string" && /^[a-f0-9]{64}$/u.test(value.outputSha256)))
 	);
 }
 

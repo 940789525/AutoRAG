@@ -1,0 +1,33 @@
+name: autorag-research
+
+services:
+  research-db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: autorag_research
+      POSTGRES_USER: research
+      POSTGRES_PASSWORD_FILE: /run/secrets/research_db_password
+    secrets:
+      - research_db_password
+    volumes:
+      - research-db:/var/lib/postgresql
+    networks:
+      - development
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U research -d autorag_research"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+secrets:
+  research_db_password:
+    file: ${AUTORAG_RESEARCH_DB_PASSWORD_FILE:?Set an absolute external secret-file path}
+
+networks:
+  development:
+    external: true
+    name: ${AUTORAG_RESEARCH_DEV_NETWORK:-autorag-xsy-dev_default}
+
+volumes:
+  research-db:

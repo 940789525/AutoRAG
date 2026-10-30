@@ -46,7 +46,6 @@ describe("provider transcript", () => {
 		});
 		const providerTranscripts: { roles: string[]; declaredTools: string[] }[] = [];
 		registration.setResponses([
-			fauxAssistantMessage("Initial pass.", { stopReason: "stop" }),
 			(context) => {
 				providerTranscripts.push({
 					roles: context.messages.map((message) => message.role),

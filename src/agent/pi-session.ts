@@ -1,6 +1,14 @@
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
-import type { Api, ImageContent, Model } from "@earendil-works/pi-ai";
+import {
+	type Api,
+	type AssistantMessage,
+	type CredentialStore,
+	createAssistantMessageEventStream,
+	type ImageContent,
+	type Model,
+} from "@earendil-works/pi-ai";
 import { streamSimple as compatStreamSimple } from "@earendil-works/pi-ai/compat";
 import {
 	type AgentSession,
@@ -23,7 +31,13 @@ import {
 import { getKeybindings, type KeyId, matchesKey } from "@earendil-works/pi-tui";
 import { PROVIDER_ID as DAZZI_PROVIDER_ID } from "../cloud/config.ts";
 import { registerDazziProvider } from "../cloud/provider.ts";
-import { createContextTokenGuardedTransform, withBoundedOutput } from "./context-token-guard.ts";
+import {
+	createContextTokenGuardedTransform,
+	estimateContextMessageTokens,
+	guardAgentContextMessages,
+	safeContextInputBudget,
+	withBoundedOutput,
+} from "./context-token-guard.ts";
 import { registerIntentTracing } from "./intent-tracing.ts";
 import { createAutoRAGMcpClient, mcpPromptAddendum } from "./mcp-client.ts";
 import { fitRequestLimits } from "./request-limits.ts";
@@ -41,7 +55,15 @@ export function resolveInteractiveTuiMode(settingsManager: SettingsManager): Tui
 	return saved ?? "regular";
 }
 
+/** Keep raw reasoning out of the reading view without writing shared pi settings. */
+export function applyReadableTuiDefaults(settingsManager: SettingsManager): void {
+	const saved =
+		settingsManager.getProjectSettings().hideThinkingBlock ?? settingsManager.getGlobalSettings().hideThinkingBlock;
+	if (saved === undefined) settingsManager.applyOverrides({ hideThinkingBlock: true });
+}
+
 export interface AutoRAGPiSessionOptions {
+	readonly credentials?: CredentialStore;
 	readonly cwd: string;
 	readonly agentDir?: string;
 	readonly sessionDir?: string;
@@ -67,8 +89,25 @@ export interface AutoRAGPiSessionOptions {
 	 * should be callable must appear here too.
 	 */
 	readonly extensionToolNames?: readonly string[];
-	readonly contextTransform?: (messages: AgentMessage[]) => Promise<AgentMessage[]>;
+	readonly contextTransform?: RequestContextTransform;
+	readonly onContextPrepared?: (messages: AgentMessage[]) => void;
+	readonly finalizeContext?: (messages: AgentMessage[]) => AgentMessage[];
+	readonly onContextDispatch?: (messages: readonly AgentMessage[]) => void;
+	readonly onContextSettled?: (success: boolean) => void;
+	readonly onContextReset?: (reason: string) => void;
+	readonly onModelUsage?: (
+		message: AssistantMessage,
+		scope: "answer_session" | "pi_compaction",
+		timing: { latencyMs: number; firstTokenMs?: number },
+	) => void;
 }
+
+export interface RequestContextInfo {
+	readonly model?: Model<Api>;
+	readonly fixedOverheadTokens: number;
+	readonly fingerprint?: string;
+}
+export type RequestContextTransform = (messages: AgentMessage[], info?: RequestContextInfo) => Promise<AgentMessage[]>;
 /**
  * How AutoRAG takes one interactive input. `steer` while a pi turn streams
  * returns the text pi should queue as steering (pi delivers it before the
@@ -199,10 +238,47 @@ async function configureModelRuntime(
  * Registered after AutoRAG's own context transform, so it sizes the final
  * transcript the provider receives.
  */
-function enforceRequestLimits(pi: ExtensionAPI): void {
+function enforceRequestLimits(
+	pi: ExtensionAPI,
+	onPrepared?: (messages: AgentMessage[]) => void,
+	finalize?: (messages: AgentMessage[]) => AgentMessage[],
+): void {
 	pi.on("context", (event, ctx) => {
-		const messages = fitRequestLimits(event.messages, ctx.model?.inputLimits);
-		return messages === undefined ? undefined : { messages };
+		let messages = fitRequestLimits(event.messages, ctx.model?.inputLimits) ?? event.messages;
+		if (finalize) {
+			const active = new Set(pi.getActiveTools());
+			const overhead = Math.ceil(
+				(ctx.getSystemPrompt().length +
+					JSON.stringify(
+						pi
+							.getAllTools()
+							.filter((t) => active.has(t.name))
+							.map(({ name, description, parameters }) => ({ name, description, parameters })),
+					).length) /
+					4,
+			);
+			const repaired = finalize(messages);
+			if (repaired !== messages) {
+				messages = guardAgentContextMessages(ctx.model, repaired, false, overhead);
+				messages = fitRequestLimits(messages, ctx.model?.inputLimits) ?? messages;
+			}
+			const capacity = safeContextInputBudget(ctx.model);
+			if (capacity !== undefined && estimateContextMessageTokens(messages, false) + overhead > capacity)
+				throw new Error(
+					`AutoRAG request exceeds safe context input budget after capacity protection (${capacity} tokens)`,
+				);
+			const maxBytes = ctx.model?.inputLimits?.maxRequestBytes;
+			if (maxBytes !== undefined && Buffer.byteLength(JSON.stringify(messages)) > maxBytes)
+				throw new Error(
+					`AutoRAG request exceeds provider maxRequestBytes after capacity protection (${maxBytes} bytes)`,
+				);
+		}
+		try {
+			onPrepared?.(messages);
+		} catch {
+			/* Observations never change provider input. */
+		}
+		return messages === event.messages ? undefined : { messages };
 	});
 }
 
@@ -211,10 +287,7 @@ function enforceRequestLimits(pi: ExtensionAPI): void {
  * within the active model's context window by dropping whole lower-ranked
  * candidates. Registered before {@link enforceRequestLimits}.
  */
-function guardContext(
-	pi: ExtensionAPI,
-	contextTransform: ((messages: AgentMessage[]) => Promise<AgentMessage[]>) | undefined,
-): void {
+function guardContext(pi: ExtensionAPI, contextTransform: RequestContextTransform | undefined): void {
 	pi.on("context", async (event, ctx) => {
 		// Not part of event.messages, yet sent with every request.
 		const activeTools = new Set(pi.getActiveTools());
@@ -222,29 +295,47 @@ function guardContext(
 			.getAllTools()
 			.filter((tool) => activeTools.has(tool.name))
 			.map(({ name, description, parameters }) => ({ name, description, parameters }));
+		const fingerprint = createHash("sha256")
+			.update(JSON.stringify([ctx.getSystemPrompt(), toolDeclarations, pi.getThinkingLevel()]))
+			.digest("hex");
 		const fixedOverheadTokens = Math.ceil(
 			(ctx.getSystemPrompt().length + JSON.stringify(toolDeclarations).length) / 4,
 		);
-		return {
-			messages: await createContextTokenGuardedTransform(
-				ctx.model,
-				contextTransform,
-				() => fixedOverheadTokens,
-			)(event.messages),
-		};
+		const messages = await createContextTokenGuardedTransform(
+			ctx.model,
+			contextTransform
+				? (input) => contextTransform(input, { model: ctx.model, fixedOverheadTokens, fingerprint })
+				: undefined,
+			() => fixedOverheadTokens,
+		)(event.messages);
+		return { messages };
 	});
 }
 
 function createAutoRAGExtension(
 	getSystemPrompt: () => string,
-	contextTransform: ((messages: AgentMessage[]) => Promise<AgentMessage[]>) | undefined,
+	contextTransform: RequestContextTransform | undefined,
+	onPrepared?: (messages: AgentMessage[]) => void,
+	finalize?: (messages: AgentMessage[]) => AgentMessage[],
+	lifecycle?: Pick<AutoRAGPiSessionOptions, "onContextReset" | "onContextSettled">,
 ): ExtensionFactory {
 	return (pi) => {
 		pi.on("before_agent_start", (event) => ({
 			systemPrompt: getSystemPrompt() + mcpPromptAddendum(event.systemPromptOptions.sections),
 		}));
 		guardContext(pi, contextTransform);
-		enforceRequestLimits(pi);
+		enforceRequestLimits(pi, onPrepared, finalize);
+		if (lifecycle?.onContextReset) {
+			pi.on("session_before_compact", () => {
+				lifecycle.onContextSettled?.(false);
+			});
+			pi.on("session_compact", (event) => {
+				lifecycle.onContextReset?.(`pi_compaction_${event.reason}`);
+			});
+			pi.on("session_compact_failed", () => {
+				lifecycle.onContextSettled?.(false);
+			});
+		}
 		registerIntentTracing(pi);
 	};
 }
@@ -310,17 +401,38 @@ function userInputText(event: { readonly source: string; readonly text: string }
 
 function createAutoRAGInteractiveExtension(
 	getSystemPrompt: () => string,
-	contextTransform: ((messages: AgentMessage[]) => Promise<AgentMessage[]>) | undefined,
+	contextTransform: RequestContextTransform | undefined,
 	options: Pick<AutoRAGPiInteractiveRuntimeOptions, "onInput" | "isSearchRunning" | "onKey">,
 	updateNotice: (() => Promise<string | undefined>) | undefined,
+	settingsManager: SettingsManager,
+	onPrepared?: (messages: AgentMessage[]) => void,
+	finalize?: (messages: AgentMessage[]) => AgentMessage[],
+	lifecycle?: Pick<AutoRAGPiSessionOptions, "onContextReset" | "onContextSettled">,
 ): ExtensionFactory {
 	return (pi) => {
 		pi.on("before_agent_start", (event) => ({
 			systemPrompt: getSystemPrompt() + mcpPromptAddendum(event.systemPromptOptions.sections),
 		}));
 		guardContext(pi, contextTransform);
-		enforceRequestLimits(pi);
+		enforceRequestLimits(pi, onPrepared, finalize);
+		if (lifecycle?.onContextReset) {
+			pi.on("session_before_compact", () => {
+				lifecycle.onContextSettled?.(false);
+			});
+			pi.on("session_compact", (event) => {
+				lifecycle.onContextReset?.(`pi_compaction_${event.reason}`);
+			});
+			pi.on("session_compact_failed", () => {
+				lifecycle.onContextSettled?.(false);
+			});
+		}
 		registerIntentTracing(pi);
+		pi.on("session_start", (_event, ctx) => {
+			// Resource reloads reread pi settings; restore only unsaved display defaults.
+			applyReadableTuiDefaults(settingsManager);
+			// Keep logs accessible via pi's expand toggle, not expanded in the answer view.
+			if (ctx.hasUI) ctx.ui.setToolsExpanded(false);
+		});
 		if (updateNotice !== undefined) {
 			pi.on("session_start", () => {
 				void updateNotice()
@@ -388,6 +500,7 @@ export async function createAutoRAGPiSession(options: AutoRAGPiSessionOptions): 
 		settingsManager.applyOverrides({ defaultTools: [...PI_BUILTIN_TOOL_NAMES] });
 	}
 	const modelRuntime = await ModelRuntime.create({
+		...(options.credentials === undefined ? {} : { credentials: options.credentials }),
 		authPath: join(agentDir, "auth.json"),
 		modelsPath: join(agentDir, "models.json"),
 	});
@@ -404,7 +517,13 @@ export async function createAutoRAGPiSession(options: AutoRAGPiSessionOptions): 
 		settingsManager,
 		extensionFactories: [
 			...(mcp?.extensionFactories ?? []),
-			createAutoRAGExtension(options.getSystemPrompt, options.contextTransform),
+			createAutoRAGExtension(
+				options.getSystemPrompt,
+				options.contextTransform,
+				options.onContextPrepared,
+				options.finalizeContext,
+				options,
+			),
 			...(options.extensionFactories ?? []),
 		],
 		systemPromptOverride: () => options.getSystemPrompt(),
@@ -430,6 +549,7 @@ export async function createAutoRAGPiSession(options: AutoRAGPiSessionOptions): 
 		tools: [...PI_BUILTIN_TOOL_NAMES, ...customToolNames, ...extensionToolNames, ...(mcp?.toolNames ?? [])],
 		thinkingLevel: "off",
 	});
+	attachContextLifecycle(session, options);
 	const initialToolNames = [...new Set([...session.getActiveToolNames(), ...customToolNames, ...extensionToolNames])];
 	session.setActiveToolsByName(initialToolNames);
 	// pi connects MCP servers on `session_start`, which only a bind emits and no TUI hosts this
@@ -460,10 +580,12 @@ export async function createAutoRAGPiInteractiveRuntime(
 ): Promise<AutoRAGPiInteractiveRuntime> {
 	const agentDir = options.agentDir ?? getAgentDir();
 	const settingsManager = SettingsManager.create(options.cwd, agentDir);
+	applyReadableTuiDefaults(settingsManager);
 	if (settingsManager.getDefaultTools() === undefined) {
 		settingsManager.applyOverrides({ defaultTools: [...PI_BUILTIN_TOOL_NAMES] });
 	}
 	const modelRuntime = await ModelRuntime.create({
+		...(options.credentials === undefined ? {} : { credentials: options.credentials }),
 		authPath: join(agentDir, "auth.json"),
 		modelsPath: join(agentDir, "models.json"),
 	});
@@ -500,6 +622,10 @@ export async function createAutoRAGPiInteractiveRuntime(
 						options.contextTransform,
 						{ onInput: options.onInput, isSearchRunning: options.isSearchRunning, onKey: options.onKey },
 						options.updateNotice,
+						settingsManager,
+						options.onContextPrepared,
+						options.finalizeContext,
+						options,
 					),
 					...(options.extensionFactories ?? []),
 				],
@@ -520,6 +646,8 @@ export async function createAutoRAGPiInteractiveRuntime(
 				...(mcp?.toolNames ?? []),
 			],
 		});
+		attachContextLifecycle(result.session, options);
+		applyReadableTuiDefaults(settingsManager);
 		if (options.inactiveToolNames !== undefined && options.inactiveToolNames.length > 0) {
 			const inactive = new Set(options.inactiveToolNames);
 			result.session.setActiveToolsByName(result.session.getActiveToolNames().filter((name) => !inactive.has(name)));
@@ -532,4 +660,84 @@ export async function createAutoRAGPiInteractiveRuntime(
 		sessionManager,
 	});
 	return { runtime, dispose: () => runtime.dispose() };
+}
+
+/** Stream completion is the commit boundary, not a tool result or a speculative context event. */
+function attachContextLifecycle(
+	session: AgentSession,
+	options: Pick<AutoRAGPiSessionOptions, "onContextDispatch" | "onContextSettled" | "onContextReset" | "onModelUsage">,
+): void {
+	if (!options.onContextDispatch && !options.onContextReset && !options.onModelUsage) return;
+	let compacting = false;
+	session.subscribe((event) => {
+		if (event.type === "compaction_start") {
+			compacting = true;
+			options.onContextSettled?.(false);
+		}
+		if (event.type === "compaction_end") {
+			compacting = false;
+		}
+	});
+	const stream = session.agent.streamFunction;
+	session.agent.streamFunction = (model, context, requestOptions) => {
+		const output = createAssistantMessageEventStream();
+		const scope = compacting ? "pi_compaction" : "answer_session";
+		const started = performance.now();
+		let firstTokenMs: number | undefined;
+		void (async () => {
+			try {
+				if (scope === "answer_session") options.onContextDispatch?.(context.messages);
+				const upstream = await stream(model, context, requestOptions);
+				for await (const event of upstream) {
+					if (event.type === "text_delta" && firstTokenMs === undefined)
+						firstTokenMs = performance.now() - started;
+					if (event.type === "done" || event.type === "error") {
+						const message = event.type === "done" ? event.message : event.error;
+						if (scope === "answer_session")
+							options.onContextSettled?.(
+								event.type === "done" &&
+									message.stopReason !== "error" &&
+									message.stopReason !== "aborted" &&
+									!requestOptions?.signal?.aborted,
+							);
+						try {
+							options.onModelUsage?.(message, scope, { latencyMs: performance.now() - started, firstTokenMs });
+						} catch {
+							/* Usage is observational. */
+						}
+					}
+					output.push(event);
+				}
+				output.end(await upstream.result());
+			} catch (error) {
+				if (scope === "answer_session") options.onContextSettled?.(false);
+				const message: AssistantMessage = {
+					role: "assistant",
+					content: [],
+					api: model.api,
+					provider: model.provider,
+					model: model.id,
+					timestamp: Date.now(),
+					stopReason: requestOptions?.signal?.aborted ? "aborted" : "error",
+					errorMessage: error instanceof Error ? error.message : String(error),
+					usage: {
+						input: 0,
+						output: 0,
+						cacheRead: 0,
+						cacheWrite: 0,
+						totalTokens: 0,
+						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+					},
+				};
+				output.push({ type: "error", reason: message.stopReason as "error" | "aborted", error: message });
+				try {
+					options.onModelUsage?.(message, scope, { latencyMs: performance.now() - started, firstTokenMs });
+				} catch {
+					/* Usage observers cannot hide the underlying model failure. */
+				}
+				output.end(message);
+			}
+		})();
+		return output;
+	};
 }

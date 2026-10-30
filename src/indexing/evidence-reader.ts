@@ -1,0 +1,75 @@
+import { readFile, realpath } from "node:fs/promises";
+import { fileSha256 } from "../filesystem/content-fingerprint.ts";
+import { loadMirrorIndex, type ParsedMirrorEntry } from "../mirror/index-store.ts";
+import { parsedOutputPath } from "../mirror/paths.ts";
+import { contentHash } from "./chunker.ts";
+import type { LocalReadHandle } from "./evidence.ts";
+import type { IndexEvidenceChunk } from "./types.ts";
+
+export const MAX_EVIDENCE_BODY_BYTES = 64 * 1024;
+
+export interface EvidenceRevision {
+	readonly source: string;
+	readonly sourceSha256: string;
+	readonly outputSha256: string;
+	readonly markdown: string;
+}
+
+/** Uses the hashes captured from parser input/output, never a timestamp as proof of source identity. */
+export async function readEvidenceRevision(
+	root: string,
+	entry: ParsedMirrorEntry,
+	authorize: (source: string, sourceId: string) => boolean,
+	signal?: AbortSignal,
+): Promise<EvidenceRevision | undefined> {
+	signal?.throwIfAborted();
+	const source = await realpath(entry.sourcePath);
+	if (!authorize(source, entry.virtualPath)) return undefined;
+	if (!entry.sourceSha256 || !entry.outputSha256 || entry.outputPath !== parsedOutputPath(root, entry.virtualPath))
+		return undefined;
+	const sourceSha256 = await fileSha256(entry.sourcePath, signal);
+	const markdown = await readFile(entry.outputPath, { encoding: "utf8", signal });
+	const outputSha256 = contentHash(markdown);
+	if (sourceSha256 !== entry.sourceSha256 || outputSha256 !== entry.outputSha256) return undefined;
+	if ((await realpath(entry.sourcePath)) !== source || !authorize(source, entry.virtualPath)) return undefined;
+	return { source, sourceSha256, outputSha256, markdown };
+}
+
+export function evidenceHandle(
+	row: IndexEvidenceChunk,
+	profile: string,
+	revision: EvidenceRevision,
+): LocalReadHandle | undefined {
+	if (row.text !== revision.markdown.slice(row.start, row.end)) return undefined;
+	return {
+		version: 1,
+		source: revision.source,
+		sourceId: row.source_id,
+		chunkId: row.id,
+		profile,
+		bodySha256: contentHash(row.text),
+		sourceSha256: revision.sourceSha256,
+		outputSha256: revision.outputSha256,
+	};
+}
+
+export async function verifyEvidenceRevision(
+	root: string,
+	handle: LocalReadHandle,
+	authorize: (source: string, sourceId: string) => boolean,
+	signal?: AbortSignal,
+): Promise<EvidenceRevision> {
+	if (!authorize(handle.source, handle.sourceId))
+		throw new Error("Local evidence is outside the current search roots or scope");
+	const entry = loadMirrorIndex(root).entries[handle.sourceId];
+	if (!entry) throw new Error("Local evidence mirror is unavailable; refresh and search again");
+	const revision = await readEvidenceRevision(root, entry, authorize, signal);
+	if (
+		!revision ||
+		revision.source !== handle.source ||
+		revision.sourceSha256 !== handle.sourceSha256 ||
+		revision.outputSha256 !== handle.outputSha256
+	)
+		throw new Error(`Local evidence source or parsed version changed: ${handle.source}; refresh and search again`);
+	return revision;
+}

@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, watch as fsWatch, mkdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import type { Agent, AgentEvent, AgentMessage, AgentTool, AgentToolResult } from "@earendil-works/pi-agent-core";
-import type { Api, ImageContent, Model, TextContent } from "@earendil-works/pi-ai";
+import type { Api, CredentialStore, ImageContent, Model, TextContent } from "@earendil-works/pi-ai";
 import { clampThinkingLevel } from "@earendil-works/pi-ai/compat";
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { getAgentDir, keyText } from "@earendil-works/pi-coding-agent";
@@ -92,6 +92,7 @@ import { RetrievalMethodRegistry } from "../retrieval/registry.ts";
 import { createReranker, DEFAULT_RERANK_TOP_N, type Reranker } from "../retrieval/rerank.ts";
 import {
 	buildRetrievalScopeBindings,
+	matchesVirtualPathScope,
 	normalizeVirtualPath,
 	type RetrievalScopeBinding,
 	resolveRetrievalScope,
@@ -116,6 +117,8 @@ import { createManageAutomationsTool, MANAGE_AUTOMATIONS_TOOL_NAME } from "./aut
 import { createCitationLinks } from "./citation-links.ts";
 import { CitationNumbers } from "./citation-numbers.ts";
 import { CITATION_RELEVANCE_FLOOR, judgeCitationRelevance } from "./citation-relevance.ts";
+import type { ContextSelectionConfig } from "./context-selection.ts";
+import { ContextSelectionProjector } from "./context-selection-projector.ts";
 import { ConversationQueries } from "./conversation-queries.ts";
 import {
 	CONVERT_FILES_TOOL_NAME,
@@ -160,6 +163,7 @@ import {
 } from "./jikji-find-tool.ts";
 import { loadLocalAutoRAGModel } from "./local-model.ts";
 import { createPermissionGate, PermissionController, type PermissionMode } from "./permission-gate.ts";
+import type { AutoRAGPiSessionOptions, RequestContextInfo } from "./pi-session.ts";
 import {
 	type AutoRAGInputDisposition,
 	type AutoRAGInteractiveInput,
@@ -180,6 +184,11 @@ import {
 	routeQuery,
 	selectDatasources,
 } from "./query-routing.ts";
+import {
+	assertCompleteEvidenceReads,
+	createReadLocalEvidenceTool,
+	READ_LOCAL_EVIDENCE_TOOL_NAME,
+} from "./read-local-evidence-tool.ts";
 import {
 	isRefreshOwnerAlive,
 	type PersistedRefreshProgress,
@@ -578,9 +587,14 @@ export interface AutoRAGThinkingOptions {
 }
 
 export interface AutoRAGAgentOptions {
+	contextSelection?: ContextSelectionConfig;
+	/** One complete answer by default; `progressive` explicitly opts into the legacy fast-answer/verification flow. */
+	answerMode?: "single" | "progressive";
 	model?: Model<Api>;
 	apiKey?: string;
 	providerApiKeys?: Readonly<Record<string, string>>;
+	/** Caller-owned Pi credentials; supports read-only in-memory OAuth without writing auth.json. */
+	piCredentials?: CredentialStore;
 	searchPaths: string[];
 	languages?: readonly LanguageTag[];
 	memoryPath?: string;
@@ -804,6 +818,7 @@ export class AutoRAGAgent {
 	private activeSession: AutoRAGSearchSession | undefined;
 	private readonly memory: RetrievalMemory;
 	private readonly runLogger: AutoRAGRunLogger;
+	private readonly contextSelection: ContextSelectionProjector;
 	private lastQuery: string | undefined;
 	/** What the user has said in this conversation; Jev's permission gate judges file changes against it. */
 	private readonly userRequests = new UserRequestLog();
@@ -887,6 +902,7 @@ export class AutoRAGAgent {
 	/** Per-phase thinking levels of the two-phase search. */
 	private readonly fastThinkingLevel: AutoRAGThinkingLevel;
 	private readonly finalThinkingLevel: AutoRAGThinkingLevel;
+	private readonly answerMode: "single" | "progressive";
 	private autoRefreshTimer: NodeJS.Timeout | undefined;
 	private refreshing = false;
 	private refreshState: RefreshState = {
@@ -945,6 +961,7 @@ export class AutoRAGAgent {
 	private readonly baseSystemPromptConfig: SystemPromptConfig;
 	private readonly droppedCallerToolNames: readonly string[];
 	private readonly piAgentDir: string | undefined;
+	private readonly piCredentials: CredentialStore | undefined;
 	private readonly piSessionDir: string | undefined;
 	private readonly persistPiSessions: boolean;
 	private readonly updateNotice: (() => Promise<string | undefined>) | undefined;
@@ -978,9 +995,14 @@ export class AutoRAGAgent {
 		this.toolBurstGuard = new ToolBurstGuard(options.toolCallBurstGuard);
 		this.fastThinkingLevel = options.thinking?.fast ?? "minimal";
 		this.finalThinkingLevel = options.thinking?.final ?? "high";
+		this.answerMode = options.answerMode ?? "single";
+		if (this.answerMode !== "single" && this.answerMode !== "progressive") {
+			throw new Error("answerMode must be 'single' or 'progressive'");
+		}
 		this.apiKey = options.apiKey;
 		this.providerApiKeys = options.providerApiKeys;
 		this.piAgentDir = options.piAgentDir;
+		this.piCredentials = options.piCredentials;
 		this.piSessionDir = options.piSessionDir;
 		this.persistPiSessions = options.persistPiSessions ?? true;
 		this.updateNotice = options.updateNotice;
@@ -1034,7 +1056,10 @@ export class AutoRAGAgent {
 		const native =
 			configuredEmbedder?.baseUrl === undefined &&
 			(configuredEmbedder?.id === undefined || configuredEmbedder.id.startsWith("native:"));
-		const minSyncDefaults: LocalIndexOptions & { defaultTopK: number } = {
+		const minSyncDefaults: LocalIndexOptions & {
+			defaultTopK: number;
+			canReadSource: (source: string, sourceId: string) => boolean;
+		} = {
 			...options.localIndex,
 			root: this.workspaceProjectRoot,
 			embedder: this.embedder,
@@ -1054,6 +1079,7 @@ export class AutoRAGAgent {
 				revision: options.localIndex?.embeddingFingerprint,
 			}),
 			defaultTopK: this.limits.minSyncTopK,
+			canReadSource: (source, sourceId) => this.canReadLocalEvidence(source, sourceId),
 		};
 		this.minSyncMethod = new LocalIndexMethod(minSyncDefaults);
 		this.methodRegistry.register(this.minSyncMethod);
@@ -1102,6 +1128,17 @@ export class AutoRAGAgent {
 		this.minSyncBinaryPath = options.minSync?.binaryPath;
 		this.memoryEmbedder = options.memoryEmbedder === false ? undefined : (options.memoryEmbedder ?? this.embedder);
 		this.runLogger = new AutoRAGRunLogger(join(dirname(memPath), "logs", "runs.jsonl"));
+		this.contextSelection = new ContextSelectionProjector(options.contextSelection, (report) => {
+			this.runLogger.write({
+				event: "context_selection",
+				timestamp: new Date().toISOString(),
+				sessionId: this.lastSessionId ?? "unbound",
+				report,
+			});
+		});
+		if (this.contextSelection.enabled)
+			this.evidenceLedger.onLocalResult = (id, result) => this.contextSelection.registerResult(id, result);
+		this.evidenceLedger.onClear = () => this.contextSelection.clear();
 
 		const checkMemoryTool = createCheckMemoryTool(this.memory, () => this.memoryContextOptions());
 		// One tool per configured datasource connection, so a question that
@@ -1123,6 +1160,16 @@ export class AutoRAGAgent {
 			this.evidenceLedger,
 		);
 		const searchAllTool = createSearchAllDocumentsTool(this, this.evidenceLedger);
+		const readLocalEvidenceTool = createReadLocalEvidenceTool(
+			this.evidenceLedger,
+			(handle, signal) =>
+				this.minSyncMethod.index.readEvidence(
+					handle,
+					(source, sourceId) => this.canReadLocalEvidence(source, sourceId),
+					signal,
+				),
+			(callId, id, handle, body, text) => this.contextSelection.registerEvidenceRead(callId, id, handle, body, text),
+		);
 		const loadDatasourceSkillTool = createLoadDatasourceSkillTool(this);
 		const scanDuplicateDocumentsTool =
 			this.dupeyOptions === false ? undefined : createScanDuplicateDocumentsTool(this);
@@ -1180,6 +1227,7 @@ export class AutoRAGAgent {
 			LOAD_DATASOURCE_SKILL_TOOL_NAME,
 			SEARCH_MINSYNC_DOCUMENTS_TOOL_NAME,
 			SEARCH_ALL_DOCUMENTS_TOOL_NAME,
+			READ_LOCAL_EVIDENCE_TOOL_NAME,
 			JIKJI_FIND_TOOL_NAME,
 			EVERYTHING_SEARCH_TOOL_NAME,
 			FSEARCH_SEARCH_TOOL_NAME,
@@ -1207,6 +1255,7 @@ export class AutoRAGAgent {
 			checkMemoryTool,
 			searchMinSyncTool,
 			searchAllTool,
+			...(!this.telegram && !this.discordRemote ? [readLocalEvidenceTool] : []),
 			...singleDatasourceTools,
 			loadDatasourceSkillTool,
 			...(webSearchTool !== undefined ? [webSearchTool] : []),
@@ -1248,7 +1297,7 @@ export class AutoRAGAgent {
 				tools: [...PI_BUILTIN_TOOL_NAMES.map((name) => ({ name })), ...tools],
 				messages: [],
 			},
-			transformContext: (messages) => this.withMemoryContext(messages),
+			transformContext: (messages) => this.transformRequestContext(messages),
 		};
 
 		if (options.autoRefresh) {
@@ -1317,6 +1366,10 @@ export class AutoRAGAgent {
 	private async withMemoryContext(messages: AgentMessage[]): Promise<AgentMessage[]> {
 		if (this.lastQuery === undefined) return messages;
 		const context = await this.loadMemoryContextFor(this.lastQuery);
+		if (this.contextSelection.adaptive) {
+			this.contextSelection.setMemoryContext(context.empty ? "" : context.text);
+			return messages;
+		}
 		if (context.empty) return messages;
 		return [
 			{
@@ -1326,6 +1379,17 @@ export class AutoRAGAgent {
 			},
 			...messages,
 		];
+	}
+
+	private async transformRequestContext(messages: AgentMessage[], info?: RequestContextInfo): Promise<AgentMessage[]> {
+		const transformed = await this.withMemoryContext(frameSteers(messages, this.interactive.steerTexts));
+		return this.contextSelection.project(
+			transformed,
+			info?.model,
+			info?.fixedOverheadTokens,
+			this.interactive.steers.length ? "steered_query" : undefined,
+			info?.fingerprint,
+		);
 	}
 
 	/**
@@ -1535,6 +1599,7 @@ export class AutoRAGAgent {
 			};
 		}
 		const piSession = await createAutoRAGPiSession({
+			credentials: this.piCredentials,
 			cwd: this.workspaceProjectRoot,
 			agentDir: this.piAgentDir,
 			sessionDir: this.piSessionDir,
@@ -1545,7 +1610,8 @@ export class AutoRAGAgent {
 			getSystemPrompt: () => systemPrompt,
 			customTools: this.steerableTools(),
 			// The model sees each steer framed as a correction of the running search.
-			contextTransform: (messages) => this.withMemoryContext(frameSteers(messages, this.interactive.steerTexts)),
+			contextTransform: (messages, info) => this.transformRequestContext(messages, info),
+			...this.contextRequestLifecycle(),
 			extensionFactories: [this.permissionGate, ...(this.jevExtension !== undefined ? [this.jevExtension] : [])],
 			extensionToolNames: this.jevExtension !== undefined ? [JEV_TOOL_NAME] : [],
 		});
@@ -1571,7 +1637,61 @@ export class AutoRAGAgent {
 		return unsubscribers;
 	}
 
+	private contextRequestLifecycle(): Pick<
+		AutoRAGPiSessionOptions,
+		| "onContextPrepared"
+		| "finalizeContext"
+		| "onContextDispatch"
+		| "onContextSettled"
+		| "onContextReset"
+		| "onModelUsage"
+	> {
+		return {
+			onContextPrepared: (messages) => {
+				assertCompleteEvidenceReads(messages, (source, sourceId) => this.canReadLocalEvidence(source, sourceId));
+				this.contextSelection.observePrepared(messages);
+			},
+			finalizeContext: this.contextSelection.adaptive
+				? (messages) => this.contextSelection.finalize(messages)
+				: undefined,
+			onContextDispatch: (messages) => {
+				assertCompleteEvidenceReads(messages, (source, sourceId) => this.canReadLocalEvidence(source, sourceId));
+				this.contextSelection.dispatch(messages);
+			},
+			onContextSettled: (success) => this.contextSelection.settle(success),
+			onContextReset: (reason) => this.contextSelection.invalidate(reason),
+			onModelUsage: (message, scope, timing) => {
+				const usage = message.usage;
+				const usageReported = [usage?.input, usage?.output, usage?.cacheRead, usage?.cacheWrite].some(
+					(value) => Number.isFinite(value) && value > 0,
+				);
+				this.runLogger.write({
+					event: "model_usage",
+					timestamp: new Date().toISOString(),
+					sessionId: this.lastSessionId ?? "unbound",
+					scope,
+					model: message.model,
+					usageReported,
+					stopReason: message.stopReason,
+					inputTokens: usageReported && Number.isFinite(usage?.input) ? usage.input : null,
+					outputTokens: usageReported && Number.isFinite(usage?.output) ? usage.output : null,
+					cacheReadTokens: usageReported && Number.isFinite(usage?.cacheRead) ? usage.cacheRead : null,
+					cacheWriteTokens: usageReported && Number.isFinite(usage?.cacheWrite) ? usage.cacheWrite : null,
+					totalTokens: usageReported && Number.isFinite(usage?.totalTokens) ? usage.totalTokens : null,
+					cost: usageReported && Number.isFinite(usage?.cost?.total) ? usage.cost.total : null,
+					latencyMs: timing.latencyMs,
+					firstTokenMs: timing.firstTokenMs ?? null,
+				});
+			},
+		};
+	}
+
 	private recordSearchToolEvent(event: AgentEvent): void {
+		if (
+			event.type === "tool_execution_end" &&
+			(this.searchToolNames.has(event.toolName) || event.toolName === READ_LOCAL_EVIDENCE_TOOL_NAME)
+		)
+			this.contextSelection.registerToolResult(event.toolCallId, event.toolName, event.result.content);
 		if (event.type === "tool_execution_end" && this.toolBurstGuard.record(event.toolName)) {
 			if (!this.interactive.harnessAbort) {
 				this.routingDiagnostics.push({
@@ -1619,6 +1739,7 @@ export class AutoRAGAgent {
 	private currentSystemPromptConfig(models: Partial<SystemPromptConfig> = {}): SystemPromptConfig {
 		return {
 			...this.baseSystemPromptConfig,
+			answerMode: this.answerMode,
 			...models,
 		};
 	}
@@ -1635,11 +1756,14 @@ export class AutoRAGAgent {
 		};
 	}
 
-	async createPiInteractiveRuntime(): Promise<AutoRAGPiInteractiveRuntime> {
+	async createPiInteractiveRuntime(
+		options: { extensionFactories?: readonly ExtensionFactory[] } = {},
+	): Promise<AutoRAGPiInteractiveRuntime> {
 		const resolved = this.configuredModel === undefined ? undefined : await this.resolveSessionModel();
 		// Loaded on demand: the bridge is large and most sessions never enable it.
 		const telegramBridge = this.telegram ? (await import("@llblab/pi-telegram")).default : undefined;
 		const runtime = await createAutoRAGPiInteractiveRuntime({
+			credentials: this.piCredentials,
 			cwd: this.workspaceProjectRoot,
 			agentDir: this.piAgentDir,
 			sessionDir: this.piSessionDir,
@@ -1659,21 +1783,21 @@ export class AutoRAGAgent {
 				),
 			// The model sees each steer framed as a correction of the running search;
 			// the transcript, pi's queue display, and Esc/dequeue restores keep the user's words.
-			contextTransform: async (messages) =>
-				this.withMemoryContext(
-					frameSteers(
-						messages.filter(
-							(message) => !(message.role === "custom" && message.customType === RERANK_FAILURE_MESSAGE_TYPE),
-						),
-						this.interactive.steerTexts,
+			contextTransform: (messages, info) =>
+				this.transformRequestContext(
+					messages.filter(
+						(message) => !(message.role === "custom" && message.customType === RERANK_FAILURE_MESSAGE_TYPE),
 					),
+					info,
 				),
+			...this.contextRequestLifecycle(),
 			customTools: this.steerableTools(),
 			onInput: (input, pi) => this.routeInteractiveInput(input, pi),
 			isSearchRunning: () => this.interactive.run !== undefined,
 			onKey: (key) => this.handleInteractiveKey(key),
 			extensionFactories: [
 				this.permissionGate,
+				...(options.extensionFactories ?? []),
 				createUserRequestPersistence(this.userRequests),
 				createEvidencePersistence(this.evidenceLedger, this.citationNumbers, this.conversationQueries),
 				createCitationLinks(this.evidenceLedger),
@@ -1711,6 +1835,7 @@ export class AutoRAGAgent {
 					// A disposed session must not receive later numbers.
 					this.citationNumbers.setSink(undefined);
 					this.conversationQueries.setSink(undefined);
+					this.evidenceLedger.clear();
 				}
 				await dispose();
 			},
@@ -2080,6 +2205,7 @@ export class AutoRAGAgent {
 		// no transcript starts over, and result numbers follow the same rule: `[n]` accumulates with the conversation.
 		if (this.boundPiRuntime === undefined) {
 			this.evidenceLedger.clear();
+			this.contextSelection.clear();
 			this.citationNumbers.reset();
 			this.conversationQueries.reset();
 		}
@@ -2088,6 +2214,7 @@ export class AutoRAGAgent {
 		this.memoryContextCache = undefined;
 		this.routingDiagnostics = [];
 		this.lastQuery = trimmedQuery;
+		this.contextSelection.begin(trimmedQuery, this.reranker !== undefined);
 		// A run that owns no TUI session is its own conversation. In the TUI the log is the session's and is fed
 		// as the user types, so a follow-up or a steer is never missing and a phase prompt is never in it.
 		if (this.boundPiRuntime === undefined) {
@@ -2265,7 +2392,7 @@ export class AutoRAGAgent {
 					// Direct answers skip every retrieval step and the verification
 					// phase: the fast answer is the final answer. Only Jev routes
 					// here, so the preliminary was never published.
-					setThinking(this.fastThinkingLevel);
+					setThinking(this.answerMode === "single" ? this.finalThinkingLevel : this.fastThinkingLevel);
 					await this.searchProgress.step("direct", "Answering from the model's own knowledge", () =>
 						activeSession.prompt(this.buildDirectAnswerPrompt(trimmedQuery)),
 					);
@@ -2282,6 +2409,25 @@ export class AutoRAGAgent {
 						? ""
 						: await this.prefetchInitialRetrievalContext(trimmedQuery, plan.queries, options, plan.datasources);
 				if (stopped()) return;
+				if (this.answerMode === "single") {
+					// Retrieval and source verification belong to this one tool-enabled
+					// turn. Never publish a draft or schedule a post-answer verification.
+					setThinking(this.finalThinkingLevel);
+					await this.searchProgress.step("answer", "Preparing the answer", () =>
+						activeSession.prompt(
+							this.buildSearchPrompt(trimmedQuery, options, baseline) +
+								formatSteerContext(this.interactive.steers),
+						),
+					);
+					while (!stopped() && !planAbort.signal.aborted && this.interactive.queuedSteers.length > 0) {
+						await activeSession.prompt(buildSteerContinuationPrompt(this.interactive.steers));
+					}
+					steering.acceptingSteers = false;
+					if (stopped() || planAbort.signal.aborted) return;
+					const answer = finalAnswerText(transcript());
+					if (answer !== undefined) captured = await this.deriveAnswer(answer);
+					return;
+				}
 				let fastText: string | undefined = directText;
 				let preliminary: AutoRAGResultsDetails | undefined;
 				if (plan.route !== "direct") {
@@ -2456,6 +2602,7 @@ export class AutoRAGAgent {
 			this.preliminaryCallback = undefined;
 			this.activeRun = false;
 			this.memoryContextCache = undefined;
+			if (this.boundPiRuntime === undefined) this.contextSelection.clear();
 		}
 	}
 
@@ -3135,25 +3282,25 @@ export class AutoRAGAgent {
 	buildFastAnswerPrompt(query: string, options: RetrievalOptions, baseline: string): string {
 		const limit = typeof options.topK === "number" ? ` Cite at most ${options.topK} sources.` : "";
 		const scope = options.scope ? ` Restrict search to virtual path scope ${options.scope}.` : "";
-		return (
+		return this.contextSelection.registerPrompt(
 			`Answer this original query immediately: ${query}${limit}${scope}\n\n` +
-			`Baseline retrieval evidence (already gathered for you):\n${baseline}\n\n` +
-			`Produce the best complete, self-contained answer you can RIGHT NOW from this evidence. Do NOT call any search, retrieval, or file-reading tools and do NOT wait for more evidence. ` +
-			`If the query is answerable from general knowledge alone, answer directly.\n\n` +
-			`Formatting and content rules for the answer:\n` +
-			`- Unless the user explicitly requests a different format or length, provide the core answer to the user's question in at most 5 bullet points. If additional explanation is necessary, append it after the bullet points.\n` +
-			`- ${ANSWER_LEAD_RULE}\n` +
-			`- ${ANSWER_BULLET_RULE}\n` +
-			`- ${ANSWER_EMPHASIS_RULE}\n` +
-			`- ${ANSWER_LANGUAGE_RULE}\n` +
-			`- Unless the user explicitly requests otherwise, answer the question directly. Do not include specific file paths, datasource descriptions, or retrieval mechanics in the answer text.\n` +
-			`- ${ANSWER_DELIVERABLE_RULE}\n` +
-			`- ${ANSWER_CITATION_RULE}\n` +
-			`- ${ANSWER_IMAGE_EMBED_RULE}\n` +
-			`- Do not report per-source negative findings (e.g. "no information found in Slack" or "checked Drive but found nothing").\n` +
-			`- When evidence conflicts, treat the freshest (most recent) information as the correct source of truth.\n` +
-			`- ${ANSWER_UNCERTAINTY_RULE} If there are partial clues or leads (even if not the exact answer), mention those clues concisely.\n\n` +
-			`Write the answer as your reply, then stop.`
+				`Baseline retrieval evidence (already gathered for you):\n${baseline}\n\n` +
+				`Produce the best complete, self-contained answer you can RIGHT NOW from this evidence. Do NOT call any search, retrieval, or file-reading tools and do NOT wait for more evidence. ` +
+				`If the query is answerable from general knowledge alone, answer directly.\n\n` +
+				`Formatting and content rules for the answer:\n` +
+				`- Unless the user explicitly requests a different format or length, provide the core answer to the user's question in at most 5 bullet points. If additional explanation is necessary, append it after the bullet points.\n` +
+				`- ${ANSWER_LEAD_RULE}\n` +
+				`- ${ANSWER_BULLET_RULE}\n` +
+				`- ${ANSWER_EMPHASIS_RULE}\n` +
+				`- ${ANSWER_LANGUAGE_RULE}\n` +
+				`- Unless the user explicitly requests otherwise, answer the question directly. Do not include specific file paths, datasource descriptions, or retrieval mechanics in the answer text.\n` +
+				`- ${ANSWER_DELIVERABLE_RULE}\n` +
+				`- ${ANSWER_CITATION_RULE}\n` +
+				`- ${ANSWER_IMAGE_EMBED_RULE}\n` +
+				`- Do not report per-source negative findings (e.g. "no information found in Slack" or "checked Drive but found nothing").\n` +
+				`- When evidence conflicts, treat the freshest (most recent) information as the correct source of truth.\n` +
+				`- ${ANSWER_UNCERTAINTY_RULE} If there are partial clues or leads (even if not the exact answer), mention those clues concisely.\n\n` +
+				`Write the answer as your reply, then stop.`,
 		);
 	}
 
@@ -3253,29 +3400,35 @@ export class AutoRAGAgent {
 	buildSearchPrompt(query: string, options: RetrievalOptions, initialRetrievalContext?: string): string {
 		const limit = typeof options.topK === "number" ? ` Cite at most ${options.topK} sources.` : "";
 		const scope = options.scope ? ` Restrict search to virtual path scope ${options.scope}.` : "";
-		return (
+		return this.contextSelection.registerPrompt(
 			`Find and curate information for this original query: ${query}${limit}${scope}\n\n` +
-			`Start by deciding whether this is answerable from general knowledge or memory. If it is a generic, stable question, answer it immediately without retrieval. ` +
-			`Otherwise, baseline MinSync and Jikji retrieval is already running in parallel; do not give the final answer until its next message arrives.\n\n` +
-			`Baseline retrieval context:\n${initialRetrievalContext ?? "Pending; continue only with a brief progress statement."}\n\n` +
-			`Treat candidates as unverified evidence, verify important claims against source files when needed, and use additional tools when needed. ` +
-			`Judge relevance, conflicts, freshness, and sufficiency in this agent loop.\n\n` +
-			`Formatting and content rules for the answer:\n` +
-			`- Unless the user explicitly requests a different format or length, provide the core answer to the user's question in at most 5 bullet points. If additional explanation is necessary, append it after the bullet points.\n` +
-			`- ${ANSWER_LEAD_RULE}\n` +
-			`- ${ANSWER_BULLET_RULE}\n` +
-			`- ${ANSWER_EMPHASIS_RULE}\n` +
-			`- ${ANSWER_LANGUAGE_RULE}\n` +
-			`- Unless the user explicitly requests otherwise, answer the question directly. Do not include specific file paths, datasource descriptions, or retrieval mechanics in the answer text.\n` +
-			`- ${ANSWER_DELIVERABLE_RULE}\n` +
-			`- ${ANSWER_CITATION_RULE}\n` +
-			`- ${ANSWER_IMAGE_EMBED_RULE}\n` +
-			`- Do not report per-source negative findings (e.g. "no information found in Slack").\n` +
-			`- When evidence conflicts, treat the freshest (most recent) information as the correct source of truth.\n` +
-			`- ${ANSWER_UNCERTAINTY_RULE} If there are partial clues or leads, mention them concisely.\n\n` +
-			`${this.discoveryHint((tools) => `When exploring local files and folders, actively use ${tools} rather than exploratory bash commands. `)}Do not use broad grep/find or recursive filesystem scans: only inspect a path or narrow neighborhood surfaced by retrieval, and only when evidence clearly points there. ` +
-			`Avoid spinning repeated near-identical queries against the same datasource; once additional attempts stop surfacing new evidence, conclude from the evidence available. ` +
-			`When finished, reply with the final answer and no tool call: that last reply is what the user receives, so keep progress notes out of it.`
+				`Start by deciding whether this is answerable from general knowledge or memory. If it is a generic, stable question, answer it immediately without retrieval. ` +
+				(initialRetrievalContext === undefined
+					? `Otherwise, use the available tools to gather the evidence needed before answering.\n\n`
+					: `Baseline retrieval has completed. Use the evidence below; if it is empty or insufficient, fill the specific gaps with tools before answering.\n\n`) +
+				`Baseline retrieval context:\n${initialRetrievalContext || "No baseline evidence is available."}\n\n` +
+				`Treat candidates as unverified evidence, verify important claims against source files when needed, and use additional tools when needed. ` +
+				`Judge relevance, conflicts, freshness, and sufficiency in this agent loop. ` +
+				`Finish necessary checks before writing one complete, self-contained final answer. Do not publish a draft, promise a later verification, or end with a confirmation-only reply. ` +
+				`When the evidence already settles the question, stop searching. Keep tool details, retry logs, and progress commentary out of the answer. ` +
+				this.webFallbackHint() +
+				`\n\n` +
+				`Formatting and content rules for the answer:\n` +
+				`- Unless the user explicitly requests a different format or length, provide the core answer to the user's question in at most 5 bullet points. If additional explanation is necessary, append it after the bullet points.\n` +
+				`- ${ANSWER_LEAD_RULE}\n` +
+				`- ${ANSWER_BULLET_RULE}\n` +
+				`- ${ANSWER_EMPHASIS_RULE}\n` +
+				`- ${ANSWER_LANGUAGE_RULE}\n` +
+				`- Unless the user explicitly requests otherwise, answer the question directly. Do not include specific file paths, datasource descriptions, or retrieval mechanics in the answer text.\n` +
+				`- ${ANSWER_DELIVERABLE_RULE}\n` +
+				`- ${ANSWER_CITATION_RULE}\n` +
+				`- ${ANSWER_IMAGE_EMBED_RULE}\n` +
+				`- Do not report per-source negative findings (e.g. "no information found in Slack").\n` +
+				`- When evidence conflicts, treat the freshest (most recent) information as the correct source of truth.\n` +
+				`- ${ANSWER_UNCERTAINTY_RULE} If there are partial clues or leads, mention them concisely.\n\n` +
+				`${this.discoveryHint((tools) => `When exploring local files and folders, actively use ${tools} rather than exploratory bash commands. `)}Do not use broad grep/find or recursive filesystem scans: only inspect a path or narrow neighborhood surfaced by retrieval, and only when evidence clearly points there. ` +
+				`Avoid spinning repeated near-identical queries against the same datasource; once additional attempts stop surfacing new evidence, conclude from the evidence available. ` +
+				`When finished, reply with the final answer and no tool call: that last reply is what the user receives, so keep progress notes out of it.`,
 		);
 	}
 
@@ -4247,6 +4400,20 @@ export class AutoRAGAgent {
 			this.retrievalScopeBindings,
 			process.platform,
 			this.datasourceVirtualScopePrefixes,
+		);
+	}
+	private canReadLocalEvidence(source: string, sourceId: string): boolean {
+		if (this.telegram || this.discordRemote) return false;
+		const canonical = realpathSync(source);
+		if (canonical !== source || !matchesVirtualPathScope(sourceId, this.activeRetrievalOptions?.scope)) return false;
+		const contained = (root: string) => {
+			const rel = relative(root, canonical);
+			return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
+		};
+		return (
+			this.searchPaths.some(
+				(root, index) => contained(root) && realpathSync(this.configuredSearchPaths[index]) === root,
+			) && !this.excludePaths.some(contained)
 		);
 	}
 }

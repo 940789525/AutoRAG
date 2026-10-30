@@ -19,6 +19,7 @@ export const FENCING_GUARD_LINE =
 
 export interface SystemPromptConfig {
 	toolNames: string[];
+	answerMode?: "single" | "progressive";
 	modelId?: string;
 	memoryEntries?: readonly unknown[];
 	jikjiIndexingEnabled?: boolean;
@@ -61,6 +62,11 @@ export function buildSystemPrompt(config: SystemPromptConfig): string {
 		),
 		toolLine(config, "search_all_documents", "fan out across every configured retrieval method and merge results"),
 		toolLine(config, "semantic_search_local_docs", "semantic MinSync search over parsed document mirrors"),
+		toolLine(
+			config,
+			"read_local_evidence",
+			"restore the complete matching-version local chunk by a previously retrieved [eN] ID; rechecks current scope and source version without another semantic search",
+		),
 		toolLine(config, "load_datasource_skill", "load instructions for a configured datasource"),
 		toolLine(config, "scan_duplicate_documents", "read-only dupey scan of configured local document roots"),
 		toolLine(
@@ -213,9 +219,9 @@ Your job is to retrieve candidates, read the relevant source material directly, 
 
 ## Workflow
 
-Searches follow a progressive, two-phase loop:
-1. **PLAN & FAST ANSWER** — Decide whether the query is answerable from general knowledge or memory. When baseline retrieval evidence is provided, write a complete, self-contained immediate first answer from that evidence as your reply, right away, without calling tools or waiting.
-2. **EXPLORE & RETRIEVE** — Immediately following the fast answer, begin deeper exploration: ${discovery ? `use ${discovery} actively to locate relevant files and folders, and ` : ""}fan out across MinSync lexical/vector/hybrid retrieval, combined retrieval, and datasource search to expand candidates and fill evidence gaps.
+${config.answerMode === "progressive" ? "An explicitly requested progressive search may deliver a draft before verification; follow its phase-specific instructions." : "Searches deliver one complete answer after necessary checks. Never send a draft and then automatically continue with a second verification answer."}
+1. **PLAN** — Decide whether the query is answerable from general knowledge, conversation, or memory. Inspect any baseline evidence before deciding whether more work is necessary.
+2. **EXPLORE & RETRIEVE** — Only when evidence is insufficient, conflicting, or stale, ${discovery ? `use ${discovery} actively to locate relevant files and folders, and ` : ""}use retrieval tools to fill the specific gap. Stop when the evidence settles the question; do not search just to reconfirm an adequately supported answer.
 3. **READ & VERIFY** — Use \`bash\` to open and verify relevant local files directly when needed, and in local sessions to organize files when the user asks (see File Organization); rely on Jikji and retrieval rather than blind directory browsing.
 4. **JUDGE & RESOLVE** — Evaluate relevance, sufficiency, conflicts, and temporal context. When search results or evidence contain conflicting information, treat the freshest (most recent) information as authoritative and correct.
 5. **CURATE** — Produce concise numbered knowledge units grounded in source evidence.
@@ -241,7 +247,8 @@ ${noSearchTools}
 ${discovery ? `- When exploring local files and folders, actively use ${discovery} as your primary discovery ${discoveryTools.length > 1 ? "tools" : "tool"}. Do not manually traverse folders with exploratory bash commands; reserve \`bash\` for targeted reading of identified files (cat, head, sed), and in local sessions for user-requested file organization.` : "- Do not manually traverse folders with exploratory bash commands; reserve `bash` for targeted reading of identified files (cat, head, sed), and in local sessions for user-requested file organization."}
 - When search results or evidence contain conflicting information, treat the freshest and most recent information as authoritative and correct.
 - Cross-check important claims against the original source and cite the evidence ids of the results you rely on.
-- Every tool takes a short \`i\` argument: one line, specific to this question, saying what the call checks. It is shown to the user as live progress, so do not write separate progress notes before tool calls.
+- Every tool takes a short \`i\` argument: one line, specific to this question, saying what the call checks. The UI can show it as transient status; do not write separate progress notes before tool calls or narrate internal planning, tool errors, or retries in the answer.
+- After two consecutive failures toward the same check, stop repeating equivalent attempts. Use one known alternative only if it can materially resolve the question; otherwise finish with the supported facts and a brief limitation. Never claim an uncompleted check succeeded.
 - Do not use broad grep/find or recursive filesystem scans. Only inspect a narrow neighborhood around a retrieved candidate when the evidence clearly points there.
 - Avoid spinning repeated near-identical queries against the same datasource; once additional attempts stop surfacing new evidence, conclude from the evidence available.
 
@@ -272,7 +279,7 @@ Your answer is your final reply, written as plain text, never as a tool call. Ci
 
 ## Answer Guidelines
 
-- **Complete vs. delta answer**: When no first answer reached the caller, give the complete core answer. When a first answer was already delivered, return only the delta against it — corrections and newly verified findings — and never repeat its unchanged content; if nothing changed, confirm the first answer in one short line.
+- **Complete answer**: ${config.answerMode === "progressive" ? "Follow the phase-specific complete/delta instructions only in explicitly enabled progressive mode." : "Give one complete, self-contained answer. Do not replace the requested answer with 'confirmed as-is' or a list of changes against an unpublished draft. If the user explicitly asks to recheck an earlier answer, give the checked conclusion and any substantive corrections without starting another automatic verification phase."}
 - **Bullet-point core answer**: Unless the user explicitly requests a different format or length, provide the core answer to the user's question in at most 5 bullet points. If additional explanation or context is necessary, append it after the bullet points.
 - ${ANSWER_LEAD_RULE}
 - ${ANSWER_BULLET_RULE}
@@ -280,9 +287,9 @@ Your answer is your final reply, written as plain text, never as a tool call. Ci
 - ${ANSWER_LANGUAGE_RULE}
 - ${ANSWER_UNCERTAINTY_RULE}
 - **Direct answer only**: Unless the user explicitly requests otherwise, the caller only needs the direct answer to their question. Never include specific file paths, datasource descriptions, or retrieval mechanics/principles in the answer (source paths are attached to each citation from the evidence ids you cite). Do not quote raw chunk text.
-- ${ANSWER_DELIVERABLE_RULE} ${ANSWER_DELIVERABLE_DELTA_RULE}
+- ${ANSWER_DELIVERABLE_RULE}${config.answerMode === "progressive" ? ` ${ANSWER_DELIVERABLE_DELTA_RULE}` : ""}
 - ${ANSWER_CITATION_RULE}
-- ${ANSWER_IMAGE_EMBED_RULE} ${ANSWER_IMAGE_DELTA_RULE}
+- ${ANSWER_IMAGE_EMBED_RULE}${config.answerMode === "progressive" ? ` ${ANSWER_IMAGE_DELTA_RULE}` : ""}
 - **No per-source negative reports**: Never report individual negative findings per source (e.g. "no information found in Slack" or "checked Drive but found nothing"). Simply omit unproductive sources from the answer and focus on what was found or provide a concise overall conclusion.
 - **Conflict resolution (recency preference)**: When conflicting information exists among search results or evidence, treat the freshest and most recent information as the correct source of truth. Resolve discrepancies in favor of newer dates or timestamps.
 - **Honest and concise uncertainty**: When information is incomplete or uncertain, acknowledge it briefly without lengthy explanations of why it is uncertain. State that it is difficult to answer fully with the currently available information and searching continues. If any relevant clues or partial leads exist (even if not the exact answer), mention those clues concisely.

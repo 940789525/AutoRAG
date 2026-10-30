@@ -290,6 +290,7 @@ function recordingMinSync() {
 
 function agentWith(options: Partial<AutoRAGAgentOptions> & Pick<AutoRAGAgentOptions, "model">): AutoRAGAgent {
 	return new AutoRAGAgent({
+		answerMode: "progressive",
 		searchPaths: [docs],
 		memoryPath: join(root, "memory.json"),
 		workspacePath: root,
@@ -313,6 +314,29 @@ async function collect(agent: AutoRAGAgent, query: string): Promise<SearchDocume
 }
 
 describe("Jev query pipeline before the fast answer", () => {
+	it("keeps routing and baseline retrieval but skips the post-answer follow-up check in single mode", async () => {
+		const prompts: string[] = [];
+		const asked: string[] = [];
+		const inner = jevRouting("local", 0.1, 0.99);
+		const backend: JevBackend = {
+			name: inner.name,
+			async judge(request) {
+				asked.push(...request.questions.map((question) => question.id));
+				return inner.judge(request);
+			},
+		};
+		const model = fauxModel(capture(finalAnswer("The approval policy is available."), prompts));
+		const agent = agentWith({ model, answerMode: "single", jev: { backend } });
+		const minSync = recordingMinSync();
+		injectMinSync(agent, minSync.method);
+		const events = await collect(agent, "Who approves the budget?");
+		expect(minSync.queries).toEqual(["Who approves the budget?"]);
+		expect(prompts).toHaveLength(1);
+		expect(prompts[0]).toContain("evidence for Who approves the budget?");
+		expect(asked).toContain(QUERY_ROUTE_QUESTION_ID);
+		expect(asked).not.toContain(FOLLOW_UP_QUESTION_ID);
+		expect(events.some((event) => event.type === "preliminary")).toBe(false);
+	});
 	it("answers a direct question immediately without any retrieval or verification phase", async () => {
 		const prompts: string[] = [];
 		const model = fauxModel(capture(fastAnswer("Paris is the capital of France."), prompts));

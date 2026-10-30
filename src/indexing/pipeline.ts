@@ -6,6 +6,14 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { writeFileAtomic } from "../mirror/atomic-write.ts";
 import { loadMirrorIndex } from "../mirror/index-store.ts";
 import { CHUNKER_VERSION, chunkMarkdown, contentHash } from "./chunker.ts";
+import type { LocalReadHandle } from "./evidence.ts";
+import {
+	type EvidenceRevision,
+	evidenceHandle,
+	MAX_EVIDENCE_BODY_BYTES,
+	readEvidenceRevision,
+	verifyEvidenceRevision,
+} from "./evidence-reader.ts";
 import { IndexJournal } from "./journal.ts";
 import { LanceIndexStore } from "./lance-store.ts";
 import { acquireIndexLease } from "./lease.ts";
@@ -58,27 +66,96 @@ export class LocalDocumentIndex {
 				throw new RangeError(`localIndex.${name} must be a positive integer`);
 		}
 	}
+	/** Optional read locators are derived only from verified parser metadata and exact indexed chunks. */
+	async readHandles(
+		hits: readonly import("./types.ts").IndexHit[],
+		authorize: (source: string, sourceId: string) => boolean,
+		signal?: AbortSignal,
+	): Promise<ReadonlyMap<string, LocalReadHandle>> {
+		const entries = loadMirrorIndex(this.options.root).entries;
+		const revisions = new Map<string, Promise<EvidenceRevision | undefined>>();
+		const handles = new Map<string, LocalReadHandle>();
+		for (const hit of hits) {
+			const entry = entries[hit.row.source_id];
+			if (!entry || !hit.profile || entry.sourcePath !== hit.row.source_path) continue;
+			let revision = revisions.get(entry.virtualPath);
+			if (!revision) {
+				revision = readEvidenceRevision(this.options.root, entry, authorize, signal);
+				revisions.set(entry.virtualPath, revision);
+			}
+			const verified = await revision;
+			const handle = verified && evidenceHandle(hit.row, hit.profile, verified);
+			if (handle) handles.set(hit.row.id, handle);
+		}
+		return handles;
+	}
+	async readEvidence(
+		handle: LocalReadHandle,
+		authorize: (source: string, sourceId: string) => boolean,
+		signal?: AbortSignal,
+	) {
+		signal?.throwIfAborted();
+		if (!authorize(handle.source, handle.sourceId))
+			throw new Error("Local evidence is outside the current search roots or scope");
+		const readyText = readFileSync(join(this.directory, "ready.json"), "utf8");
+		const ready = JSON.parse(readyText) as { version?: number; profile?: string };
+		if (ready.version !== 1 || ready.profile !== handle.profile || this.readinessError())
+			throw new Error("Local evidence index profile changed; refresh and search again");
+		const revision = await verifyEvidenceRevision(this.options.root, handle, authorize, signal);
+		const store =
+			this.options.store ?? (await LanceIndexStore.openExisting(join(this.directory, handle.profile, "store")));
+		if (!store.readChunk) throw new Error("Local index does not support exact evidence reads");
+		const row = await store.readChunk(handle.sourceId, handle.chunkId);
+		signal?.throwIfAborted();
+		if (
+			!row ||
+			row.id !== handle.chunkId ||
+			row.source_id !== handle.sourceId ||
+			row.source_path !== loadMirrorIndex(this.options.root).entries[handle.sourceId]?.sourcePath ||
+			row.text !== revision.markdown.slice(row.start, row.end) ||
+			contentHash(row.text) !== handle.bodySha256
+		)
+			throw new Error("Local evidence chunk version is unavailable; refresh and search again");
+		const bytes = Buffer.byteLength(row.text, "utf8");
+		if (bytes > MAX_EVIDENCE_BODY_BYTES)
+			throw new Error(`Local evidence body is ${bytes} bytes, exceeding the ${MAX_EVIDENCE_BODY_BYTES} byte limit`);
+		await verifyEvidenceRevision(this.options.root, handle, authorize, signal);
+		if (readFileSync(join(this.directory, "ready.json"), "utf8") !== readyText)
+			throw new Error("Local evidence index changed while reading; search again");
+		signal?.throwIfAborted();
+		return row;
+	}
 	isReady(): boolean {
 		return this.status() !== "configured";
 	}
-	status(): "configured" | "ready" | "degraded" {
+	/** Explain why a persisted index cannot be queried without opening or modifying its store. */
+	readinessError(): string | undefined {
 		const path = join(this.directory, "ready.json");
-		if (!existsSync(path)) return "configured";
+		const recovery = `run autorag refresh --method local with the same --config used for this query (${this.directory})`;
+		if (!existsSync(path)) return `Local index is not ready: ready.json is missing; ${recovery}`;
 		const ready = JSON.parse(readFileSync(path, "utf8")) as {
 			version?: number;
 			model?: string;
 			dimension?: number;
 			embeddingFingerprint?: string;
+		};
+		if (ready.version !== 1)
+			return `Local index is not ready: unsupported index version ${ready.version}; ${recovery}`;
+		if (
+			this.options.identity &&
+			(ready.model !== this.options.identity.model || ready.dimension !== this.options.identity.dimension)
+		)
+			return `Local index is not ready: embedding identity mismatch (indexed: ${ready.model}, ${ready.dimension} dimensions; configured: ${this.options.identity.model}, ${this.options.identity.dimension} dimensions); ${recovery}`;
+		if (ready.embeddingFingerprint !== this.options.embeddingFingerprint)
+			return `Local index is not ready: embedding configuration changed; ${recovery}`;
+		return undefined;
+	}
+	status(): "configured" | "ready" | "degraded" {
+		if (this.readinessError()) return "configured";
+		const ready = JSON.parse(readFileSync(join(this.directory, "ready.json"), "utf8")) as {
 			partial?: boolean;
 			profile?: string;
 		};
-		if (
-			ready.version !== 1 ||
-			ready.embeddingFingerprint !== this.options.embeddingFingerprint ||
-			(this.options.identity &&
-				(ready.model !== this.options.identity.model || ready.dimension !== this.options.identity.dimension))
-		)
-			return "configured";
 		if (ready.profile && existsSync(join(this.directory, ready.profile, "maintenance-needed"))) return "degraded";
 		const lastReport = join(this.directory, "last-run.json");
 		if (existsSync(lastReport) && (JSON.parse(readFileSync(lastReport, "utf8")) as { ok?: boolean }).ok === false)
@@ -530,11 +607,18 @@ export class LocalDocumentIndex {
 	}
 	async search(
 		query: string,
-		options: { mode?: "vector" | "bm25" | "hybrid"; topK?: number; scope?: string; signal?: AbortSignal } = {},
+		options: {
+			mode?: "vector" | "bm25" | "hybrid";
+			topK?: number;
+			scope?: string;
+			sourceIds?: readonly string[];
+			signal?: AbortSignal;
+		} = {},
 	) {
 		options.signal?.throwIfAborted();
-		if (!this.isReady())
-			throw new Error(`Local index is not ready: run autorag refresh --method minsync (${this.directory})`);
+		if (options.sourceIds?.length === 0) return [];
+		const readinessError = this.readinessError();
+		if (readinessError) throw new Error(readinessError);
 		const context = await this.context();
 		const ready = JSON.parse(readFileSync(join(this.directory, "ready.json"), "utf8")) as { profile: string };
 		if (ready.profile !== context.profile)
@@ -576,9 +660,10 @@ export class LocalDocumentIndex {
 			mode,
 			topK: options.topK ?? 50,
 			scope: options.scope,
+			sourceIds: options.sourceIds,
 		});
 		options.signal?.throwIfAborted();
-		return hits;
+		return hits.map((hit) => ({ ...hit, profile: context.profile }));
 	}
 }
 
