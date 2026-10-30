@@ -6,16 +6,16 @@ legacy/ package license: Apache-2.0
 
 Third-party production dependencies:
 
-@earendil-works/pi-agent-core@1.2.0
+@earendil-works/pi-agent-core@1.4.0
 License: MIT
 
-@earendil-works/pi-ai@1.2.0
+@earendil-works/pi-ai@1.4.0
 License: MIT
 
-@earendil-works/pi-coding-agent@1.2.0
+@earendil-works/pi-coding-agent@1.4.0
 License: MIT
 
-@earendil-works/pi-tui@1.2.0
+@earendil-works/pi-tui@1.4.0
 License: MIT
 
 @huggingface/tokenizers@0.2.0
