@@ -74,13 +74,16 @@
     "pythonServiceRssKiB": 2062692,
     "nodePeakRssKiB": 854624,
     "oldMinSyncReference": "not available; no speedup/equivalence claim",
-    "dedicated4cpu8gContainer": "not run"
+    "dedicated4cpu8gContainer": "PASS; see docs/qa/docker-deployment-2026-10-31.json (4.013 GiB cgroup peak, no OOM)"
   },
   "docker": {
     "composeConfiguration": "PASS",
-    "imageBuild": "BLOCKED_NETWORK",
-    "diagnostic": "failed to fetch anonymous token: Get https://auth.docker.io/token?scope=repository%3Aoven%2Fbun%3Apull&service=registry.docker.io: dial tcp 65.22.160.17:443: i/o timeout",
-    "existingContainersRestarted": false
+    "imageBuild": "PASS",
+    "existingContainersRestarted": false,
+    "previousDiagnostic": "failed to fetch anonymous token: Get https://auth.docker.io/token?scope=repository%3Aoven%2Fbun%3Apull&service=registry.docker.io: dial tcp 65.22.160.17:443: i/o timeout",
+    "developmentImageBuild": "PASS",
+    "deployment": "PASS: 4 CPUs/8 GiB, cold/warm core, offline restart/query, recreation persistence, local-model and Obsidian live QA",
+    "followupEvidence": "docs/qa/docker-deployment-2026-10-31.json"
   },
   "unverified": [
     "real hosted API build/query",

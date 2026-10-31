@@ -1,0 +1,2164 @@
+{
+  "schemaVersion": 1,
+  "result": "PASS",
+  "completedAt": "2026-10-31T17:02:48.210503+08:00",
+  "implementationBase": "5d08c9efce679baada03f1bef6016bb31c08860a",
+  "scope": "Docker deployment acceptance for local FastEmbed Qwen; independent Compose project, synthetic documents, CPU only",
+  "fixes": [
+    "Copy the npm bundled with the existing Node image into both Docker images so release-asset tests can run npm pack.",
+    "Run the QA image as UID/GID 1000 with an owned node_modules mountpoint so directory-permission tests exercise real access restrictions."
+  ],
+  "images": [
+    {
+      "name": "autorag-qa-ob8tmejo",
+      "id": "sha256:ea37e4f5aac0a87bb596fa7527b18773f0d7502477a58211e4ac6e52a8bc1ca2",
+      "size": 328822931,
+      "user": "1000:1000"
+    },
+    {
+      "name": "autorag-qa-ob8tmejo-dev",
+      "id": "sha256:e0dee75ffc697e082f97ea22932369a0d8906f798d0b4ba52116996738f72939",
+      "size": 328953673,
+      "user": "1000:1000"
+    }
+  ],
+  "environment": {
+    "platform": "linux/amd64",
+    "cpuLimit": 4,
+    "memoryLimitBytes": 8589934592,
+    "defaultUser": "1000:1000",
+    "runtimeVersions": [
+      "v24.22.2",
+      "11.19.1",
+      "1.4.2",
+      "Python 3.12.3"
+    ],
+    "model": "Qwen/Qwen3-Embedding-0.6B",
+    "dimension": 1024,
+    "modelPreparation": "Copied clone-local pinned ONNX files into a new QA-owned volume; service verified every manifest hash. No first-download benchmark."
+  },
+  "gates": {
+    "qaImageBuild": "PASS",
+    "developmentImageBuild": "PASS",
+    "check": "PASS (8 existing informational suggestions)",
+    "lint": "PASS (8 informational suggestions)",
+    "typecheck": "PASS",
+    "build": "PASS",
+    "supplyChain": "PASS",
+    "pythonContracts": {
+      "passed": 5,
+      "failed": 0
+    },
+    "fullRegression": {
+      "passed": 3290,
+      "failed": 0,
+      "skipped": 67,
+      "passedFiles": 290,
+      "skippedFiles": [
+        "↓ test/live-e2e/answer-readability.test.ts (1 test | 1 skipped)",
+        "↓ test/live-e2e/automation-agent.test.ts (2 tests | 2 skipped)",
+        "↓ test/live-e2e/citation-relevance.test.ts (1 test | 1 skipped)",
+        "↓ test/live-e2e/filee-agent.test.ts (1 test | 1 skipped)",
+        "↓ test/live-e2e/filee-convert.test.ts (5 tests | 5 skipped)",
+        "↓ test/live-e2e/filee-install.test.ts (2 tests | 2 skipped)",
+        "↓ test/live-e2e/filee-matrix.test.ts (1 test | 1 skipped)",
+        "↓ test/live-e2e/jev.test.ts (2 tests | 2 skipped)",
+        "↓ test/live-e2e/filee-chain-agent.test.ts (1 test | 1 skipped)",
+        "↓ test/live-e2e/rerank-dazzi.test.ts (5 tests | 5 skipped)",
+        "↓ test/live-e2e/permission-gate.test.ts (27 tests | 27 skipped)",
+        "↓ test/live-e2e/rerank.test.ts (4 tests | 4 skipped)",
+        "↓ test/live-e2e/search-progress.test.ts (1 test | 1 skipped)",
+        "↓ test/live-e2e/web-search.test.ts (8 tests | 8 skipped)",
+        "↓ test/live-e2e/telegram-remote.test.ts (1 test | 1 skipped)",
+        "↓ test/research/service.integration.test.ts (4 tests | 4 skipped)",
+        "↓ test/live-e2e/whatsapp.test.ts (1 test | 1 skipped)"
+      ],
+      "totalFiles": 307,
+      "command": "node node_modules/vitest/vitest.mjs run --maxWorkers=2",
+      "summary": "Test Files  290 passed | 17 skipped (307)\n      Tests  3290 passed | 67 skipped (3357)\n   Start at  08:53:52\n   Duration  290.38s (import 65%, tests 33%, setup 1%, transform 1%)"
+    },
+    "imageDefaultUserAndOfflineToolVersions": "PASS"
+  },
+  "deployment": {
+    "limitsAndHealth": {
+      "id": "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422",
+      "memory": 8589934592,
+      "nanoCpus": 4000000000,
+      "state": {
+        "Dead": false,
+        "Error": "",
+        "ExitCode": 0,
+        "FinishedAt": "0001-01-01T00:00:00Z",
+        "Health": {
+          "FailingStreak": 0,
+          "Log": [
+            {
+              "End": "2026-10-31T08:37:59.083176117Z",
+              "ExitCode": 1,
+              "Output": "fetch failed\n",
+              "Start": "2026-10-31T08:37:58.924337439Z"
+            },
+            {
+              "End": "2026-10-31T08:38:04.531764885Z",
+              "ExitCode": 1,
+              "Output": "fetch failed\n",
+              "Start": "2026-10-31T08:38:04.084220641Z"
+            },
+            {
+              "End": "2026-10-31T08:38:09.749640867Z",
+              "ExitCode": 1,
+              "Output": "fetch failed\n",
+              "Start": "2026-10-31T08:38:09.533393843Z"
+            },
+            {
+              "End": "2026-10-31T08:38:14.929003355Z",
+              "ExitCode": 0,
+              "Output": "{\"ready\":true,\"model\":\"Qwen/Qwen3-Embedding-0.6B\",\"dimension\":1024,\"revision\":\"af95f2c416ffe9379369ad64f9113e865db6112c/fastembed-0.9.1/v1\",\"maxInputTokens\":2048,\"maxInputs\":32,\"device\":\"cpu\",\"prefixOwner\":\"client\",\"pooling\":\"last-token\",\"normalization\":\"l2\",\"tokenizerPath\":\"/dev-home/.autorag/models/fastembed/qwen3-0.6b-af95f2c416ffe9379369ad64f9113e865db6112c\",\"artifact\":{\"model\":\"Qwen/Qwen3-Embedding-0.6B\",\"repository\":\"Qdrant/Qwen3-Embedding-0.6B-onnx\",\"revision\":\"af95f2c416ffe9379369ad64f9113e865db6112c\",\"dimension\":1024,\"license\":\"Apache-2.0\",\"files\":{\"config.json\":\"da2b52e46d1469b9f6ff3a45e2bec36b2bb667de5ea9dd5a076e8bfe3b30cc05\",\"tokenizer_config.json\":\"1c45aaa97b2bec1d2e1ab0df53e1b2ed2f9568b871b25ca56095c0b83a5d4e93\",\"special_tokens_map.json\":\"76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd\",\"tokenizer.json\":\"def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a\",\"onnx/model.onnx\":\"754d6ba1c7a323d7b3af0d85b8268f8b716b0cd362ce73295e0f71d3dd831639\",\"onnx/model.onnx_data\":\"15d02a315e3b95296700c73d72a436e79facf4e17d919345bed730e98433bcb4\"}}}\n",
+              "Start": "2026-10-31T08:38:14.750329303Z"
+            }
+          ],
+          "Status": "healthy"
+        },
+        "OOMKilled": false,
+        "Paused": false,
+        "Pid": 14782,
+        "Restarting": false,
+        "Running": true,
+        "StartedAt": "2026-10-31T08:37:53.778074848Z",
+        "Status": "running"
+      }
+    },
+    "offlineRestart": {
+      "container": "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422",
+      "networks": {},
+      "healthy": true
+    },
+    "containerRecreation": {
+      "previous": "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422",
+      "current": "1f311fcc929329471af29cef09a9e8060fbf4b4bec4253a685b32eced7848269"
+    },
+    "persistence": {
+      "cold": {
+        "phase": "cold",
+        "configPath": "/dev-home/.autorag/config.json",
+        "model": "Qwen/Qwen3-Embedding-0.6B",
+        "dimension": 1024,
+        "build": {
+          "version": 1,
+          "jobId": "de605638-398e-4dcb-a6d0-f951068579aa",
+          "requestId": "86dd83b5-349a-48bd-859d-9a01260ef921",
+          "configurationFingerprint": "4dffa72d7fb2ed22bafb6862c8739db0e603dabb481cab9935ee938cb0b40a7c",
+          "owner": "bad3bee0-d9f1-47ec-ac80-15d315a532fd",
+          "pid": 482,
+          "birth": "1b8da3b4-b018-414f-b4c6-f32b4f49b5bc:2656455",
+          "mode": "build",
+          "embeddingProfile": "local-qwen3",
+          "state": "succeeded",
+          "startedAt": "2026-10-31T08:45:18.990Z",
+          "updatedAt": "2026-10-31T08:45:20.826Z",
+          "phase": "done",
+          "event": {
+            "runId": "4dba77f3-f0a5-4177-8ce2-2f1c1a789f05",
+            "elapsedMs": 1477.2795319999996,
+            "phase": "done",
+            "state": "end"
+          },
+          "report": {
+            "runId": "4dba77f3-f0a5-4177-8ce2-2f1c1a789f05",
+            "backend": "autorag",
+            "ok": true,
+            "durationMs": 1477.1930270000003,
+            "timings": {
+              "prepare": 927.7271320000004,
+              "write": 52.27329000000009,
+              "parse": 53.808060000000296,
+              "chunk": 15.932276999999885,
+              "lexical": 4.580151000000114,
+              "cache": 4.7388599999999315,
+              "embed": 405.00142400000004,
+              "maintain": 29.827549000000545
+            },
+            "documents": 2,
+            "unchanged": 0,
+            "chunks": 2,
+            "embedded": 2,
+            "reused": 0,
+            "deleted": 0,
+            "failures": [],
+            "reportPath": "/qa-state/workspace/.autorag/local-index/runs/4dba77f3-f0a5-4177-8ce2-2f1c1a789f05/report.json"
+          },
+          "partial": false
+        },
+        "configHash": "05d02818c2c3bc2360449bcd6938d0561ff4409544d6f8f2e3a4c5f1f910bd62",
+        "result": "PASS"
+      },
+      "read": {
+        "phase": "read",
+        "configPath": "/dev-home/.autorag/config.json",
+        "model": "Qwen/Qwen3-Embedding-0.6B",
+        "dimension": 1024,
+        "queryWithoutNetwork": "PASS",
+        "result": "PASS"
+      },
+      "warm": {
+        "phase": "warm",
+        "configPath": "/dev-home/.autorag/config.json",
+        "model": "Qwen/Qwen3-Embedding-0.6B",
+        "dimension": 1024,
+        "queryBeforeRefresh": "PASS",
+        "unchanged": {
+          "version": 1,
+          "jobId": "cf1829f6-5a53-454c-b4b2-ed590f6f4490",
+          "requestId": "301096d5-34ca-49bf-ab20-82fd640e3dbb",
+          "configurationFingerprint": "4dffa72d7fb2ed22bafb6862c8739db0e603dabb481cab9935ee938cb0b40a7c",
+          "owner": "c30d6647-2f3a-46f9-b9b1-4a3705cdc02f",
+          "pid": 111,
+          "birth": "1b8da3b4-b018-414f-b4c6-f32b4f49b5bc:2707022",
+          "mode": "refresh",
+          "embeddingProfile": "local-qwen3",
+          "state": "succeeded",
+          "startedAt": "2026-10-31T08:53:45.127Z",
+          "updatedAt": "2026-10-31T08:53:45.185Z",
+          "phase": "done",
+          "event": {
+            "runId": "464dd9cf-67a8-4c2b-99d3-ed065fdad52a",
+            "elapsedMs": 20.485939000000144,
+            "phase": "done",
+            "state": "end"
+          },
+          "report": {
+            "runId": "464dd9cf-67a8-4c2b-99d3-ed065fdad52a",
+            "backend": "autorag",
+            "ok": true,
+            "durationMs": 20.44473700000026,
+            "timings": {
+              "prepare": 4.871946999999636,
+              "write": 0.6236320000002706,
+              "parse": 0
+            },
+            "documents": 2,
+            "unchanged": 2,
+            "chunks": 0,
+            "embedded": 0,
+            "reused": 0,
+            "deleted": 0,
+            "failures": [],
+            "reportPath": "/qa-state/workspace/.autorag/local-index/runs/464dd9cf-67a8-4c2b-99d3-ed065fdad52a/report.json"
+          },
+          "partial": false
+        },
+        "increment": {
+          "version": 1,
+          "jobId": "bf8b4b8e-3dbc-42a2-b634-c8b65a6ef387",
+          "requestId": "dd0e47ad-f4ed-48fc-89f3-3f674b7c01b7",
+          "configurationFingerprint": "4dffa72d7fb2ed22bafb6862c8739db0e603dabb481cab9935ee938cb0b40a7c",
+          "owner": "c30d6647-2f3a-46f9-b9b1-4a3705cdc02f",
+          "pid": 111,
+          "birth": "1b8da3b4-b018-414f-b4c6-f32b4f49b5bc:2707022",
+          "mode": "refresh",
+          "embeddingProfile": "local-qwen3",
+          "state": "succeeded",
+          "startedAt": "2026-10-31T08:53:45.236Z",
+          "updatedAt": "2026-10-31T08:53:45.604Z",
+          "phase": "done",
+          "event": {
+            "runId": "88a35c90-173f-47b5-845c-c8487fd6ae3e",
+            "elapsedMs": 339.117804,
+            "phase": "done",
+            "state": "end"
+          },
+          "report": {
+            "runId": "88a35c90-173f-47b5-845c-c8487fd6ae3e",
+            "backend": "autorag",
+            "ok": true,
+            "durationMs": 339.07300199999963,
+            "timings": {
+              "prepare": 2.5814299999997274,
+              "write": 39.67051300000003,
+              "parse": 15.155169000000114,
+              "chunk": 2.9815520000001925,
+              "lexical": 3.35407000000032,
+              "cache": 3.5110779999999977,
+              "embed": 214.14016300000003,
+              "maintain": 48.47705999999971
+            },
+            "documents": 2,
+            "unchanged": 1,
+            "chunks": 1,
+            "embedded": 1,
+            "reused": 0,
+            "deleted": 0,
+            "failures": [],
+            "reportPath": "/qa-state/workspace/.autorag/local-index/runs/88a35c90-173f-47b5-845c-c8487fd6ae3e/report.json"
+          },
+          "partial": false
+        },
+        "deletion": {
+          "version": 1,
+          "jobId": "a36d31d9-79aa-44e2-904a-039116106ba2",
+          "requestId": "73d4c043-029d-4788-950e-70a671e624e5",
+          "configurationFingerprint": "4dffa72d7fb2ed22bafb6862c8739db0e603dabb481cab9935ee938cb0b40a7c",
+          "owner": "c30d6647-2f3a-46f9-b9b1-4a3705cdc02f",
+          "pid": 111,
+          "birth": "1b8da3b4-b018-414f-b4c6-f32b4f49b5bc:2707022",
+          "mode": "refresh",
+          "embeddingProfile": "local-qwen3",
+          "state": "succeeded",
+          "startedAt": "2026-10-31T08:53:45.648Z",
+          "updatedAt": "2026-10-31T08:53:45.703Z",
+          "phase": "done",
+          "event": {
+            "runId": "bca21909-6f95-46ed-bbb8-b95a7fad32b8",
+            "elapsedMs": 29.60640199999989,
+            "phase": "done",
+            "state": "end"
+          },
+          "report": {
+            "runId": "bca21909-6f95-46ed-bbb8-b95a7fad32b8",
+            "backend": "autorag",
+            "ok": true,
+            "durationMs": 29.559799999999996,
+            "timings": {
+              "prepare": 0.8064399999998386,
+              "write": 15.794702000000143,
+              "parse": 0,
+              "maintain": 5.847197000000051
+            },
+            "documents": 1,
+            "unchanged": 1,
+            "chunks": 0,
+            "embedded": 0,
+            "reused": 0,
+            "deleted": 1,
+            "failures": [],
+            "reportPath": "/qa-state/workspace/.autorag/local-index/runs/bca21909-6f95-46ed-bbb8-b95a7fad32b8/report.json"
+          },
+          "partial": false
+        },
+        "configUnchanged": true,
+        "result": "PASS"
+      }
+    },
+    "coldCore": {
+      "mode": "cold",
+      "refresh": {
+        "parsed": {
+          "scanned": 2,
+          "written": 2,
+          "skipped": 0
+        },
+        "minsync": {
+          "report": {
+            "runId": "8d1a59db-cb7f-483d-8299-72ea18ab2669",
+            "backend": "autorag",
+            "ok": true,
+            "durationMs": 25804.262052000002,
+            "timings": {
+              "prepare": 681.2843830000018,
+              "write": 40.53742700000157,
+              "parse": 33.9503279999999,
+              "chunk": 10.958305999998629,
+              "lexical": 24243.968644,
+              "cache": 5.090092000002187,
+              "embed": 774.1084840000003,
+              "maintain": 27.637087999999494
+            },
+            "documents": 2,
+            "unchanged": 0,
+            "chunks": 2,
+            "embedded": 2,
+            "reused": 0,
+            "deleted": 0,
+            "failures": [],
+            "reportPath": "/qa-state/fixed-workspace/.autorag/local-index/runs/8d1a59db-cb7f-483d-8299-72ea18ab2669/report.json"
+          },
+          "ok": true,
+          "synced": 2
+        }
+      },
+      "cursorPath": "/qa-state/fixed-workspace/.autorag/local-index/ready.json",
+      "cursorExists": true,
+      "koreanLexical": {
+        "status": "PASS",
+        "query": "인증서",
+        "fixture": "korean-policy.txt"
+      },
+      "hit": {
+        "source": "/workspace/scripts/live-e2e/corpus/sample.txt",
+        "sourceAbsolute": true,
+        "sourceExists": true,
+        "sourceReadable": true,
+        "score": 1
+      },
+      "status": {
+        "state": "success",
+        "stale": false,
+        "components": {
+          "minsync": "ready",
+          "fsearch": "unavailable"
+        }
+      },
+      "liteRetrieve": {
+        "healthy": {
+          "exitCode": 0,
+          "ok": true,
+          "stale": false,
+          "resultCount": 2,
+          "unsearched": [],
+          "sourceMatched": "/workspace/scripts/live-e2e/corpus/sample.txt"
+        },
+        "embedderDown": {
+          "exitCode": 0,
+          "ok": true,
+          "unsearched": [
+            {
+              "surface": "minsync",
+              "methods": [
+                "minsync"
+              ],
+              "reason": "TypeError: Unable to connect. Is the computer able to access the url?"
+            }
+          ],
+          "diagnostics": [
+            {
+              "code": "retrieval-method-failed",
+              "severity": "warning",
+              "message": "Retrieval method \"minsync\" failed and was skipped; partial results from other methods were used: TypeError: Unable to connect. Is the computer able to access the url?",
+              "source": "minsync",
+              "reason": "TypeError: Unable to connect. Is the computer able to access the url?"
+            }
+          ],
+          "skippedSurface": "minsync",
+          "skippedMethods": [
+            "minsync"
+          ],
+          "reasonVerbatim": "TypeError: Unable to connect. Is the computer able to access the url?",
+          "humanWarningWithoutDebug": [
+            "warning: not searched: minsync (minsync): TypeError: Unable to connect. Is the computer able to access the url?"
+          ]
+        }
+      },
+      "embedding": {
+        "endpoint": "http://127.0.0.1:18382",
+        "model": "Qwen/Qwen3-Embedding-0.6B",
+        "dimension": 1024,
+        "queryPrefix": "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:",
+        "passagePrefix": "",
+        "loopbackOnly": true
+      },
+      "openaiKeyPresent": false,
+      "incremental": false,
+      "fullSync": true
+    },
+    "warmCore": {
+      "mode": "warm",
+      "refresh": {
+        "parsed": {
+          "scanned": 2,
+          "written": 0,
+          "skipped": 0
+        },
+        "minsync": {
+          "report": {
+            "runId": "39bfe64a-3878-4841-9a32-d5059c3f2d7f",
+            "backend": "autorag",
+            "ok": true,
+            "durationMs": 600.1546069999999,
+            "timings": {
+              "prepare": 585.5483449999999,
+              "write": 0.6451339999998709,
+              "parse": 0
+            },
+            "documents": 2,
+            "unchanged": 2,
+            "chunks": 0,
+            "embedded": 0,
+            "reused": 0,
+            "deleted": 0,
+            "failures": [],
+            "reportPath": "/qa-state/fixed-workspace/.autorag/local-index/runs/39bfe64a-3878-4841-9a32-d5059c3f2d7f/report.json"
+          },
+          "ok": true,
+          "synced": 0
+        }
+      },
+      "cursorPath": "/qa-state/fixed-workspace/.autorag/local-index/ready.json",
+      "cursorExists": true,
+      "koreanLexical": {
+        "status": "PASS",
+        "query": "인증서",
+        "fixture": "korean-policy.txt"
+      },
+      "hit": {
+        "source": "/workspace/scripts/live-e2e/corpus/sample.txt",
+        "sourceAbsolute": true,
+        "sourceExists": true,
+        "sourceReadable": true,
+        "score": 1
+      },
+      "status": {
+        "state": "success",
+        "stale": false,
+        "components": {
+          "minsync": "ready",
+          "fsearch": "unavailable"
+        }
+      },
+      "liteRetrieve": {
+        "healthy": {
+          "exitCode": 0,
+          "ok": true,
+          "stale": false,
+          "resultCount": 2,
+          "unsearched": [],
+          "sourceMatched": "/workspace/scripts/live-e2e/corpus/sample.txt"
+        },
+        "embedderDown": {
+          "exitCode": 0,
+          "ok": true,
+          "unsearched": [
+            {
+              "surface": "minsync",
+              "methods": [
+                "minsync"
+              ],
+              "reason": "TypeError: Unable to connect. Is the computer able to access the url?"
+            }
+          ],
+          "diagnostics": [
+            {
+              "code": "retrieval-method-failed",
+              "severity": "warning",
+              "message": "Retrieval method \"minsync\" failed and was skipped; partial results from other methods were used: TypeError: Unable to connect. Is the computer able to access the url?",
+              "source": "minsync",
+              "reason": "TypeError: Unable to connect. Is the computer able to access the url?"
+            }
+          ],
+          "skippedSurface": "minsync",
+          "skippedMethods": [
+            "minsync"
+          ],
+          "reasonVerbatim": "TypeError: Unable to connect. Is the computer able to access the url?",
+          "humanWarningWithoutDebug": [
+            "warning: not searched: minsync (minsync): TypeError: Unable to connect. Is the computer able to access the url?"
+          ]
+        }
+      },
+      "embedding": {
+        "endpoint": "http://127.0.0.1:18382",
+        "model": "Qwen/Qwen3-Embedding-0.6B",
+        "dimension": 1024,
+        "queryPrefix": "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:",
+        "passagePrefix": "",
+        "loopbackOnly": true
+      },
+      "openaiKeyPresent": false,
+      "incremental": true,
+      "fullSync": false
+    },
+    "composeOverrides": {
+      "services": {
+        "dev": {
+          "image": "autorag-qa-ob8tmejo-dev",
+          "volumes": [
+            {
+              "type": "bind",
+              "source": "/tmp/autorag-docker-qa-ob8tmejo/documents",
+              "target": "/documents",
+              "read_only": true
+            },
+            {
+              "type": "bind",
+              "source": "/tmp/autorag-docker-qa-ob8tmejo",
+              "target": "/qa-evidence"
+            },
+            {
+              "type": "volume",
+              "source": "qa-fixtures",
+              "target": "/qa-state"
+            }
+          ]
+        }
+      },
+      "volumes": {
+        "qa-fixtures": {}
+      }
+    }
+  },
+  "localModelChecks": {
+    "result": "PASS",
+    "fixtures": "18 synthetic source documents including Chinese/English, long Markdown, PDF and non-ASCII paths",
+    "query": {
+      "samples": 32,
+      "p50Ms": 322.1010399999941,
+      "p95Ms": 556.455786999999,
+      "failures": 0
+    },
+    "quality": {
+      "en->en": {
+        "questions": 16,
+        "recallAt5": 1,
+        "recallAt10": 1
+      },
+      "en->中文": {
+        "questions": 16,
+        "recallAt5": 1,
+        "recallAt10": 1
+      },
+      "zh->en": {
+        "questions": 16,
+        "recallAt5": 1,
+        "recallAt10": 1
+      },
+      "zh->中文": {
+        "questions": 16,
+        "recallAt5": 1,
+        "recallAt10": 1
+      }
+    },
+    "jobs": [
+      {
+        "mode": "build",
+        "profile": "local-qwen3",
+        "state": "succeeded",
+        "error": null,
+        "report": {
+          "runId": "3f4af01b-7e55-4a05-9efa-56be63f4078d",
+          "backend": "autorag",
+          "ok": true,
+          "durationMs": 39273.167639,
+          "timings": {
+            "prepare": 763.4317150000002,
+            "write": 142.52110900000116,
+            "parse": 816.6285340000004,
+            "chunk": 243.57735000000048,
+            "lexical": 19.54699999999957,
+            "cache": 15.714102000001276,
+            "embed": 37894.255602,
+            "maintain": 56.921848999998474
+          },
+          "documents": 18,
+          "unchanged": 0,
+          "chunks": 26,
+          "embedded": 25,
+          "reused": 1,
+          "deleted": 0,
+          "failures": [],
+          "reportPath": "/tmp/autorag-fastembed-live-SaYEuQ/workspace/.autorag/local-index/runs/3f4af01b-7e55-4a05-9efa-56be63f4078d/report.json"
+        }
+      },
+      {
+        "mode": "refresh",
+        "profile": "local-qwen3",
+        "state": "succeeded",
+        "error": null,
+        "report": {
+          "runId": "b42ea83b-ad5e-4677-9b01-867630e8ad70",
+          "backend": "autorag",
+          "ok": true,
+          "durationMs": 17.534936000003654,
+          "timings": {
+            "prepare": 2.143914999993285,
+            "write": 0.5882310000015423,
+            "parse": 0
+          },
+          "documents": 18,
+          "unchanged": 18,
+          "chunks": 0,
+          "embedded": 0,
+          "reused": 0,
+          "deleted": 0,
+          "failures": [],
+          "reportPath": "/tmp/autorag-fastembed-live-SaYEuQ/workspace/.autorag/local-index/runs/b42ea83b-ad5e-4677-9b01-867630e8ad70/report.json"
+        }
+      },
+      {
+        "mode": "build",
+        "profile": "api-protocol-fixture",
+        "state": "succeeded",
+        "error": null,
+        "report": {
+          "runId": "c8b8e14e-7a18-4376-b998-9945b9996b8b",
+          "backend": "autorag",
+          "ok": true,
+          "durationMs": 44333.316767000004,
+          "timings": {
+            "prepare": 707.1831300000049,
+            "write": 121.70149800000218,
+            "parse": 0,
+            "chunk": 301.7849060000008,
+            "lexical": 101.2350999999835,
+            "cache": 14.061821999996027,
+            "embed": 42815.73289199999,
+            "maintain": 69.43993200000841
+          },
+          "documents": 18,
+          "unchanged": 0,
+          "chunks": 26,
+          "embedded": 25,
+          "reused": 1,
+          "deleted": 0,
+          "failures": [],
+          "reportPath": "/tmp/autorag-fastembed-live-SaYEuQ/workspace/.autorag/local-index/runs/c8b8e14e-7a18-4376-b998-9945b9996b8b/report.json"
+        }
+      },
+      {
+        "mode": "build",
+        "profile": "failed-candidate",
+        "state": "failed",
+        "error": "Unable to connect. Is the computer able to access the url?",
+        "report": null
+      },
+      {
+        "mode": "build",
+        "profile": "local-qwen3",
+        "state": "cancelled",
+        "error": "Index task cancelled by user",
+        "report": null
+      },
+      {
+        "mode": "build",
+        "profile": "local-qwen3",
+        "state": "succeeded",
+        "error": null,
+        "report": {
+          "runId": "1bfcb7b1-1906-4bf5-bff2-7f954b70193a",
+          "backend": "autorag",
+          "ok": true,
+          "durationMs": 35334.704979,
+          "timings": {
+            "prepare": 418.07613000001584,
+            "write": 92.12110599999141,
+            "parse": 0,
+            "chunk": 157.68677299997944,
+            "lexical": 10.79958700001589,
+            "cache": 9.216402000005473,
+            "embed": 34551.19118700002,
+            "maintain": 57.4886220000044
+          },
+          "documents": 18,
+          "unchanged": 0,
+          "chunks": 26,
+          "embedded": 25,
+          "reused": 1,
+          "deleted": 0,
+          "failures": [],
+          "reportPath": "/tmp/autorag-fastembed-live-SaYEuQ/workspace/.autorag/local-index/runs/1bfcb7b1-1906-4bf5-bff2-7f954b70193a/report.json"
+        }
+      },
+      {
+        "mode": "refresh",
+        "profile": "local-qwen3",
+        "state": "succeeded",
+        "error": null,
+        "report": {
+          "runId": "0a4b5928-4b6d-4d9f-adcf-45075c0f13f1",
+          "backend": "autorag",
+          "ok": true,
+          "durationMs": 270.3197780000046,
+          "timings": {
+            "prepare": 1.7855969999800436,
+            "write": 27.773308000003453,
+            "parse": 3.4873899999947753,
+            "chunk": 2.9310590000241064,
+            "lexical": 0.411521999980323,
+            "cache": 3.8269080000172835,
+            "embed": 187.3813740000187,
+            "maintain": 32.58957000001101
+          },
+          "documents": 18,
+          "unchanged": 17,
+          "chunks": 1,
+          "embedded": 1,
+          "reused": 0,
+          "deleted": 0,
+          "failures": [],
+          "reportPath": "/tmp/autorag-fastembed-live-SaYEuQ/workspace/.autorag/local-index/runs/0a4b5928-4b6d-4d9f-adcf-45075c0f13f1/report.json"
+        }
+      },
+      {
+        "mode": "refresh",
+        "profile": "local-qwen3",
+        "state": "succeeded",
+        "error": null,
+        "report": {
+          "runId": "9dfc36d7-457d-4316-acc0-5fa58de5258c",
+          "backend": "autorag",
+          "ok": true,
+          "durationMs": 59.14091099999496,
+          "timings": {
+            "prepare": 1.3858750000072177,
+            "write": 13.924155999993673,
+            "parse": 0,
+            "maintain": 33.60992499999702
+          },
+          "documents": 17,
+          "unchanged": 17,
+          "chunks": 0,
+          "embedded": 0,
+          "reused": 0,
+          "deleted": 1,
+          "failures": [],
+          "reportPath": "/tmp/autorag-fastembed-live-SaYEuQ/workspace/.autorag/local-index/runs/9dfc36d7-457d-4316-acc0-5fa58de5258c/report.json"
+        }
+      }
+    ],
+    "obsidian": "PASS: synthetic vault, source-native identities, Korean paths, scopes, increment and deletion",
+    "minsyncBinaryAbsent": true,
+    "remoteEmbeddingCalls": 0,
+    "profileSwitching": "Local/API protocol fixture uses the same loopback Qwen service; no real hosted-provider validation in this run."
+  },
+  "resources": {
+    "memoryPeakBytes": 4308504576,
+    "memoryPeakGiB": 4.013,
+    "memoryEvents": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    },
+    "cpuMax": "400000 100000",
+    "finalStats": {
+      "BlockIO": "509MB / 20.6MB",
+      "CPUPerc": "0.17%",
+      "Container": "1f311fcc929329471af29cef09a9e8060fbf4b4bec4253a685b32eced7848269",
+      "ID": "1f311fcc9293",
+      "MemPerc": "36.13%",
+      "MemUsage": "2.89GiB / 8GiB",
+      "Name": "autorag-qa-ob8tmejo-dev-1",
+      "NetIO": "10.1kB / 4.55kB",
+      "PIDs": "15"
+    }
+  },
+  "initialFailuresResolved": [
+    {
+      "test": "two release-asset tests",
+      "error": "npm pack failed: spawnSync npm ENOENT",
+      "resolution": "Included bundled npm; both passed in final full regression."
+    },
+    {
+      "test": "Obsidian unreadable-folder warning",
+      "error": "Root bypassed chmod 000 restrictions, so no warning was produced.",
+      "resolution": "Ran final QA as UID 1000; test passed."
+    },
+    {
+      "test": "intermediate ordinary-user test startup",
+      "error": "EACCES in .vite-temp left by the first root run",
+      "resolution": "Changed ownership only inside this run's dependency volume; final clean-user run passed."
+    }
+  ],
+  "cleanup": {
+    "realConfigBefore": "ABSENT",
+    "realConfigAfter": "ABSENT",
+    "unchanged": true,
+    "existingContainersBefore": [
+      "7c851c3ea1ee postgres:18-alpine autorag-research-research-db-1 Up 7 hours (healthy)",
+      "4dcef4e4e493 autorag-xsy-dev:2.11.0 autorag-xsy-dev-dev-1 Up 7 hours (unhealthy)",
+      "4fd858eb6563 surrealdb/surrealdb:v2 open-notebook-surrealdb-1 Up 7 hours"
+    ],
+    "existingContainersAfter": [
+      "7c851c3ea1ee postgres:18-alpine autorag-research-research-db-1 Up 7 hours (healthy)",
+      "4dcef4e4e493 autorag-xsy-dev:2.11.0 autorag-xsy-dev-dev-1 Up 7 hours (unhealthy)",
+      "4fd858eb6563 surrealdb/surrealdb:v2 open-notebook-surrealdb-1 Up 7 hours"
+    ],
+    "existingContainersUnchanged": true,
+    "ownedComposeContainersNetworkAndVolumesRemoved": true,
+    "imagesRetainedForReuse": true,
+    "cloneModelCacheUntouched": true,
+    "hostHomeMounted": false,
+    "credentialsForwarded": false
+  },
+  "notCovered": [
+    "Real hosted embedding end-to-end acceptance (user requested minimal quota use).",
+    "Real conversation-model tool selection and native account/store lanes.",
+    "Windows/macOS/GPU, first model-download timing, old MinSync performance comparison."
+  ],
+  "commands": [
+    {
+      "time": 1793435861.4397702,
+      "argv": [
+        "docker",
+        "ps",
+        "--format",
+        "{{.ID}} {{.Image}} {{.Names}} {{.Status}}"
+      ]
+    },
+    {
+      "time": 1793435861.4866683,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "config",
+        "--format",
+        "json"
+      ]
+    },
+    {
+      "time": 1793435861.6155338,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "create",
+        "--no-build",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793435862.2121027,
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--label",
+        "autorag.qa=autorag-qa-ob8tmejo",
+        "--user",
+        "0:0",
+        "--mount",
+        "type=volume,source=autorag-qa-ob8tmejo_home,target=/seed",
+        "--mount",
+        "type=volume,source=autorag-qa-ob8tmejo_qa-fixtures,target=/qa-state",
+        "--mount",
+        "type=bind,src=/home/xsy/projects/AutoRAG/.autorag/embedding-models,dst=/models,readonly",
+        "autorag-qa-ob8tmejo-dev",
+        "bash",
+        "-lc",
+        "mkdir -p /seed/.autorag/models/fastembed && cp -a /models/qwen3-0.6b-af95f2c416ffe9379369ad64f9113e865db6112c /seed/.autorag/models/fastembed/ && chown -R 1000:1000 /seed /qa-state"
+      ]
+    },
+    {
+      "time": 1793435873.627017,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "start",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793435873.936423,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793435874.059366,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422"
+      ]
+    },
+    {
+      "time": 1793435879.092,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793435879.1903217,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422"
+      ]
+    },
+    {
+      "time": 1793435884.2182753,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793435884.463361,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422"
+      ]
+    },
+    {
+      "time": 1793435889.5065289,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793435889.6894474,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422"
+      ]
+    },
+    {
+      "time": 1793435894.7234988,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793435894.856558,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422"
+      ]
+    },
+    {
+      "time": 1793435899.891117,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793435899.9956815,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422"
+      ]
+    },
+    {
+      "time": 1793435900.023339,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793435900.1381483,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793435900.2493052,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{\"id\":{{json .Id}},\"memory\":{{.HostConfig.Memory}},\"nanoCpus\":{{.HostConfig.NanoCpus}},\"state\":{{json .State}}}",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422"
+      ]
+    },
+    {
+      "time": 1793435915.539388,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793435915.6348748,
+      "argv": [
+        "docker",
+        "exec",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422",
+        "bash",
+        "/qa-evidence/prepare.sh"
+      ]
+    },
+    {
+      "time": 1793436037.6473181,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436037.7683742,
+      "argv": [
+        "docker",
+        "stats",
+        "--no-stream",
+        "--format",
+        "{{json .}}",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422"
+      ]
+    },
+    {
+      "time": 1793436038.8104396,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436038.9107716,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422"
+      ]
+    },
+    {
+      "time": 1793436123.7628856,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436124.0358124,
+      "argv": [
+        "docker",
+        "exec",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422",
+        "bash",
+        "/qa-evidence/install-status.sh"
+      ]
+    },
+    {
+      "time": 1793436222.6612337,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436222.7520454,
+      "argv": [
+        "docker",
+        "exec",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422",
+        "bash",
+        "/qa-evidence/install-status.sh"
+      ]
+    },
+    {
+      "time": 1793436315.8429847,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436315.935023,
+      "argv": [
+        "docker",
+        "exec",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422",
+        "bash",
+        "/qa-evidence/cold.sh"
+      ]
+    },
+    {
+      "time": 1793436317.1116104,
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "autorag-qa-ob8tmejo-checks",
+        "--label",
+        "autorag.qa=autorag-qa-ob8tmejo",
+        "--cpus",
+        "4",
+        "--memory",
+        "8g",
+        "--env",
+        "HOME=/tmp/autorag-qa-home",
+        "--env",
+        "AUTORAG_HOME=/tmp/autorag-qa-home/.autorag",
+        "--env",
+        "AUTORAG_CONFIG=/tmp/autorag-qa-home/.autorag/config.json",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--mount",
+        "type=bind,src=/home/xsy/projects/AutoRAG,dst=/workspace",
+        "--mount",
+        "type=bind,src=/tmp/autorag-docker-qa-ob8tmejo,dst=/qa-evidence",
+        "--mount",
+        "type=volume,source=autorag-qa-ob8tmejo_dependencies,target=/workspace/node_modules",
+        "--mount",
+        "type=volume,source=autorag-qa-ob8tmejo_build-output,target=/workspace/dist",
+        "--workdir",
+        "/workspace",
+        "autorag-qa-ob8tmejo",
+        "bash",
+        "/qa-evidence/checks.sh"
+      ]
+    },
+    {
+      "time": 1793436371.7664015,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436371.9028296,
+      "argv": [
+        "docker",
+        "exec",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422",
+        "bash",
+        "/qa-evidence/core-cold.sh"
+      ]
+    },
+    {
+      "time": 1793436470.0540502,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436470.16239,
+      "argv": [
+        "docker",
+        "network",
+        "disconnect",
+        "autorag-qa-ob8tmejo_default",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422"
+      ]
+    },
+    {
+      "time": 1793436470.3254538,
+      "argv": [
+        "docker",
+        "restart",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422"
+      ]
+    },
+    {
+      "time": 1793436470.752957,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436470.872576,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422"
+      ]
+    },
+    {
+      "time": 1793436475.9063365,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436476.0286036,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422"
+      ]
+    },
+    {
+      "time": 1793436481.0646975,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436481.178047,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422"
+      ]
+    },
+    {
+      "time": 1793436486.2104533,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436486.317912,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422"
+      ]
+    },
+    {
+      "time": 1793436486.3578827,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436486.4747443,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .NetworkSettings.Networks}}",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422"
+      ]
+    },
+    {
+      "time": 1793436612.2808871,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436612.372799,
+      "argv": [
+        "docker",
+        "exec",
+        "c14eea962308008118c632ebbee107be35f8750bef506f29227a2042f3579422",
+        "bash",
+        "/qa-evidence/offline-query.sh"
+      ]
+    },
+    {
+      "time": 1793436694.7696085,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436694.859451,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "up",
+        "-d",
+        "--no-build",
+        "--force-recreate",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436696.0007536,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436696.1001139,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        "1f311fcc929329471af29cef09a9e8060fbf4b4bec4253a685b32eced7848269"
+      ]
+    },
+    {
+      "time": 1793436698.120577,
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "autorag-qa-ob8tmejo-checks",
+        "--label",
+        "autorag.qa=autorag-qa-ob8tmejo",
+        "--user",
+        "1000:1000",
+        "--cpus",
+        "4",
+        "--memory",
+        "8g",
+        "--env",
+        "HOME=/tmp/autorag-qa-home",
+        "--env",
+        "AUTORAG_HOME=/tmp/autorag-qa-home/.autorag",
+        "--env",
+        "AUTORAG_CONFIG=/tmp/autorag-qa-home/.autorag/config.json",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--mount",
+        "type=bind,src=/home/xsy/projects/AutoRAG,dst=/workspace",
+        "--mount",
+        "type=bind,src=/tmp/autorag-docker-qa-ob8tmejo,dst=/qa-evidence",
+        "--mount",
+        "type=volume,source=autorag-qa-ob8tmejo_dependencies,target=/workspace/node_modules",
+        "--mount",
+        "type=volume,source=autorag-qa-ob8tmejo_build-output,target=/workspace/dist",
+        "--workdir",
+        "/workspace",
+        "autorag-qa-ob8tmejo",
+        "bash",
+        "/qa-evidence/checks.sh"
+      ]
+    },
+    {
+      "time": 1793436701.1269429,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436701.2416303,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        "1f311fcc929329471af29cef09a9e8060fbf4b4bec4253a685b32eced7848269"
+      ]
+    },
+    {
+      "time": 1793436706.2703114,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436706.3805838,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        "1f311fcc929329471af29cef09a9e8060fbf4b4bec4253a685b32eced7848269"
+      ]
+    },
+    {
+      "time": 1793436711.4104447,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436711.501611,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        "1f311fcc929329471af29cef09a9e8060fbf4b4bec4253a685b32eced7848269"
+      ]
+    },
+    {
+      "time": 1793436711.527963,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436711.6495495,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436780.3758073,
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--label",
+        "autorag.qa=autorag-qa-ob8tmejo",
+        "--user",
+        "0:0",
+        "--mount",
+        "type=volume,source=autorag-qa-ob8tmejo_dependencies,target=/cache",
+        "autorag-qa-ob8tmejo",
+        "bash",
+        "-lc",
+        "for cache in /cache/.vite /cache/.vite-temp; do if test -d \"$cache\"; then chown -R 1000:1000 \"$cache\"; fi; done"
+      ]
+    },
+    {
+      "time": 1793436821.477004,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436821.5698059,
+      "argv": [
+        "docker",
+        "exec",
+        "1f311fcc929329471af29cef09a9e8060fbf4b4bec4253a685b32eced7848269",
+        "bash",
+        "/qa-evidence/warm.sh"
+      ]
+    },
+    {
+      "time": 1793436823.380654,
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "autorag-qa-ob8tmejo-checks",
+        "--label",
+        "autorag.qa=autorag-qa-ob8tmejo",
+        "--user",
+        "1000:1000",
+        "--cpus",
+        "4",
+        "--memory",
+        "8g",
+        "--env",
+        "HOME=/tmp/autorag-qa-home",
+        "--env",
+        "AUTORAG_HOME=/tmp/autorag-qa-home/.autorag",
+        "--env",
+        "AUTORAG_CONFIG=/tmp/autorag-qa-home/.autorag/config.json",
+        "--env",
+        "PYTHONDONTWRITEBYTECODE=1",
+        "--mount",
+        "type=bind,src=/home/xsy/projects/AutoRAG,dst=/workspace",
+        "--mount",
+        "type=bind,src=/tmp/autorag-docker-qa-ob8tmejo,dst=/qa-evidence",
+        "--mount",
+        "type=volume,source=autorag-qa-ob8tmejo_dependencies,target=/workspace/node_modules",
+        "--mount",
+        "type=volume,source=autorag-qa-ob8tmejo_build-output,target=/workspace/dist",
+        "--workdir",
+        "/workspace",
+        "autorag-qa-ob8tmejo",
+        "bash",
+        "/qa-evidence/checks.sh"
+      ]
+    },
+    {
+      "time": 1793436854.9550374,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436855.0709858,
+      "argv": [
+        "docker",
+        "exec",
+        "1f311fcc929329471af29cef09a9e8060fbf4b4bec4253a685b32eced7848269",
+        "bash",
+        "/qa-evidence/core-warm.sh"
+      ]
+    },
+    {
+      "time": 1793436919.6195886,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793436919.7268872,
+      "argv": [
+        "docker",
+        "exec",
+        "1f311fcc929329471af29cef09a9e8060fbf4b4bec4253a685b32eced7848269",
+        "bash",
+        "/qa-evidence/comprehensive.sh"
+      ]
+    },
+    {
+      "time": 1793437004.9884315,
+      "argv": [
+        "docker",
+        "run",
+        "--rm",
+        "--label",
+        "autorag.qa=autorag-qa-ob8tmejo",
+        "--network",
+        "none",
+        "--env",
+        "HOME=/tmp/qa-smoke",
+        "autorag-qa-ob8tmejo",
+        "bash",
+        "-lc",
+        "test \"$(id -u)\" = 1000 && node --version && npm --version && bun --version && /opt/autorag-embedding/bin/python --version"
+      ]
+    },
+    {
+      "time": 1793437063.0726993,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793437063.2221398,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{\"id\":{{json .Id}},\"memory\":{{.HostConfig.Memory}},\"nanoCpus\":{{.HostConfig.NanoCpus}},\"state\":{{json .State}},\"mounts\":{{json .Mounts}}}",
+        "1f311fcc929329471af29cef09a9e8060fbf4b4bec4253a685b32eced7848269"
+      ]
+    },
+    {
+      "time": 1793437063.2907772,
+      "argv": [
+        "docker",
+        "image",
+        "inspect",
+        "--format",
+        "{\"name\":\"autorag-qa-ob8tmejo\",\"id\":{{json .Id}},\"size\":{{.Size}},\"user\":{{json .Config.User}}}",
+        "autorag-qa-ob8tmejo"
+      ]
+    },
+    {
+      "time": 1793437063.4101768,
+      "argv": [
+        "docker",
+        "image",
+        "inspect",
+        "--format",
+        "{\"name\":\"autorag-qa-ob8tmejo-dev\",\"id\":{{json .Id}},\"size\":{{.Size}},\"user\":{{json .Config.User}}}",
+        "autorag-qa-ob8tmejo-dev"
+      ]
+    },
+    {
+      "time": 1793437063.5265462,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793437063.691628,
+      "argv": [
+        "docker",
+        "stats",
+        "--no-stream",
+        "--format",
+        "{{json .}}",
+        "1f311fcc929329471af29cef09a9e8060fbf4b4bec4253a685b32eced7848269"
+      ]
+    },
+    {
+      "time": 1793437064.744645,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "exec",
+        "-T",
+        "dev",
+        "bash",
+        "-lc",
+        "cat /sys/fs/cgroup/memory.peak; cat /sys/fs/cgroup/memory.events; cat /sys/fs/cgroup/cpu.max"
+      ]
+    },
+    {
+      "time": 1793437163.1524746,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793437163.252226,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{\"id\":{{json .Id}},\"memory\":{{.HostConfig.Memory}},\"nanoCpus\":{{.HostConfig.NanoCpus}},\"state\":{{json .State}},\"mounts\":{{json .Mounts}}}",
+        "1f311fcc929329471af29cef09a9e8060fbf4b4bec4253a685b32eced7848269"
+      ]
+    },
+    {
+      "time": 1793437163.282003,
+      "argv": [
+        "docker",
+        "image",
+        "inspect",
+        "--format",
+        "{\"name\":\"autorag-qa-ob8tmejo\",\"id\":{{json .Id}},\"size\":{{.Size}},\"user\":{{json .Config.User}}}",
+        "autorag-qa-ob8tmejo"
+      ]
+    },
+    {
+      "time": 1793437163.342791,
+      "argv": [
+        "docker",
+        "image",
+        "inspect",
+        "--format",
+        "{\"name\":\"autorag-qa-ob8tmejo-dev\",\"id\":{{json .Id}},\"size\":{{.Size}},\"user\":{{json .Config.User}}}",
+        "autorag-qa-ob8tmejo-dev"
+      ]
+    },
+    {
+      "time": 1793437163.4030206,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "ps",
+        "-q",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793437163.502424,
+      "argv": [
+        "docker",
+        "stats",
+        "--no-stream",
+        "--format",
+        "{{json .}}",
+        "1f311fcc929329471af29cef09a9e8060fbf4b4bec4253a685b32eced7848269"
+      ]
+    },
+    {
+      "time": 1793437164.5341158,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "exec",
+        "-T",
+        "dev",
+        "bash",
+        "-lc",
+        "cat /sys/fs/cgroup/memory.peak; cat /sys/fs/cgroup/memory.events; cat /sys/fs/cgroup/cpu.max"
+      ]
+    },
+    {
+      "time": 1793437251.8137598,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "logs",
+        "--no-color",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793437251.917378,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-qa-ob8tmejo",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "-f",
+        "/tmp/autorag-docker-qa-ob8tmejo/compose.override.json",
+        "down",
+        "--volumes",
+        "--remove-orphans"
+      ]
+    },
+    {
+      "time": 1793437254.6326022,
+      "argv": [
+        "docker",
+        "ps",
+        "--format",
+        "{{.ID}} {{.Image}} {{.Names}} {{.Status}}"
+      ]
+    }
+  ],
+  "testHarness": {
+    "persistence.mts": "import assert from 'node:assert/strict';\nimport { createHash } from 'node:crypto';\nimport { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';\nimport { join, isAbsolute } from 'node:path';\nimport { AutoRAGAgent, defaultEmbeddingConfig, releaseEmbedders } from '/workspace/dist/index.js';\n\nconst phase = process.argv[2];\nassert(['cold', 'warm', 'read'].includes(phase));\nconst root = '/qa-state';\nconst docs = join(root, 'documents');\nconst workspace = join(root, 'workspace');\nconst config = process.env.AUTORAG_CONFIG!;\nassert(config.startsWith('/dev-home/'));\nassert.equal(process.env.AUTORAG_HOME, '/dev-home/.autorag');\nmkdirSync(docs, { recursive: true });\nconst source = join(docs, '退款规则-中文.txt');\nif (phase === 'cold') {\n    writeFileSync(source, '退款例外必须在付款前获得主管批准。');\n    writeFileSync(join(docs, 'travel.txt'), 'International travel reimbursement requires an itemized hotel receipt.');\n}\nconst embedding = defaultEmbeddingConfig();\nembedding.profiles['local-qwen3'].manifest!.tokenizerPath = '/dev-home/.autorag/models/fastembed/qwen3-0.6b-af95f2c416ffe9379369ad64f9113e865db6112c';\nconst options = { searchPaths: [docs], workspacePath: workspace, memoryPath: join(root, 'memory.json'), embedding,\n    jikji: false, everything: false, fsearch: false, dupey: false, filee: false, jev: false, webSearch: false };\nconst before = existsSync(config) ? createHash('sha256').update(readFileSync(config)).digest('hex') : 'ABSENT';\nif (phase === 'cold') writeFileSync(config, JSON.stringify(options, null, 2));\nelse assert.equal(readFileSync(config, 'utf8'), JSON.stringify(options, null, 2));\nconst agent = new AutoRAGAgent(options);\nconst ready = join(workspace, '.autorag/local-index/ready.json');\nasync function wait(jobId: string) {\n    const deadline = Date.now() + 180_000;\n    while (Date.now() < deadline) {\n        const job = agent.indexJobs.status(jobId)!;\n        if (['succeeded', 'failed', 'cancelled', 'interrupted'].includes(job.state)) {\n            assert.equal(job.state, 'succeeded', job.error);\n            return job;\n        }\n        await new Promise(resolve => setTimeout(resolve, 100));\n    }\n    throw new Error('Index task timeout');\n}\nasync function query() {\n    const results = await agent.getRetrievalEngine().retrieveSelected('退款例外需要谁批准？', { methods: ['local-vector'], local: true }, { topK: 5 });\n    assert(results.results.some(hit => hit.source === source));\n    for (const hit of results.results) { assert(isAbsolute(hit.source)); readFileSync(hit.source); }\n}\nconst evidence: Record<string, unknown> = { phase, configPath: config, model: 'Qwen/Qwen3-Embedding-0.6B', dimension: 1024 };\ntry {\n    if (phase === 'cold') {\n        evidence.build = await wait(agent.startIndexJob({ mode: 'build' }).jobId);\n        await query();\n        writeFileSync(join(root, 'ready-before.json'), readFileSync(ready));\n        evidence.configHash = createHash('sha256').update(readFileSync(config)).digest('hex');\n    } else if (phase === 'warm') {\n        assert.equal(readFileSync(ready, 'utf8'), readFileSync(join(root, 'ready-before.json'), 'utf8'));\n        await query();\n        evidence.queryBeforeRefresh = 'PASS';\n        const unchanged = await wait(agent.startIndexJob({ mode: 'refresh' }).jobId);\n        assert.equal(unchanged.report?.embedded, 0);\n        evidence.unchanged = unchanged;\n        writeFileSync(source, '退款例外必须在付款前获得主管批准。财务部门核对批准记录。');\n        const increment = await wait(agent.startIndexJob({ mode: 'refresh' }).jobId);\n        assert.equal(increment.report?.embedded, 1);\n        evidence.increment = increment;\n        rmSync(join(docs, 'travel.txt'));\n        const deletion = await wait(agent.startIndexJob({ mode: 'refresh' }).jobId);\n        assert.equal(deletion.report?.deleted, 1);\n        evidence.deletion = deletion;\n        await query();\n        evidence.configUnchanged = before === createHash('sha256').update(readFileSync(config)).digest('hex');\n        assert.equal(evidence.configUnchanged, true);\n    } else {\n        assert.equal(readFileSync(ready, 'utf8'), readFileSync(join(root, 'ready-before.json'), 'utf8'));\n        await query();\n        evidence.queryWithoutNetwork = 'PASS';\n    }\n    evidence.result = 'PASS';\n} finally {\n    await agent.indexJobs.close();\n    await releaseEmbedders();\n    writeFileSync('/qa-evidence/persistence-' + phase + '.json', JSON.stringify(evidence, null, 2));\n}\nconsole.log(JSON.stringify({phase, result: evidence.result, querySource: source}));\n",
+    "core-cold.sh": "set -euo pipefail\nexport AUTORAG_EMBED_ENDPOINT=http://127.0.0.1:18382\nexport AUTORAG_WORKSPACE=/qa-state/fixed-workspace\nexport AUTORAG_SEARCH_PATHS=/workspace/scripts/live-e2e/corpus\nexport AUTORAG_MEMORY_PATH=/qa-state/fixed-memory.json\nexport AUTORAG_LIVE_E2E_KIWI=required\ntest \"$AUTORAG_CONFIG\" = /dev-home/.autorag/config.json\nnode scripts/live-e2e/runner.mjs verify-corpus --root /workspace/scripts/live-e2e\nnode scripts/live-e2e/runner.mjs preflight --endpoint \"$AUTORAG_EMBED_ENDPOINT\" --json > /qa-evidence/preflight.json\nbun scripts/live-e2e/live-stack.mts --root /workspace/scripts/live-e2e --workspace \"$AUTORAG_WORKSPACE\" --mode cold\ncp \"$AUTORAG_WORKSPACE/live-stack-result.json\" /qa-evidence/fixed-core-cold.json\n",
+    "core-warm.sh": "set -euo pipefail\nexport AUTORAG_EMBED_ENDPOINT=http://127.0.0.1:18382\nexport AUTORAG_WORKSPACE=/qa-state/fixed-workspace\nexport AUTORAG_SEARCH_PATHS=/workspace/scripts/live-e2e/corpus\nexport AUTORAG_MEMORY_PATH=/qa-state/fixed-memory.json\nexport AUTORAG_LIVE_E2E_KIWI=required\nbun scripts/live-e2e/live-stack.mts --root /workspace/scripts/live-e2e --workspace \"$AUTORAG_WORKSPACE\" --mode warm\ncp \"$AUTORAG_WORKSPACE/live-stack-result.json\" /qa-evidence/fixed-core-warm.json\n",
+    "comprehensive.sh": "set -euo pipefail\nexport AUTORAG_QA_EMBED_ENDPOINT=http://127.0.0.1:18382\nexport AUTORAG_QA_TOKENIZER=/dev-home/.autorag/models/fastembed/qwen3-0.6b-af95f2c416ffe9379369ad64f9113e865db6112c\nexport AUTORAG_QA_KIWI_MODEL=/workspace/.autorag/embedding-models/kiwi-0.24.1\nexport AUTORAG_QA_EVIDENCE=/qa-evidence/local-qwen-container.json\nexport AUTORAG_QA_BUILT=1\nbun scripts/manual-qa/run-qa-fastembed.mts\nbun scripts/manual-qa/run-qa-obsidian-live.ts\n",
+    "checks.sh": "set -euo pipefail\nmkdir -p \"$AUTORAG_HOME\"\ntest \"$AUTORAG_CONFIG\" = /tmp/autorag-qa-home/.autorag/config.json\nbun run check\nbun run lint\nbun run typecheck\n/opt/autorag-embedding/bin/python -m unittest discover -s test/embedding -p '*_test.py'\nbun run supply-chain\nnode node_modules/vitest/vitest.mjs run --maxWorkers=2 > /qa-evidence/full-tests.log 2>&1\nprintf 'PASS: checks, lint, typecheck, Python contracts, supply-chain, full suite\\n'\n"
+  }
+}

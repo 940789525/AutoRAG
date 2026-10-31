@@ -45,8 +45,13 @@ RUN /opt/autorag-embedding/bin/pip install --no-cache-dir --require-hashes -r /o
 ENV AUTORAG_FASTEMBED_PYTHON=/opt/autorag-embedding/bin/python
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+	&& ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
 
+RUN mkdir -p /workspace/node_modules && chown -R 1000:1000 /workspace
+USER 1000:1000
 WORKDIR /workspace
 
 CMD ["bash"]
