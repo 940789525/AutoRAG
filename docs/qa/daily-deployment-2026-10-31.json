@@ -1,0 +1,916 @@
+{
+  "schemaVersion": 1,
+  "result": "PASS",
+  "completedAt": "2026-10-31T19:02:25.702068+08:00",
+  "baseCommit": "60542e59a4038817554c7fc4b4cc8c7829e2d39f",
+  "containerName": "autorag-xsy-dev-dev-1",
+  "image": "autorag-xsy-dev:2.11.1-fastembed",
+  "before": {
+    "id": "4dcef4e4e493d10a09beb3ff94411213b21709b75621db680ab0ed482e8e3206",
+    "image": "sha256:527243f8080ea5f343ad788f07eb78c43d892113694c30d53b6f4c75d7e45cbf",
+    "command": [
+      "bash",
+      "-c",
+      "minsync serve --idle-timeout 0 & exec sleep infinity"
+    ],
+    "mounts": [
+      {
+        "Destination": "/workspace/node_modules",
+        "Driver": "local",
+        "Mode": "rw",
+        "Name": "autorag-xsy-dev_dependencies",
+        "Propagation": "",
+        "RW": true,
+        "Source": "/var/lib/docker/volumes/autorag-xsy-dev_dependencies/_data",
+        "Type": "volume"
+      },
+      {
+        "Destination": "/data/workspace",
+        "Driver": "local",
+        "Mode": "rw",
+        "Name": "autorag-xsy-dev_workspace",
+        "Propagation": "",
+        "RW": true,
+        "Source": "/var/lib/docker/volumes/autorag-xsy-dev_workspace/_data",
+        "Type": "volume"
+      },
+      {
+        "Destination": "/dev-home",
+        "Driver": "local",
+        "Mode": "rw",
+        "Name": "autorag-xsy-dev_home",
+        "Propagation": "",
+        "RW": true,
+        "Source": "/var/lib/docker/volumes/autorag-xsy-dev_home/_data",
+        "Type": "volume"
+      },
+      {
+        "Destination": "/dev-home/.cache",
+        "Driver": "local",
+        "Mode": "rw",
+        "Name": "autorag-xsy-dev_cache",
+        "Propagation": "",
+        "RW": true,
+        "Source": "/var/lib/docker/volumes/autorag-xsy-dev_cache/_data",
+        "Type": "volume"
+      },
+      {
+        "Destination": "/documents",
+        "Mode": "ro",
+        "Propagation": "rprivate",
+        "RW": false,
+        "Source": "/home/xsy/projects/AutoRAG/myself_dev/fixtures",
+        "Type": "bind"
+      },
+      {
+        "Destination": "/workspace",
+        "Mode": "rw",
+        "Propagation": "rprivate",
+        "RW": true,
+        "Source": "/home/xsy/projects/AutoRAG",
+        "Type": "bind"
+      },
+      {
+        "Destination": "/workspace/dist",
+        "Driver": "local",
+        "Mode": "rw",
+        "Name": "autorag-xsy-dev_build-output",
+        "Propagation": "",
+        "RW": true,
+        "Source": "/var/lib/docker/volumes/autorag-xsy-dev_build-output/_data",
+        "Type": "volume"
+      }
+    ]
+  },
+  "after": {
+    "id": "433acfe38bca682a080ddbae95230e98cd5614b40ab1965b496b478a4ca2ecec",
+    "image": "sha256:e0dee75ffc697e082f97ea22932369a0d8906f798d0b4ba52116996738f72939",
+    "command": [
+      "bash",
+      "-c",
+      "/opt/autorag-embedding/bin/python /workspace/src/embedding/service.py --cache-dir /workspace/.autorag/embedding-models --offline & exec sleep infinity"
+    ],
+    "mounts": [
+      {
+        "Destination": "/data/workspace",
+        "Driver": "local",
+        "Mode": "rw",
+        "Name": "autorag-xsy-dev_workspace",
+        "Propagation": "",
+        "RW": true,
+        "Source": "/var/lib/docker/volumes/autorag-xsy-dev_workspace/_data",
+        "Type": "volume"
+      },
+      {
+        "Destination": "/workspace",
+        "Mode": "rw",
+        "Propagation": "rprivate",
+        "RW": true,
+        "Source": "/run/desktop/mnt/host/wsl/docker-desktop-bind-mounts/Ubuntu-24.04/6c3fb025747a3aab2091ba0679db502c8ee3a4f7cc4174f9765e7296bdfed17a",
+        "Type": "bind"
+      },
+      {
+        "Destination": "/documents",
+        "Mode": "ro",
+        "Propagation": "rprivate",
+        "RW": false,
+        "Source": "/home/xsy/projects/AutoRAG/myself_dev/fixtures",
+        "Type": "bind"
+      },
+      {
+        "Destination": "/workspace/node_modules",
+        "Driver": "local",
+        "Mode": "rw",
+        "Name": "autorag-xsy-dev_dependencies",
+        "Propagation": "",
+        "RW": true,
+        "Source": "/var/lib/docker/volumes/autorag-xsy-dev_dependencies/_data",
+        "Type": "volume"
+      },
+      {
+        "Destination": "/workspace/dist",
+        "Driver": "local",
+        "Mode": "rw",
+        "Name": "autorag-xsy-dev_build-output",
+        "Propagation": "",
+        "RW": true,
+        "Source": "/var/lib/docker/volumes/autorag-xsy-dev_build-output/_data",
+        "Type": "volume"
+      },
+      {
+        "Destination": "/dev-home",
+        "Driver": "local",
+        "Mode": "rw",
+        "Name": "autorag-xsy-dev_home",
+        "Propagation": "",
+        "RW": true,
+        "Source": "/var/lib/docker/volumes/autorag-xsy-dev_home/_data",
+        "Type": "volume"
+      },
+      {
+        "Destination": "/dev-home/.cache",
+        "Driver": "local",
+        "Mode": "rw",
+        "Name": "autorag-xsy-dev_cache",
+        "Propagation": "",
+        "RW": true,
+        "Source": "/var/lib/docker/volumes/autorag-xsy-dev_cache/_data",
+        "Type": "volume"
+      }
+    ],
+    "state": {
+      "Dead": false,
+      "Error": "",
+      "ExitCode": 0,
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "End": "2026-10-31T10:57:37.642287838Z",
+            "ExitCode": 0,
+            "Output": "{\"ready\":true,\"model\":\"Qwen/Qwen3-Embedding-0.6B\",\"dimension\":1024,\"revision\":\"af95f2c416ffe9379369ad64f9113e865db6112c/fastembed-0.9.1/v1\",\"maxInputTokens\":2048,\"maxInputs\":32,\"device\":\"cpu\",\"prefixOwner\":\"client\",\"pooling\":\"last-token\",\"normalization\":\"l2\",\"tokenizerPath\":\"/workspace/.autorag/embedding-models/qwen3-0.6b-af95f2c416ffe9379369ad64f9113e865db6112c\",\"artifact\":{\"model\":\"Qwen/Qwen3-Embedding-0.6B\",\"repository\":\"Qdrant/Qwen3-Embedding-0.6B-onnx\",\"revision\":\"af95f2c416ffe9379369ad64f9113e865db6112c\",\"dimension\":1024,\"license\":\"Apache-2.0\",\"files\":{\"config.json\":\"da2b52e46d1469b9f6ff3a45e2bec36b2bb667de5ea9dd5a076e8bfe3b30cc05\",\"tokenizer_config.json\":\"1c45aaa97b2bec1d2e1ab0df53e1b2ed2f9568b871b25ca56095c0b83a5d4e93\",\"special_tokens_map.json\":\"76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd\",\"tokenizer.json\":\"def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a\",\"onnx/model.onnx\":\"754d6ba1c7a323d7b3af0d85b8268f8b716b0cd362ce73295e0f71d3dd831639\",\"onnx/model.onnx_data\":\"15d02a315e3b95296700c73d72a436e79facf4e17d919345bed730e98433bcb4\"}}}\n",
+            "Start": "2026-10-31T10:57:37.378827143Z"
+          },
+          {
+            "End": "2026-10-31T10:58:07.959594621Z",
+            "ExitCode": 0,
+            "Output": "{\"ready\":true,\"model\":\"Qwen/Qwen3-Embedding-0.6B\",\"dimension\":1024,\"revision\":\"af95f2c416ffe9379369ad64f9113e865db6112c/fastembed-0.9.1/v1\",\"maxInputTokens\":2048,\"maxInputs\":32,\"device\":\"cpu\",\"prefixOwner\":\"client\",\"pooling\":\"last-token\",\"normalization\":\"l2\",\"tokenizerPath\":\"/workspace/.autorag/embedding-models/qwen3-0.6b-af95f2c416ffe9379369ad64f9113e865db6112c\",\"artifact\":{\"model\":\"Qwen/Qwen3-Embedding-0.6B\",\"repository\":\"Qdrant/Qwen3-Embedding-0.6B-onnx\",\"revision\":\"af95f2c416ffe9379369ad64f9113e865db6112c\",\"dimension\":1024,\"license\":\"Apache-2.0\",\"files\":{\"config.json\":\"da2b52e46d1469b9f6ff3a45e2bec36b2bb667de5ea9dd5a076e8bfe3b30cc05\",\"tokenizer_config.json\":\"1c45aaa97b2bec1d2e1ab0df53e1b2ed2f9568b871b25ca56095c0b83a5d4e93\",\"special_tokens_map.json\":\"76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd\",\"tokenizer.json\":\"def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a\",\"onnx/model.onnx\":\"754d6ba1c7a323d7b3af0d85b8268f8b716b0cd362ce73295e0f71d3dd831639\",\"onnx/model.onnx_data\":\"15d02a315e3b95296700c73d72a436e79facf4e17d919345bed730e98433bcb4\"}}}\n",
+            "Start": "2026-10-31T10:58:07.641833899Z"
+          },
+          {
+            "End": "2026-10-31T10:58:38.15040721Z",
+            "ExitCode": 0,
+            "Output": "{\"ready\":true,\"model\":\"Qwen/Qwen3-Embedding-0.6B\",\"dimension\":1024,\"revision\":\"af95f2c416ffe9379369ad64f9113e865db6112c/fastembed-0.9.1/v1\",\"maxInputTokens\":2048,\"maxInputs\":32,\"device\":\"cpu\",\"prefixOwner\":\"client\",\"pooling\":\"last-token\",\"normalization\":\"l2\",\"tokenizerPath\":\"/workspace/.autorag/embedding-models/qwen3-0.6b-af95f2c416ffe9379369ad64f9113e865db6112c\",\"artifact\":{\"model\":\"Qwen/Qwen3-Embedding-0.6B\",\"repository\":\"Qdrant/Qwen3-Embedding-0.6B-onnx\",\"revision\":\"af95f2c416ffe9379369ad64f9113e865db6112c\",\"dimension\":1024,\"license\":\"Apache-2.0\",\"files\":{\"config.json\":\"da2b52e46d1469b9f6ff3a45e2bec36b2bb667de5ea9dd5a076e8bfe3b30cc05\",\"tokenizer_config.json\":\"1c45aaa97b2bec1d2e1ab0df53e1b2ed2f9568b871b25ca56095c0b83a5d4e93\",\"special_tokens_map.json\":\"76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd\",\"tokenizer.json\":\"def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a\",\"onnx/model.onnx\":\"754d6ba1c7a323d7b3af0d85b8268f8b716b0cd362ce73295e0f71d3dd831639\",\"onnx/model.onnx_data\":\"15d02a315e3b95296700c73d72a436e79facf4e17d919345bed730e98433bcb4\"}}}\n",
+            "Start": "2026-10-31T10:58:37.960169668Z"
+          },
+          {
+            "End": "2026-10-31T10:59:08.277361708Z",
+            "ExitCode": 0,
+            "Output": "{\"ready\":true,\"model\":\"Qwen/Qwen3-Embedding-0.6B\",\"dimension\":1024,\"revision\":\"af95f2c416ffe9379369ad64f9113e865db6112c/fastembed-0.9.1/v1\",\"maxInputTokens\":2048,\"maxInputs\":32,\"device\":\"cpu\",\"prefixOwner\":\"client\",\"pooling\":\"last-token\",\"normalization\":\"l2\",\"tokenizerPath\":\"/workspace/.autorag/embedding-models/qwen3-0.6b-af95f2c416ffe9379369ad64f9113e865db6112c\",\"artifact\":{\"model\":\"Qwen/Qwen3-Embedding-0.6B\",\"repository\":\"Qdrant/Qwen3-Embedding-0.6B-onnx\",\"revision\":\"af95f2c416ffe9379369ad64f9113e865db6112c\",\"dimension\":1024,\"license\":\"Apache-2.0\",\"files\":{\"config.json\":\"da2b52e46d1469b9f6ff3a45e2bec36b2bb667de5ea9dd5a076e8bfe3b30cc05\",\"tokenizer_config.json\":\"1c45aaa97b2bec1d2e1ab0df53e1b2ed2f9568b871b25ca56095c0b83a5d4e93\",\"special_tokens_map.json\":\"76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd\",\"tokenizer.json\":\"def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a\",\"onnx/model.onnx\":\"754d6ba1c7a323d7b3af0d85b8268f8b716b0cd362ce73295e0f71d3dd831639\",\"onnx/model.onnx_data\":\"15d02a315e3b95296700c73d72a436e79facf4e17d919345bed730e98433bcb4\"}}}\n",
+            "Start": "2026-10-31T10:59:08.150478983Z"
+          },
+          {
+            "End": "2026-10-31T10:59:38.39681762Z",
+            "ExitCode": 0,
+            "Output": "{\"ready\":true,\"model\":\"Qwen/Qwen3-Embedding-0.6B\",\"dimension\":1024,\"revision\":\"af95f2c416ffe9379369ad64f9113e865db6112c/fastembed-0.9.1/v1\",\"maxInputTokens\":2048,\"maxInputs\":32,\"device\":\"cpu\",\"prefixOwner\":\"client\",\"pooling\":\"last-token\",\"normalization\":\"l2\",\"tokenizerPath\":\"/workspace/.autorag/embedding-models/qwen3-0.6b-af95f2c416ffe9379369ad64f9113e865db6112c\",\"artifact\":{\"model\":\"Qwen/Qwen3-Embedding-0.6B\",\"repository\":\"Qdrant/Qwen3-Embedding-0.6B-onnx\",\"revision\":\"af95f2c416ffe9379369ad64f9113e865db6112c\",\"dimension\":1024,\"license\":\"Apache-2.0\",\"files\":{\"config.json\":\"da2b52e46d1469b9f6ff3a45e2bec36b2bb667de5ea9dd5a076e8bfe3b30cc05\",\"tokenizer_config.json\":\"1c45aaa97b2bec1d2e1ab0df53e1b2ed2f9568b871b25ca56095c0b83a5d4e93\",\"special_tokens_map.json\":\"76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd\",\"tokenizer.json\":\"def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a\",\"onnx/model.onnx\":\"754d6ba1c7a323d7b3af0d85b8268f8b716b0cd362ce73295e0f71d3dd831639\",\"onnx/model.onnx_data\":\"15d02a315e3b95296700c73d72a436e79facf4e17d919345bed730e98433bcb4\"}}}\n",
+            "Start": "2026-10-31T10:59:38.276866086Z"
+          }
+        ],
+        "Status": "healthy"
+      },
+      "OOMKilled": false,
+      "Paused": false,
+      "Pid": 65747,
+      "Restarting": false,
+      "Running": true,
+      "StartedAt": "2026-10-31T10:45:16.952540593Z",
+      "Status": "running"
+    }
+  },
+  "storageStrategy": {
+    "newImageBuilt": false,
+    "newImageDownloaded": false,
+    "imageReusedFrom": "autorag-qa-ob8tmejo-dev:latest",
+    "modelCopiedOrDownloaded": false,
+    "modelCache": "/workspace/.autorag/embedding-models",
+    "serviceOffline": true,
+    "existingVolumesReused": {
+      "/data/workspace": "autorag-xsy-dev_workspace",
+      "/workspace/node_modules": "autorag-xsy-dev_dependencies",
+      "/workspace/dist": "autorag-xsy-dev_build-output",
+      "/dev-home": "autorag-xsy-dev_home",
+      "/dev-home/.cache": "autorag-xsy-dev_cache"
+    },
+    "newDependencyVolumeCreated": false,
+    "dependencyUpdate": "11 packages installed incrementally in 6.83 seconds; Pi 1.2.0 updated to the already locked 1.4.0",
+    "beforeHumanReadable": "88K\t/dev-home/.autorag\n43M\t/data/workspace\n2.3G\t/workspace/node_modules\n11M\t/workspace/dist\n2.4G\t/workspace/.autorag/embedding-models\n",
+    "afterHumanReadable": "47M\t/data/workspace\n2.4M\t/dev-home/.autorag\n2.3G\t/workspace/node_modules\n11M\t/workspace/dist\n",
+    "afterKiB": {
+      "/data/workspace": 47456,
+      "/dev-home/.autorag": 2448,
+      "/workspace/node_modules": 2354144,
+      "/workspace/dist": 10784
+    },
+    "windowsCFreeBeforeApproxGiB": 3.5,
+    "windowsCFreeAfterApproxGiB": 3.45,
+    "otherProjectsPruned": false,
+    "legacyMinSyncCachesDeleted": false
+  },
+  "configuration": {
+    "active": "/dev-home/.autorag/config.fastembed.json",
+    "original": "/dev-home/.autorag/config.json",
+    "originalSha256Before": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+    "originalSha256After": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+    "originalUnchanged": true,
+    "embedding": "local-qwen3 / Qwen3-Embedding-0.6B / 1024 dimensions",
+    "tokenizer": "/workspace/.autorag/embedding-models/qwen3-0.6b-af95f2c416ffe9379369ad64f9113e865db6112c",
+    "koreanModel": "/workspace/.autorag/embedding-models/kiwi-0.24.1",
+    "remoteRerank": false,
+    "rawCredentialsWritten": false,
+    "existingPiLoginVolumePreserved": true
+  },
+  "verification": {
+    "check": "PASS; 8 existing infos, 3 container-inapplicable host-venv symlink warnings",
+    "lint": "PASS; same existing warnings/infos",
+    "typecheck": "PASS",
+    "build": "PASS",
+    "supplyChain": "PASS",
+    "composeConfig": "PASS",
+    "healthy": true,
+    "allPinnedPiComponents": "1.4.0",
+    "parserRecovery": {
+      "scanned": 5,
+      "written": 5,
+      "skipped": 0,
+      "diagnostics": [
+        {
+          "code": "parser-warning",
+          "severity": "warning",
+          "message": "HIDDEN_TEXT_FILTERED: 1개 숨겨진 텍스트 요소 필터링됨",
+          "source": "/documents/DGL.pdf"
+        },
+        {
+          "code": "parser-warning",
+          "severity": "warning",
+          "message": "SKIPPED_IMAGE: 1개 이미지 영역에 추출 가능한 텍스트 없음 (그림/차트/도장 내용 누락 가능 — 그림 속 글은 ocr: true / CLI --ocr 로 읽습니다)",
+          "source": "/documents/DGL.pdf"
+        },
+        {
+          "code": "parser-warning",
+          "severity": "warning",
+          "message": "SKIPPED_IMAGE: 1개 이미지 영역에 추출 가능한 텍스트 없음 (그림/차트/도장 내용 누락 가능 — 그림 속 글은 ocr: true / CLI --ocr 로 읽습니다)",
+          "source": "/documents/DGL.pdf"
+        },
+        {
+          "code": "parser-warning",
+          "severity": "warning",
+          "message": "HIDDEN_TEXT_FILTERED: 16개 머리글/바닥글 요소 제거됨",
+          "source": "/documents/DGL.pdf"
+        },
+        {
+          "code": "parser-warning",
+          "severity": "warning",
+          "message": "HIDDEN_TEXT_FILTERED: 82개 숨겨진 텍스트 요소 필터링됨",
+          "source": "/documents/TempMe.pdf"
+        },
+        {
+          "code": "parser-warning",
+          "severity": "warning",
+          "message": "HIDDEN_TEXT_FILTERED: 7개 숨겨진 텍스트 요소 필터링됨",
+          "source": "/documents/TempMe.pdf"
+        },
+        {
+          "code": "parser-warning",
+          "severity": "warning",
+          "message": "HIDDEN_TEXT_FILTERED: 41개 머리글/바닥글 요소 제거됨",
+          "source": "/documents/TempMe.pdf"
+        },
+        {
+          "code": "fsearch-binary-missing",
+          "severity": "warning",
+          "message": "fsearch-cli is not installed; file-name search uses a slow filesystem walk: fsearch-cli --version exit null: fsearch-cli: spawn fsearch-cli ENOENT",
+          "source": "fsearch"
+        }
+      ]
+    },
+    "index": {
+      "configPath": "/dev-home/.autorag/config.fastembed.json",
+      "searchPaths": [
+        "/documents"
+      ],
+      "workspacePath": "/data/workspace",
+      "oldConfigHash": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+      "queries": [
+        {
+          "query": "退款例外需要谁批准？",
+          "expected": "/documents/refund-policy.txt",
+          "latencyMs": 257.2099509999971,
+          "sources": [
+            "/documents/refund-policy.txt",
+            "/documents/DiscoVLA.pdf",
+            "/documents/DiscoVLA.pdf",
+            "/documents/DiscoVLA.pdf",
+            "/documents/DGL.pdf"
+          ],
+          "passed": true
+        },
+        {
+          "query": "Where does the isolated development environment keep document indexes?",
+          "expected": "/documents/development-notes.md",
+          "latencyMs": 261.37905799999135,
+          "sources": [
+            "/documents/development-notes.md",
+            "/documents/development-notes.md",
+            "/documents/DGL.pdf",
+            "/documents/DGL.pdf",
+            "/documents/TempMe.pdf"
+          ],
+          "passed": true
+        },
+        {
+          "query": "DGL",
+          "expected": "/documents/DGL.pdf",
+          "latencyMs": 288.2012880000402,
+          "sources": [
+            "/documents/DGL.pdf",
+            "/documents/DGL.pdf",
+            "/documents/DGL.pdf",
+            "/documents/DGL.pdf",
+            "/documents/DGL.pdf"
+          ],
+          "passed": true
+        }
+      ],
+      "build": {
+        "version": 1,
+        "jobId": "4bc97770-a2ce-4064-85ad-2266255ac600",
+        "requestId": "8df3d17e-9d87-4157-883c-35b6f9f076f8",
+        "configurationFingerprint": "771ab17145588f7cd3bca1aab9918f57ee68ec1f9783150eb93ee9111eaa1e9e",
+        "owner": "c3cc100f-ed78-4175-bb42-68625ce12c41",
+        "pid": 323,
+        "birth": "1b8da3b4-b018-414f-b4c6-f32b4f49b5bc:3412154",
+        "mode": "build",
+        "embeddingProfile": "local-qwen3",
+        "state": "succeeded",
+        "startedAt": "2026-10-31T10:51:14.396Z",
+        "updatedAt": "2026-10-31T10:58:17.572Z",
+        "phase": "done",
+        "event": {
+          "runId": "76f0a91f-ef48-4d74-bfaa-5a6a2109cc6d",
+          "elapsedMs": 422938.243769,
+          "phase": "done",
+          "state": "end"
+        },
+        "report": {
+          "runId": "76f0a91f-ef48-4d74-bfaa-5a6a2109cc6d",
+          "backend": "autorag",
+          "ok": true,
+          "durationMs": 422938.203867,
+          "timings": {
+            "prepare": 617.9662299999998,
+            "write": 245.19980600000804,
+            "parse": 0,
+            "chunk": 1645.7228549999918,
+            "lexical": 31.615453000001253,
+            "cache": 13.45157400000835,
+            "embed": 420091.69129499997,
+            "maintain": 95.2868240000098
+          },
+          "documents": 5,
+          "unchanged": 0,
+          "chunks": 213,
+          "embedded": 213,
+          "reused": 0,
+          "deleted": 0,
+          "failures": [],
+          "reportPath": "/data/workspace/.autorag/local-index/runs/76f0a91f-ef48-4d74-bfaa-5a6a2109cc6d/report.json"
+        },
+        "partial": false
+      },
+      "noChangeRefresh": {
+        "version": 1,
+        "jobId": "5dbde00f-af6c-4463-9006-c814f61ddf25",
+        "requestId": "1f7183f6-84dc-4d3f-acf9-173988ea2f66",
+        "configurationFingerprint": "771ab17145588f7cd3bca1aab9918f57ee68ec1f9783150eb93ee9111eaa1e9e",
+        "owner": "c3cc100f-ed78-4175-bb42-68625ce12c41",
+        "pid": 323,
+        "birth": "1b8da3b4-b018-414f-b4c6-f32b4f49b5bc:3412154",
+        "mode": "refresh",
+        "embeddingProfile": "local-qwen3",
+        "state": "succeeded",
+        "startedAt": "2026-10-31T10:58:18.693Z",
+        "updatedAt": "2026-10-31T10:58:18.738Z",
+        "phase": "done",
+        "event": {
+          "runId": "87fb8196-1d9b-4008-85dd-5cf66832d700",
+          "elapsedMs": 15.144551000033971,
+          "phase": "done",
+          "state": "end"
+        },
+        "report": {
+          "runId": "87fb8196-1d9b-4008-85dd-5cf66832d700",
+          "backend": "autorag",
+          "ok": true,
+          "durationMs": 15.133151000016369,
+          "timings": {
+            "prepare": 7.606276999984402,
+            "write": 0.3666180000291206,
+            "parse": 0
+          },
+          "documents": 5,
+          "unchanged": 5,
+          "chunks": 0,
+          "embedded": 0,
+          "reused": 0,
+          "deleted": 0,
+          "failures": [],
+          "reportPath": "/data/workspace/.autorag/local-index/runs/87fb8196-1d9b-4008-85dd-5cf66832d700/report.json"
+        },
+        "partial": false
+      },
+      "status": {
+        "state": "success",
+        "inFlight": false,
+        "lastStartedAt": "2026-10-31T10:58:18.703Z",
+        "lastFinishedAt": "2026-10-31T10:58:18.734Z",
+        "counts": {
+          "scanned": 5,
+          "written": 0,
+          "deleted": 0,
+          "skipped": 0
+        },
+        "stale": false,
+        "diagnostics": [
+          {
+            "code": "jikji-unavailable",
+            "severity": "warning",
+            "message": "Jikji indexing is degraded: the Jikji binary could not be started (missing or not executable).",
+            "source": "jikji"
+          },
+          {
+            "code": "fsearch-binary-missing",
+            "severity": "warning",
+            "message": "fsearch-cli is not installed; file-name search uses a slow filesystem walk: fsearch-cli --version exit null: fsearch-cli: spawn fsearch-cli ENOENT",
+            "source": "fsearch"
+          }
+        ],
+        "components": {
+          "minsync": "ready",
+          "jikji": "degraded",
+          "fsearch": "unavailable"
+        }
+      },
+      "result": "PASS",
+      "originalConfigUnchanged": true
+    },
+    "vectorVerificationScript": "PASS",
+    "standardCliLiteRetrieve": {
+      "ok": true,
+      "stale": false,
+      "unsearched": []
+    },
+    "chatModelAuthCatalog": "44 locally available entries; no remote inference performed",
+    "remoteEmbeddingOrChatCalls": 0
+  },
+  "resources": {
+    "cpuLimit": 4,
+    "memoryLimitGiB": 8,
+    "memoryPeakBytes": 4985004032,
+    "memoryPeakGiB": 4.643,
+    "memoryEvents": {
+      "low": 0,
+      "high": 0,
+      "max": 0,
+      "oom": 0,
+      "oom_kill": 0,
+      "oom_group_kill": 0
+    },
+    "stats": {
+      "BlockIO": "1.66GB / 12.7MB",
+      "CPUPerc": "0.14%",
+      "Container": "autorag-xsy-dev-dev-1",
+      "ID": "433acfe38bca",
+      "MemPerc": "51.05%",
+      "MemUsage": "4.084GiB / 8GiB",
+      "Name": "autorag-xsy-dev-dev-1",
+      "NetIO": "10.4kB / 3.51kB",
+      "PIDs": "15"
+    }
+  },
+  "rollback": {
+    "previousImageId": "sha256:527243f8080ea5f343ad788f07eb78c43d892113694c30d53b6f4c75d7e45cbf",
+    "previousImageTag": "autorag-xsy-dev:2.11.0",
+    "previousCommand": [
+      "bash",
+      "-c",
+      "minsync serve --idle-timeout 0 & exec sleep infinity"
+    ],
+    "originalConfig": "/dev-home/.autorag/config.json",
+    "previousBuiltArtifacts": "/dev-home/.autorag/dist-before-fastembed-20261031.tgz",
+    "allVolumesPreserved": true,
+    "oldIndexesDeleted": false,
+    "note": "Rollback requires the matching old program and config. The new runtime does not query old MinSync vectors."
+  },
+  "limits": [
+    "Image-only PDF content was not OCRed; local text extraction warnings retained above.",
+    "fsearch-cli is unavailable; the established filesystem-walk fallback remains.",
+    "No paid chat-model end-to-end question or hosted embedding acceptance performed."
+  ],
+  "executionNote": "A temporary Node STDIN diagnostic inherited --input-type in parse workers; corrected by executing normal .mjs files and explicitly retrying failed parses. No product parser code change was needed.",
+  "preservation": {
+    "hostConfigBefore": "ABSENT",
+    "hostConfigAfter": "ABSENT",
+    "otherRunningContainers": {
+      "autorag-research-research-db-1": "7c851c3ea1ee",
+      "open-notebook-surrealdb-1": "4fd858eb6563"
+    },
+    "sourceDocumentsReadOnly": true,
+    "dailyContainerLeftRunning": true,
+    "temporaryContainerHelperScriptsRemoved": true
+  },
+  "commands": [
+    {
+      "time": 1793443393.4563007,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{index .Config.Labels \"com.docker.compose.project\"}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793443393.4839342,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{\"id\":{{json .Id}},\"image\":{{json .Image}},\"command\":{{json .Config.Cmd}},\"mounts\":{{json .Mounts}}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793443393.51147,
+      "argv": [
+        "docker",
+        "ps",
+        "--format",
+        "{{.ID}} {{.Names}} {{.Status}}"
+      ]
+    },
+    {
+      "time": 1793443476.174503,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{index .Config.Labels \"com.docker.compose.project\"}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793443515.2771509,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{index .Config.Labels \"com.docker.compose.project\"}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793443515.3070538,
+      "argv": [
+        "docker",
+        "image",
+        "tag",
+        "autorag-qa-ob8tmejo-dev:latest",
+        "autorag-xsy-dev:2.11.1-fastembed"
+      ]
+    },
+    {
+      "time": 1793443515.3625615,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-xsy-dev",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "config",
+        "--quiet"
+      ]
+    },
+    {
+      "time": 1793443515.4736922,
+      "argv": [
+        "docker",
+        "compose",
+        "-p",
+        "autorag-xsy-dev",
+        "-f",
+        "/home/xsy/projects/AutoRAG/myself_dev/compose.yaml",
+        "up",
+        "-d",
+        "--no-deps",
+        "--no-build",
+        "--pull",
+        "never",
+        "dev"
+      ]
+    },
+    {
+      "time": 1793443566.5202558,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{index .Config.Labels \"com.docker.compose.project\"}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793443566.5500805,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{json .State}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793443620.7578232,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{index .Config.Labels \"com.docker.compose.project\"}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793443700.6519449,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{index .Config.Labels \"com.docker.compose.project\"}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793443747.9767756,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{index .Config.Labels \"com.docker.compose.project\"}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793443804.8266022,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{index .Config.Labels \"com.docker.compose.project\"}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793443804.9014728,
+      "argv": [
+        "docker",
+        "cp",
+        "/tmp/autorag-daily-deploy-km6syhza/retry-pdf.mjs",
+        "autorag-xsy-dev-dev-1:/dev-home/.autorag/deploy-reparse-20261031.mjs"
+      ]
+    },
+    {
+      "time": 1793443805.0756211,
+      "argv": [
+        "docker",
+        "exec",
+        "autorag-xsy-dev-dev-1",
+        "node",
+        "/dev-home/.autorag/deploy-reparse-20261031.mjs"
+      ]
+    },
+    {
+      "time": 1793443872.5109806,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{index .Config.Labels \"com.docker.compose.project\"}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793443872.5377223,
+      "argv": [
+        "docker",
+        "cp",
+        "/tmp/autorag-daily-deploy-km6syhza/index.mjs",
+        "autorag-xsy-dev-dev-1:/dev-home/.autorag/deploy-index-20261031.mjs"
+      ]
+    },
+    {
+      "time": 1793443872.5792625,
+      "argv": [
+        "docker",
+        "exec",
+        "autorag-xsy-dev-dev-1",
+        "node",
+        "/dev-home/.autorag/deploy-index-20261031.mjs"
+      ]
+    },
+    {
+      "time": 1793444105.6422293,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{index .Config.Labels \"com.docker.compose.project\"}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793444105.6939962,
+      "argv": [
+        "docker",
+        "exec",
+        "autorag-xsy-dev-dev-1",
+        "node",
+        "-e",
+        "const f=require('fs');const j=JSON.parse(f.readFileSync('/data/workspace/.autorag/index-jobs/latest.json')); console.log(JSON.stringify({state:j.state,phase:j.phase,event:j.event,error:j.error}));"
+      ]
+    },
+    {
+      "time": 1793444106.0233042,
+      "argv": [
+        "docker",
+        "stats",
+        "--no-stream",
+        "--format",
+        "{{json .}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793444315.471475,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{index .Config.Labels \"com.docker.compose.project\"}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793444387.7282422,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{index .Config.Labels \"com.docker.compose.project\"}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793444387.7560322,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{\"id\":{{json .Id}},\"image\":{{json .Image}},\"command\":{{json .Config.Cmd}},\"mounts\":{{json .Mounts}},\"state\":{{json .State}}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793444387.7844088,
+      "argv": [
+        "docker",
+        "ps",
+        "--format",
+        "{{.ID}} {{.Names}} {{.Status}}"
+      ]
+    },
+    {
+      "time": 1793444387.8312054,
+      "argv": [
+        "docker",
+        "exec",
+        "autorag-xsy-dev-dev-1",
+        "du",
+        "-sh",
+        "/data/workspace",
+        "/dev-home/.autorag",
+        "/workspace/node_modules",
+        "/workspace/dist"
+      ]
+    },
+    {
+      "time": 1793444388.1198754,
+      "argv": [
+        "docker",
+        "stats",
+        "--no-stream",
+        "--format",
+        "{{json .}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793444389.1464176,
+      "argv": [
+        "docker",
+        "exec",
+        "autorag-xsy-dev-dev-1",
+        "cat",
+        "/dev-home/.autorag/daily-deployment-20261031.json"
+      ]
+    },
+    {
+      "time": 1793444389.2551491,
+      "argv": [
+        "docker",
+        "exec",
+        "autorag-xsy-dev-dev-1",
+        "bash",
+        "-lc",
+        "cat /sys/fs/cgroup/memory.peak; cat /sys/fs/cgroup/memory.events; cat /sys/fs/cgroup/cpu.max"
+      ]
+    },
+    {
+      "time": 1793444389.365344,
+      "argv": [
+        "docker",
+        "exec",
+        "autorag-xsy-dev-dev-1",
+        "du",
+        "-sk",
+        "/data/workspace",
+        "/dev-home/.autorag",
+        "/workspace/node_modules",
+        "/workspace/dist",
+        "/dev-home/.autorag/dist-before-fastembed-20261031.tgz"
+      ]
+    },
+    {
+      "time": 1793444389.5991294,
+      "argv": [
+        "docker",
+        "exec",
+        "autorag-xsy-dev-dev-1",
+        "node",
+        "-e",
+        "const f=require('fs');for(const n of ['pi-agent-core','pi-ai','pi-coding-agent','pi-tui']){const p=JSON.parse(f.readFileSync('/workspace/node_modules/@earendil-works/'+n+'/package.json'));if(p.version!=='1.4.0')throw Error('Wrong Pi version');}console.log('PASS: all four Pi components are 1.4.0');"
+      ]
+    },
+    {
+      "time": 1793444497.382141,
+      "argv": [
+        "docker",
+        "inspect",
+        "--format",
+        "{{index .Config.Labels \"com.docker.compose.project\"}}",
+        "autorag-xsy-dev-dev-1"
+      ]
+    },
+    {
+      "time": 1793444497.4448216,
+      "argv": [
+        "docker",
+        "exec",
+        "autorag-xsy-dev-dev-1",
+        "node",
+        "-e",
+        "const f=require('fs');for(const p of ['/dev-home/.autorag/deploy-index-20261031.mjs','/dev-home/.autorag/deploy-reparse-20261031.mjs'])if(f.existsSync(p))f.unlinkSync(p);console.log('Removed only this deployment temporary helper scripts; daily service retained.');"
+      ]
+    }
+  ]
+}

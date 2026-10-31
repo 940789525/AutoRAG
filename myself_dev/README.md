@@ -2,7 +2,7 @@
 
 本目录保存本机 Docker 开发配置、操作记录、无敏感测试文档和验证证据。当前默认不传递任何主机模型凭据。
 
-已完成：依赖安装、源码/构建 CLI、TUI 启动、本地 CPU embedding、真实索引/向量检索、容器重建持久化、96 项相关测试。完整模型问答等待你在 TUI 手动登录并选择模型。
+已完成 FastEmbed 日常部署：`autorag-xsy-dev-dev-1` 使用 `autorag-xsy-dev:2.11.1-fastembed`，复用原有五个数据卷。完整模型问答使用 TUI 中已有的登录和模型选择；部署验证不调用远程对话模型。
 
 本机开发配置已关闭可选远程 rerank；embedding 保持本地。可选 fsearch-cli 尚未安装，文件名搜索使用文件系统遍历。主机原有 Node 和 AutoRAG home 保持原状。
 
@@ -12,7 +12,7 @@
 
 ```bash
 cd /home/xsy/projects/AutoRAG
-bash myself_dev/dev.sh up -d --build
+bash myself_dev/dev.sh up -d --no-build --pull never
 bash myself_dev/dev.sh ps
 bash myself_dev/dev.sh exec dev bash
 ```
@@ -23,7 +23,7 @@ bash myself_dev/dev.sh exec dev bash
 bash myself_dev/dev.sh exec dev bun src/cli/index.ts tui
 ```
 
-容器自动启动本地 CPU MinSync embedding daemon，并保持开发环境存活；在 TUI 中关闭 embedding 不会关闭整个容器。首次下载模型需要联网。查看进度：
+容器自动启动本地 CPU FastEmbed/Qwen 服务，并保持开发环境存活。服务以 `--offline` 复用本克隆 `/workspace/.autorag/embedding-models` 的已验证模型，不复制到 Docker 卷，也不在启动时下载。该目录必须保留；只有修改 Dockerfile 时才需要重新构建镜像。查看进度：
 
 ```bash
 bash myself_dev/dev.sh logs --tail 50 dev
@@ -61,7 +61,7 @@ bash myself_dev/dev.sh exec dev bash myself_dev/check-in-copy.sh
 重新验证纯向量检索及原文来源：
 
 ```bash
-bash myself_dev/dev.sh exec dev bun myself_dev/verify-retrieval.mjs
+bash myself_dev/dev.sh exec dev node myself_dev/verify-retrieval.mjs
 ```
 
 ## 路径与持久化
@@ -74,9 +74,10 @@ bash myself_dev/dev.sh exec dev bun myself_dev/verify-retrieval.mjs
 | `/workspace/dist` | Docker 构建产物卷 |
 | `/dev-home` | 专属用户状态卷；配置、Pi 登录、会话 |
 | `/dev-home/.cache` | 专属模型/下载缓存卷 |
-| `/data/workspace` | 解析镜像、索引和 MinSync 状态卷 |
+| `/data/workspace` | 解析镜像、AutoRAG 索引和任务状态卷 |
+| `/workspace/.autorag/embedding-models` | 直接复用克隆内已有的 Qwen ONNX 与 Kiwi 缓存 |
 
-`AUTORAG_HOME=/dev-home/.autorag`；`AUTORAG_CONFIG=/dev-home/.autorag/config.json`。`--workspace` 不能替代这两个变量的隔离。
+`AUTORAG_HOME=/dev-home/.autorag`；`AUTORAG_CONFIG=/dev-home/.autorag/config.fastembed.json`。原 `config.json` 保留用于回退；`--workspace` 不能替代这两个变量的隔离。
 
 使用非 root UID/GID 1000:1000，限制 4 CPU、8 GiB 内存。无需显卡、端口映射、Redis、MySQL；不挂载主机 HOME 或 Docker socket。
 
@@ -93,3 +94,5 @@ bash myself_dev/dev.sh up -d
 普通重建容器保留数据卷。不要执行 `down -v`，它会删除本项目的数据、登录状态和模型缓存。
 
 详细过程与当前验证结果见 `操作记录.md`，失败诊断保留在对应 `.log` 文件中。
+
+日常容器的 FastEmbed 切换、存储复用及真实查询记录见 [2026-10-31 日常部署证据](../docs/qa/daily-deployment-2026-10-31.json)。

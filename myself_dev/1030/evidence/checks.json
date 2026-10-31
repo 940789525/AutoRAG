@@ -101,5 +101,15 @@
     "projectVenv": ".venv-embedding (ignored)",
     "verifiedModels": ".autorag/embedding-models (ignored; preserved for reuse)",
     "sharedMinSyncCache": "untouched"
+  },
+  "dailyDeploymentFollowup": {
+    "status": "PASS",
+    "container": "autorag-xsy-dev-dev-1",
+    "image": "autorag-xsy-dev:2.11.1-fastembed",
+    "evidence": "docs/qa/daily-deployment-2026-10-31.json",
+    "oldConfigAndAllVolumesPreserved": true,
+    "modelCopiedOrDownloaded": false,
+    "documents": 5,
+    "chunks": 213
   }
 }

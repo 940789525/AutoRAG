@@ -2,7 +2,7 @@ name: autorag-xsy-dev
 
 services:
   dev:
-    image: autorag-xsy-dev:2.11.0
+    image: autorag-xsy-dev:2.11.1-fastembed
     build:
       context: ..
       dockerfile: myself_dev/Dockerfile
@@ -13,7 +13,7 @@ services:
     environment:
       HOME: /dev-home
       AUTORAG_HOME: /dev-home/.autorag
-      AUTORAG_CONFIG: /dev-home/.autorag/config.json
+      AUTORAG_CONFIG: /dev-home/.autorag/config.fastembed.json
       PI_CODING_AGENT_DIR: /dev-home/.pi/agent
       XDG_CACHE_HOME: /dev-home/.cache
       OMP_NUM_THREADS: "4"
@@ -27,7 +27,8 @@ services:
       - cache:/dev-home/.cache
       - workspace:/data/workspace
     # Keep the dev shell available when an embedding process exits.
-    command: ["bash", "-c", "/opt/autorag-embedding/bin/python /workspace/src/embedding/service.py --cache-dir /dev-home/.autorag/models/fastembed & exec sleep infinity"]
+    # Reuse this clone's verified ONNX cache; offline mode prevents duplicate downloads.
+    command: ["bash", "-c", "/opt/autorag-embedding/bin/python /workspace/src/embedding/service.py --cache-dir /workspace/.autorag/embedding-models --offline & exec sleep infinity"]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     mem_limit: 8g
