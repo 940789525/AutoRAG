@@ -1,0 +1,24 @@
+embedding backend: local-http alive=true (http://127.0.0.1:33695)
+PASS  an embedding backend is alive (start a local FastEmbed service first)
+PASS  factory builds the obsidian skill with no external CLI
+PASS  descriptor does not claim an external CLI
+Quantization is not supported for ArchType::none. Fall back to non-quantized model.
+Quantization is not supported for ArchType::none. Fall back to non-quantized model.
+PASS  refresh: obsidian indexed through AutoRAG/FastEmbed — []
+PASS  refresh: only the 5 notes were indexed
+PASS  BM25: finds the note by exact terms — /obsidian/vault/Projects/Budget.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/프로젝트/계획.md, /obsidian/vault/프로젝트/계획.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/Daily/2026-10-01.md, /obsidian/vault/Daily/2026-10-01.md, /obsidian/vault/Projects/Budget.md, /obsidian/vault/Ideas/C%23 tips 100%25.md, /obsidian/vault/Ideas/C%23 tips 100%25.md
+PASS  BM25: result carries the real file path and title
+PASS  semantic: finds the roadmap note with no shared keywords — /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/프로젝트/계획.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/Daily/2026-10-01.md, /obsidian/vault/Ideas/C%23 tips 100%25.md, /obsidian/vault/Projects/Budget.md, /obsidian/vault/Projects/Budget.md, /obsidian/vault/Ideas/C%23 tips 100%25.md, /obsidian/vault/Daily/2026-10-01.md, /obsidian/vault/프로젝트/계획.md
+PASS  Korean query matches a note whose file name is written decomposed (NFD) — /obsidian/vault/프로젝트/계획.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/Projects/Budget.md, /obsidian/vault/Daily/2026-10-01.md, /obsidian/vault/Ideas/C%23 tips 100%25.md, /obsidian/vault/Projects/Budget.md, /obsidian/vault/프로젝트/계획.md, /obsidian/vault/Ideas/C%23 tips 100%25.md, /obsidian/vault/Daily/2026-10-01.md
+PASS  folder scope: only notes under Projects — /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/Projects/Budget.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/Projects/Budget.md
+PASS  folder scope: a name prefix is not a folder
+PASS  special characters in a note name are escaped in its source — /obsidian/vault/Ideas/C%23 tips 100%25.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/Ideas/C%23 tips 100%25.md, /obsidian/vault/Daily/2026-10-01.md, /obsidian/vault/프로젝트/계획.md, /obsidian/vault/프로젝트/계획.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/Daily/2026-10-01.md, /obsidian/vault/Projects/Budget.md, /obsidian/vault/Projects/Budget.md
+PASS  hidden folders and attachments are never indexed — /obsidian/vault/Ideas/C%23 tips 100%25.md, /obsidian/vault/Ideas/C%23 tips 100%25.md, /obsidian/vault/Projects/Budget.md, /obsidian/vault/Daily/2026-10-01.md, /obsidian/vault/Daily/2026-10-01.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/Projects/Roadmap.md, /obsidian/vault/프로젝트/계획.md, /obsidian/vault/프로젝트/계획.md, /obsidian/vault/Projects/Budget.md
+PASS  incremental refresh succeeds
+PASS  incremental refresh: note count is 5 (-1 deleted, +1 added)
+PASS  incremental: an edited note answers with its new text
+PASS  incremental: the old text is gone
+PASS  incremental: a deleted note no longer answers
+PASS  incremental: a new note is searchable
+
+LIVE QA PASSED

@@ -9,7 +9,7 @@ import { createSearchMinSyncDocumentsTool } from "../../src/agent/search-minsync
 import { createSingleDatasourceSearchTools } from "../../src/agent/search-single-datasource-tool.ts";
 import { createWebFetchTool } from "../../src/agent/web-fetch-tool.ts";
 import { createWebSearchTool } from "../../src/agent/web-search-tool.ts";
-import type { MinSyncVectorMethod } from "../../src/minsync/method.ts";
+import type { LocalIndexMethod as MinSyncVectorMethod } from "../../src/indexing/method.ts";
 import type { RetrievalResult } from "../../src/retrieval/types.ts";
 import { clearRegisteredSearchProviders, registerSearchProvider } from "../../src/web/search/provider.ts";
 import { SEARCH_PROVIDER_ORDER, type SearchProviderId } from "../../src/web/search/types.ts";

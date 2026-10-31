@@ -95,6 +95,11 @@ export function resolveSelectedMethods(
 	selection: RetrievalSelection,
 	datasourceIds: readonly string[],
 ): RetrievalMethod[] {
+	if (selection.methods?.includes("local-vector"))
+		selection = {
+			...selection,
+			methods: [...new Set(selection.methods.map((name) => (name === "local-vector" ? "minsync" : name)))],
+		};
 	const byName = new Map<string, RetrievalMethod>();
 	for (const method of methods) {
 		const name = method.describe().name;

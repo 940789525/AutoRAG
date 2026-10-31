@@ -195,7 +195,7 @@ export class MailcrawlClient implements MailcrawlSearchClient {
 						reason: "embedding-unavailable",
 						stdout: "",
 						stderr:
-							"no embedding endpoint is available: start `minsync serve` (docs/minsync-setup.md) or set minSync.embedder to a remote endpoint",
+							"no embedding endpoint is available: start a local FastEmbed service (docs/embedding-setup.md) or configure an explicitly authorized API profile",
 						code: null,
 					};
 				}

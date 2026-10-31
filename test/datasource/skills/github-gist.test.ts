@@ -464,7 +464,6 @@ describe("GitHubGistSkill semantic retrieval", () => {
 		expect(result.diagnostics.some((d) => d.message.includes("semantic-unavailable"))).toBe(true);
 
 		const semantic = skill.retrievalMethods().find((m) => m.describe().name === "github-gist-semantic");
-		const hits = await semantic!.retrieve("anything", { topK: 5 });
-		expect(hits).toEqual([]);
+		await expect(semantic!.retrieve("anything", { topK: 5 })).rejects.toThrow("gateway down");
 	});
 });

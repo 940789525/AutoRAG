@@ -724,7 +724,7 @@ the defaults.
 
 Deep dive into AutoRAG Agent's architecture, security, and integration guides:
 
-- **[MinSync Setup & Embedding QA](docs/minsync-setup.md):** Automatic binary installation, CDC chunking, embedding backends (remote, `minsync serve` daemon, in-process addon), and local verification.
+- **[FastEmbed / API Setup & QA](docs/embedding-setup.md):** Pinned local Qwen ONNX runtime, explicitly authorized API profiles, TUI indexing, migration and rollback.
 - **[Hosted Dazzi Models Provider](docs/cloud-provider.md):** The hosted `dazzi` model provider — PKCE `/login`, `AUTORAG_BASE_URL`, live model discovery, and offline catalog snapshots.
 - **[Discord Remote Control](docs/discord.md):** Ask the librarian from a Discord channel through a running `autorag tui --discord` session: bot setup, permissions, and limits.
 - **[Telegram Remote Control](docs/telegram.md):** Ask the librarian from a Telegram chat through a running `autorag tui --telegram` session: setup, commands, and keeping it alive.
@@ -797,10 +797,10 @@ Common failures and their fix:
 |---|---|---|
 | Results are missing recent files | `stale-index` | `autorag refresh --method parsed,minsync --json` |
 | Semantic search returns nothing after changing the embedder, or after moving off the old embedding gateway | `embedding-identity-mismatch` | `autorag index rebuild --method minsync` |
-| No remote endpoint answers, no `minsync serve` daemon could start, and the in-process addon is missing or failed | `embedder-unavailable` | run `minsync serve` by hand to see its own error, install MinSync, install the optional `@nomadamas/minsync-native` addon, or configure a remote `minSync.embedder` |
+| Local FastEmbed is unavailable | `embedder-unavailable` | Install the pinned Python runtime and inspect `/embedding status`; see [setup](docs/embedding-setup.md). No native fallback. |
 | A datasource is healthy in its own CLI but absent from results | — | confirm it is configured under `datasources` and connected through its native CLI |
 | A datasource errors during refresh | `datasource-index-failed` | run that CLI's own `doctor` |
-| MinSync binary missing (search and refresh fail with `MinSync is required ...`) | — | `cargo install minsync`, or leave `minSync.autoInstall` on and re-run refresh |
+| A legacy MinSync configuration needs migration | — | Use the migration preview and build a fresh FastEmbed profile; do not install MinSync for the new runtime. |
 | Jikji missing | `jikji-unavailable` | check the Rust toolchain, re-run refresh |
 | Jikji prepare of a large root times out (`the Jikji prepare run timed out`) | `jikji-prepare-failed` | the refresh still finishes and the other roots are indexed. There is no fixed total wall: the per-root hang guard is `jikji.timeoutMs` (60 s base) plus `jikji.prepareTimeoutMsPerFile` ms per file under the root (default: `jikji.parseTimeout`, 5 s), uncapped, so a huge root is not cut by its size and only a run stuck beyond every file hitting its parse limit is killed. Set `prepareTimeoutMsPerFile: 0` for a flat `timeoutMs` wall. `jikji.parseTimeout` (seconds) is the per-file limit, forwarded to `jikji prepare --parse-timeout`; jikji skips a file that exceeds it. A timeout kills jikji's whole process group |
 | Windows file-name search fails during refresh | `everything-index-failed` | read the ES exit code and stderr in the message, then `autorag refresh --method everything --json` |

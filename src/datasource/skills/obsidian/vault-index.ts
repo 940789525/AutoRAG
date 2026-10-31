@@ -1,5 +1,5 @@
 import { basename, extname, join } from "node:path";
-import { createEmbedderFromConfig, type Embedder } from "../../../embedding/index.ts";
+import { createEmbedderFromConfig, type Embedder, ProfileEmbedder } from "../../../embedding/index.ts";
 import { LocalDocumentIndex } from "../../../indexing/pipeline.ts";
 import type { IndexDocument, LocalIndexOptions } from "../../../indexing/types.ts";
 import type { MinSyncVectorMethodOptions } from "../../../minsync/method.ts";
@@ -52,32 +52,28 @@ export class ObsidianVaultIndex {
 	private readonly minSync: ObsidianMinSyncOptions;
 	private nativeIndex: LocalDocumentIndex | undefined;
 
-	private native(workspace: string): LocalDocumentIndex {
-		const configured = this.minSync.embedder;
-		const local =
-			!this.minSync.sharedEmbedder &&
-			configured?.baseUrl === undefined &&
-			(configured?.id === undefined || configured.id.startsWith("native:"));
-		this.nativeIndex ??= new LocalDocumentIndex({
-			...this.minSync.localIndex,
-			root: workspace,
-			embedder: this.minSync.sharedEmbedder ?? createEmbedderFromConfig({ embedder: this.minSync.embedder }),
-			identity:
-				this.minSync.localIndex?.identity ??
-				(local
-					? {
-							provider: "minsync",
-							model: configured?.id?.slice("native:".length) ?? "Qwen/Qwen3-Embedding-0.6B",
-							dimension: configured?.dimension ?? 1024,
-						}
-					: undefined),
-			embeddingFingerprint: JSON.stringify({
-				id: configured?.id,
-				baseUrl: configured?.baseUrl,
-				passagePrefix: configured?.passagePrefix,
-				revision: this.minSync.localIndex?.embeddingFingerprint,
-			}),
-		});
+	private nativeIdentity?: string;
+	private fallbackEmbedder?: Embedder;
+	private async native(workspace: string): Promise<LocalDocumentIndex> {
+		if (!this.minSync.sharedEmbedder)
+			this.fallbackEmbedder ??= createEmbedderFromConfig({ embedder: this.minSync.embedder });
+		const shared = this.minSync.sharedEmbedder ?? this.fallbackEmbedder!;
+		const embedder = shared.snapshot?.() ?? shared;
+		const identity = await embedder.identity();
+		const fingerprint = JSON.stringify([identity, this.minSync.localIndex?.embeddingFingerprint]);
+		if (!this.nativeIndex || this.nativeIdentity !== fingerprint) {
+			this.nativeIndex = new LocalDocumentIndex({
+				...this.minSync.localIndex,
+				root: workspace,
+				embedder,
+				identity,
+				tokenizerPath:
+					this.minSync.localIndex?.tokenizerPath ??
+					(shared instanceof ProfileEmbedder ? shared.profile().manifest?.tokenizerPath : undefined),
+				embeddingFingerprint: fingerprint,
+			});
+			this.nativeIdentity = fingerprint;
+		}
 		return this.nativeIndex;
 	}
 
@@ -137,7 +133,7 @@ export class ObsidianVaultIndex {
 						updatedAt: `${note.mtimeNs}:${note.size}`,
 					};
 			}
-			const result = await this.native(workspace).sync(documents(), { signal });
+			const result = await (await this.native(workspace)).sync(documents(), { signal });
 			if (!result.ok)
 				return failure(
 					"datasource-index-failed",
@@ -193,7 +189,7 @@ export class ObsidianVaultIndex {
 		workspaceRoot: string,
 		workspace: string,
 	): Promise<RetrievalResult[]> {
-		const index = this.native(workspace);
+		const index = await this.native(workspace);
 		if (!index.isReady())
 			throw new Error(
 				`The Obsidian vault "${this.instanceId}" is not indexed yet: run autorag refresh --method datasources first.`,

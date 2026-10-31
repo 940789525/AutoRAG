@@ -134,7 +134,7 @@ function buildImage() {
 	const image = dockerImageName();
 	const platform = process.env.QA_PLATFORM?.trim() || "linux/amd64";
 	const dockerfile = process.env.QA_DOCKERFILE?.trim() || "scripts/ci/qa.Dockerfile";
-	return runDocker(["build", "--platform", platform, "-f", dockerfile, "-t", image, "scripts/ci"]);
+	return runDocker(["build", "--platform", platform, "-f", dockerfile, "-t", image, "."]);
 }
 
 function runShell() {

@@ -41,6 +41,7 @@ interface Context {
 	maxInputTokens: number;
 	queryPrefix: string;
 	passagePrefix: string;
+	handlesRetries: boolean;
 }
 
 /** Owns the indexing workflow. External engines only implement embedding or individual database operations. */
@@ -51,8 +52,23 @@ export class LocalDocumentIndex {
 	private lastQuery:
 		| { text: string; at: number; vector: Promise<readonly number[]>; signal?: AbortSignal }
 		| undefined;
+	private candidateReady?: Record<string, unknown>;
 	constructor(options: LocalIndexOptions) {
-		this.options = options;
+		const readyPath = join(options.root, ".autorag", "local-index", "ready.json");
+		let generation = options.generation;
+		if (generation === undefined && existsSync(readyPath)) {
+			const ready = JSON.parse(readFileSync(readyPath, "utf8")) as {
+				generation?: string;
+				embeddingFingerprint?: string;
+				semanticFingerprint?: string;
+			};
+			if (
+				ready.embeddingFingerprint === options.embeddingFingerprint &&
+				ready.semanticFingerprint === options.semanticFingerprint
+			)
+				generation = ready.generation;
+		}
+		this.options = { ...options, generation };
 		if ((options.maxTokens ?? 768) + 8 > (options.maxInputTokens ?? 2048))
 			throw new RangeError(
 				"localIndex.maxTokens exceeds the serving runtime's maxInputTokens (including special-token reserve)",
@@ -174,7 +190,12 @@ export class LocalDocumentIndex {
 			if (!Number.isInteger(identity.dimension) || identity.dimension <= 0)
 				throw new Error("embedding identity has an invalid dimension");
 			const profile = contentHash(
-				JSON.stringify([identity, capabilities?.passagePrefix ?? "", this.options.embeddingFingerprint ?? ""]),
+				JSON.stringify([
+					identity,
+					capabilities?.passagePrefix ?? "",
+					this.options.embeddingFingerprint ?? "",
+					this.options.generation,
+				]),
 			);
 			let tokenizerPromise: Promise<TokenCounter> | undefined;
 			const tokenizer = async (tokenizerSignal?: AbortSignal): Promise<TokenCounter> => {
@@ -209,6 +230,7 @@ export class LocalDocumentIndex {
 				maxInputTokens,
 				queryPrefix: capabilities?.queryPrefix ?? "",
 				passagePrefix: capabilities?.passagePrefix ?? "",
+				handlesRetries: capabilities?.handlesRetries ?? false,
 			};
 		})();
 		try {
@@ -221,9 +243,15 @@ export class LocalDocumentIndex {
 	/** Source iterator completion certifies the complete preserved source set; failures never trigger a deletion sweep. */
 	async sync(
 		documents?: AsyncIterable<IndexDocument>,
-		options: { force?: boolean; signal?: AbortSignal; onEvent?: (event: IndexEvent) => void } = {},
+		options: {
+			force?: boolean;
+			signal?: AbortSignal;
+			onEvent?: (event: IndexEvent) => void;
+			activate?: boolean;
+		} = {},
 	): Promise<IndexReport> {
 		options.signal?.throwIfAborted();
+		this.candidateReady = undefined;
 		const release = acquireIndexLease(this.directory);
 		const runId = randomUUID();
 		const runDirectory = join(this.directory, "runs", runId);
@@ -364,7 +392,11 @@ export class LocalDocumentIndex {
 										return result;
 									} catch (error) {
 										options.signal?.throwIfAborted();
-										if (attempt >= 2 || !/HTTP (?:429|5\d\d)|ECONNRESET|fetch failed/i.test(errorText(error)))
+										if (
+											context.handlesRetries ||
+											attempt >= 2 ||
+											!/HTTP (?:429|5\d\d)|ECONNRESET|fetch failed/i.test(errorText(error))
+										)
 											throw error;
 										event({
 											phase: "embed",
@@ -554,19 +586,21 @@ export class LocalDocumentIndex {
 				dirty = true;
 			}
 			if (dirty || this.status() !== "ready") await stage("maintain", () => context.store.maintain());
-			if (!failures.length || journal.sources().length > 0)
-				writeFileAtomic(
-					join(this.directory, "ready.json"),
-					JSON.stringify({
-						version: 1,
-						profile: context.profile,
-						runId,
-						model: context.model,
-						dimension: context.dimension,
-						embeddingFingerprint: this.options.embeddingFingerprint,
-						partial: failures.length > 0,
-					}),
-				);
+			const ready = {
+				version: 1,
+				profile: context.profile,
+				runId,
+				model: context.model,
+				dimension: context.dimension,
+				embeddingFingerprint: this.options.embeddingFingerprint,
+				partial: failures.length > 0,
+				embeddingProfile: this.options.embeddingProfile,
+				semanticFingerprint: this.options.semanticFingerprint,
+				generation: this.options.generation,
+			};
+			if (!failures.length) this.candidateReady = ready;
+			if (options.activate !== false && (!failures.length || journal.sources().length > 0))
+				writeFileAtomic(join(this.directory, "ready.json"), JSON.stringify(ready));
 			rmSync(maintenanceMarker, { force: true });
 		} catch (error) {
 			failed = true;
@@ -605,6 +639,22 @@ export class LocalDocumentIndex {
 		if (failed) throw fatal;
 		return JSON.parse(readFileSync(join(runDirectory, "report.json"), "utf8")) as IndexReport;
 	}
+	/** Candidate builds never replace the active pointer until a query smoke test succeeds. */
+	async activateCandidate(signal?: AbortSignal): Promise<void> {
+		if (!this.candidateReady) throw new Error("Candidate index is incomplete; active index was kept");
+		const context = await this.context();
+		const sample = await context.store.sampleRow?.();
+		if (sample) {
+			const text = sample.text.slice(0, 160);
+			const [vector] = await this.options.embedder.embed([text], { role: "query", signal });
+			const hits = await context.store.search({ text, vector, mode: "hybrid", topK: 5 });
+			if (!hits.length) throw new Error("Candidate index query smoke test returned no hits; active index was kept");
+		} else if (context.store.sampleRow && (await context.store.countRows()))
+			throw new Error("Candidate index could not read a sample row");
+		signal?.throwIfAborted();
+		writeFileAtomic(join(this.directory, "ready.json"), JSON.stringify(this.candidateReady));
+		this.candidateReady = undefined;
+	}
 	async search(
 		query: string,
 		options: {
@@ -619,8 +669,9 @@ export class LocalDocumentIndex {
 		if (options.sourceIds?.length === 0) return [];
 		const readinessError = this.readinessError();
 		if (readinessError) throw new Error(readinessError);
-		const context = await this.context();
+		// Pin the activation pointer before the first await so an in-flight query can finish on its generation.
 		const ready = JSON.parse(readFileSync(join(this.directory, "ready.json"), "utf8")) as { profile: string };
+		const context = await this.context();
 		if (ready.profile !== context.profile)
 			throw new Error("Local index embedding identity changed; refresh before searching");
 		if ((await context.store.countRows()) === 0) return [];

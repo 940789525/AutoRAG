@@ -1,0 +1,13 @@
+{
+  "ok": true,
+  "backend": "local-http",
+  "model": "Qwen/Qwen3-Embedding-0.6B",
+  "dimension": 1024,
+  "parsed": true,
+  "semanticHit": true,
+  "sourceReadable": true,
+  "modelOptInEnforced": true,
+  "sharedConfigBefore": "absent",
+  "sharedConfigAfter": "absent",
+  "cleanup": "only this run's temporary root"
+}

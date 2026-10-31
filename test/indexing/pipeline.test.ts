@@ -372,3 +372,13 @@ it("refreshes and searches an empty corpus without loading tokenizer assets or a
 	assert.deepEqual(await index.search("anything"), []);
 	assert.equal(calls.length, 0);
 });
+
+it("pins the generation before awaiting a concurrent activation", async () => {
+	const f = fixture();
+	await f.index.sync(input([document(f.root, "a.md", "A stable policy document.")]));
+	const pointer = join(f.index.directory, "ready.json");
+	const old = JSON.parse(readFileSync(pointer, "utf8"));
+	const search = f.index.search("policy");
+	writeFileSync(pointer, JSON.stringify({ ...old, profile: "another-generation" }));
+	assert.equal((await search).length, 1);
+});

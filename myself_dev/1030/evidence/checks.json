@@ -1,0 +1,102 @@
+{
+  "implementationBase": "c2e404b1",
+  "branch": "codex/observable-local-index",
+  "environment": {
+    "os": "Linux/WSL x86_64",
+    "cpu": "Intel Core i7-10750H",
+    "logicalCpus": 12,
+    "memoryGiB": 15.57,
+    "gpu": "not used; CPUExecutionProvider",
+    "node": "24.19.0",
+    "bun": "1.4.4",
+    "python": "3.12.3"
+  },
+  "checks": {
+    "check": "PASS; 8 existing informational suggestions",
+    "lint": "PASS; 8 informational suggestions",
+    "typecheck": "PASS",
+    "build": "PASS",
+    "supplyChain": "PASS; repository TS policy gate, not a Python vulnerability audit",
+    "gitDiffCheck": "PASS"
+  },
+  "tests": {
+    "full": {
+      "passed": 3290,
+      "failed": 0,
+      "skipped": 67
+    },
+    "finalAffectedRegression": {
+      "files": 16,
+      "passed": 122,
+      "failed": 0
+    },
+    "pythonContract": {
+      "passed": 5,
+      "failed": 0
+    }
+  },
+  "package": {
+    "assetsVerified": true,
+    "files": 396,
+    "unpackedBytes": 12058713,
+    "nodeModulesOrVenvIncluded": false,
+    "removedMinSyncDeclarationFilesAbsent": true
+  },
+  "runtimeAudit": {
+    "MinSyncBinaryAddonInstallerCallsInBuiltJs": 0,
+    "legacyAliasesRetained": [
+      "minsync method",
+      "minSync.embedder config converter",
+      "syncMinSync result/method types",
+      "DEFAULT_DAEMON_MODEL constant alias"
+    ],
+    "newMcpFeatures": false
+  },
+  "runtime": {
+    "fastembed": "0.9.1",
+    "onnxruntime": "1.31.1",
+    "fastapi": "0.162.0",
+    "uvicorn": "0.54.0",
+    "requirementsSha256": "e41620dd07b9a8ab98ca6798030533806133bacb993c843f4cbad0f2e254e8fc",
+    "cleanVenvHashLockedOfflineInstall": "PASS"
+  },
+  "live": {
+    "localQwenBuiltArtifact": "PASS",
+    "referenceOnnxPoolingNormalization": "PASS",
+    "ownedServiceLifecycle": "PASS",
+    "researchPdf": "PASS",
+    "obsidian": "PASS after preparing existing Kiwi 0.24.1 artifact; initial network-related failure retained in report",
+    "hostedApi": "SKIP: operator-authorized provider profile and credentials unavailable",
+    "apiProtocolAndProfileSwitching": "PASS using real loopback Qwen service through API profile"
+  },
+  "performance": {
+    "benchmarkCorpus": "18 synthetic source documents (Chinese/English, long Markdown, valid PDF), 26 chunks, 25 unique embeddings",
+    "pythonServiceRssKiB": 2062692,
+    "nodePeakRssKiB": 854624,
+    "oldMinSyncReference": "not available; no speedup/equivalence claim",
+    "dedicated4cpu8gContainer": "not run"
+  },
+  "docker": {
+    "composeConfiguration": "PASS",
+    "imageBuild": "BLOCKED_NETWORK",
+    "diagnostic": "failed to fetch anonymous token: Get https://auth.docker.io/token?scope=repository%3Aoven%2Fbun%3Apull&service=registry.docker.io: dial tcp 65.22.160.17:443: i/o timeout",
+    "existingContainersRestarted": false
+  },
+  "unverified": [
+    "real hosted API build/query",
+    "live conversation-model choice of natural-language indexing tool",
+    "native CLI/account/store end-to-end lanes",
+    "Windows/macOS runtime and GPU",
+    "PyTorch/MinSync numerical equivalence and performance baseline"
+  ],
+  "cleanup": {
+    "realAutoRagConfigBefore": "ABSENT",
+    "realAutoRagConfigAfter": "ABSENT",
+    "ownedFastEmbedService": "stopped",
+    "ownedPyPiRelay": "stopped",
+    "temporaryFixtureHomes": "removed by runners",
+    "projectVenv": ".venv-embedding (ignored)",
+    "verifiedModels": ".autorag/embedding-models (ignored; preserved for reuse)",
+    "sharedMinSyncCache": "untouched"
+  }
+}

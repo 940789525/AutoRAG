@@ -1,0 +1,23 @@
+{
+  "result": "PASS",
+  "packagedAssets": true,
+  "projectPythonAutoDiscovery": true,
+  "offlinePreparedCache": true,
+  "readyMs": 35659.18438599999,
+  "messages": [
+    "FastEmbed startup log: /tmp/autorag-fastembed-owned-aVqnrb/home/logs/fastembed-115648.log",
+    "Model preparation/verification: 25.493s",
+    "Loading pinned Qwen ONNX on CPU",
+    "Model load: 7.508s",
+    "FastEmbed Qwen ready: 1024 dimensions, cpu, af95f2c416ffe9379369ad64f9113e865db6112c/fastembed-0.9.1/v1",
+    "INFO:     Started server process [115648]",
+    "INFO:     Waiting for application startup.",
+    "INFO:     Application startup complete.",
+    "INFO:     Uvicorn running on http://127.0.0.1:34781 (Press CTRL+C to quit)",
+    "INFO:     Shutting down",
+    "INFO:     Waiting for application shutdown.",
+    "INFO:     Application shutdown complete.\nINFO:     Finished server process [115648]"
+  ],
+  "externalProcessProtected": true,
+  "stoppedOwnedChild": true
+}

@@ -154,21 +154,9 @@ replace the implicit `~/.autorag/config.json`. Legacy cwd
 
 ### Retrieval defaults
 
-MinSync and Jikji are enabled by default. Leave them enabled unless the
-user explicitly asks otherwise. Indexing never happens while answering: a
-question only reads indexes that `autorag refresh` (or `autorag watch`) built,
-so run a refresh after setup and whenever documents change. A never-refreshed
-workspace still answers, but without MinSync/Jikji evidence.
+AutoRAG's local index and optional Jikji discovery are enabled by default. Queries read existing indexes and never prepare models or refresh. Start the loopback FastEmbed service explicitly, then refresh the index. In the TUI use `/index build --embedding local-qwen3`, `/index status`, `/index refresh` and `/index cancel`. Explicit commands need no conversation-model login.
 
-Refresh (never a query) auto-installs the binaries: MinSync installs a verified
-GitHub release into `<workspace>/.autorag/bin` (`minSync.autoInstall` defaults
-to true), and Jikji installs `jikji-cli` through cargo (`jikji.autoInstall`
-defaults to true; requires the Rust toolchain). Set `"autoInstall": false` only
-when managing the binary yourself. Refresh is incremental: MinSync syncs only
-changed parsed mirrors, and `jikji prepare` reuses unchanged documents. Jikji
-roots prepare one at a time (they share one central SQLite file that rejects
-concurrent writers). A search root nested inside, or duplicating, another root
-is skipped for Jikji because the outer root's index already covers it.
+MinSync installation and native fallback were removed. The pinned Python runtime and Qwen ONNX preparation are described in `docs/embedding-setup.md`. Jikji may still install its own CLI through cargo when enabled. Never touch another clone's service or real home during QA.
 
 Jikji keeps its prepared corpus (search index, parsed text, wiki, routes) in one
 central store, not inside your documents: `<OS data dir>/jikji/index.sqlite`
@@ -190,46 +178,9 @@ is impossible, refresh continues without this optimization and the user is
 told duplicate exclusion is off. Set `"excludeExactDuplicates": false` to
 index every copy.
 
-AutoRAG owns no embedding model. MinSync provisions the embedder
-(`Qwen/Qwen3-Embedding-0.6B`, 1024 dimensions) in its own cache
-(`~/.cache/minsync/models`); there is no local model download and no bundled
-runtime. One shared embedder serves everything that embeds inside
-AutoRAG: MinSync indexing/query, memory similar-question search, the
-chat-crawler sidecars, the GitHub Gist vector index, and the endpoint external
-CLIs are pointed at. The default needs no embedder flags and no API key. It
-resolves in order:
+The shared Embedder sends vectors through an explicit `embedding` profile: local FastEmbed/Qwen3-Embedding-0.6B (1024 dimensions) by default, or an opt-in API. The ONNX cache is separate from the preserved MinSync cache. A new engine/profile requires an independent build before activation.
 
-1. A configured remote endpoint (`minSync.embedder`), used for everything; no
-   daemon is started and no local model is loaded.
-2. A running `minsync serve` daemon (loopback only; MinSync 0.4.12+).
-   AutoRAG never starts it: run `minsync serve --idle-timeout 0` yourself, as
-   a launchd/systemd service (see `docs/minsync-setup.md`), or press
-   Ctrl+Shift+E in `autorag tui`. `autorag setup` only reports whether it is
-   alive.
-3. MinSync's in-process engine, through the optional Node-API addon
-   `@nomadamas/minsync-native` (same engine and weights, so bit-for-bit
-   identical vectors; not bundled). Without a daemon and without the addon,
-   embedding fails with an error naming the missing package.
-
-Override the embedder only when intentionally using a remote provider:
-
-```bash
-autorag init \
-  --embedder-id "voyageai/voyage-4-lite" \
-  --embedder-base-url "https://openrouter.ai/api/v1" \
-  --embedder-api-key-env "OPENROUTER_API_KEY" \
-  --embedder-dimension 1024 \
-  --embedder-batch-size 64
-```
-
-A remote `minSync.embedder` names an `id` (`openai:<model>`, `tei:<model>`, or
-any id together with a `baseUrl`) plus optional `apiKeyEnv` (the **name** of the
-environment variable holding the bearer token), `dimension`, `batchSize`, and
-`timeoutMs`. OpenAI-protocol endpoints POST `{baseUrl}/v1/embeddings`; a `tei:`
-endpoint POSTs `{baseUrl}/embed`; `openai:` with no `baseUrl` means
-`https://api.openai.com`. Only store the environment-variable name, never its
-value. `dimension` and `batchSize` must be positive integers, and `dimension`
-must match the endpoint (the local default is 1024).
+Use `docs/embedding-setup.md` for the complete validated configuration. API profiles require `allowRemote:true`, an explicit `allowedConsumers` list, and an environment-variable credential reference. Document authorization never grants chat, mail or memory authorization. Legacy remote flags do not grant this permission. Do not store literal credentials or modify existing configuration without the user's requested scope. Setup/status only report readiness; they never download models.
 
 ### Jev routing and question decomposition (on by default)
 
@@ -415,7 +366,7 @@ and `index` lifecycle, then uses the mailcrawl CLI for BM25, semantic, or
 hybrid search. Do not use 0.1.3 or earlier: a no-op sync followed by `index`
 fails with `text array must be non-empty`. 0.2.2 embeds through the same
 backend as the rest of AutoRAG (a remote `minSync.embedder`, else the
-`minsync serve` daemon) instead of its own in-process model, and keeps vectors
+local FastEmbed service) instead of its own in-process model, and keeps vectors
 in LanceDB. Switching from the old native model rebuilds the semantic index on
 the next `index`. kakao needs `lazykatok` 0.3.3 or newer for the same reason.
 Use mailcrawl for Gmail, IMAP, and Maildir retrieval. The former Gmail REST
@@ -423,59 +374,7 @@ datasource is removed.
 
 ### Browser history (Hister) and the shared embedding model
 
-`hister` is the one datasource whose backing program AutoRAG does not install,
-start, or bundle (it is AGPL-3.0-or-later and stays a separate program). Setting
-it up is an agent task with these steps. Run each command; do not just describe it.
-
-1. **Probe first.** Add the datasource entry, then run `autorag setup --format json`
-   and read the `hister` object: `installed`, `running`, and `embedding`. Every
-   problem has a `remediation` string with the exact next command.
-2. **Install Hister** when `installed` is false: `brew install hister` (other
-   platforms: the release binaries at https://github.com/asciimoo/hister/releases).
-3. **Run it as a login item** when `running` is false: `brew services start hister`.
-   Hister must stay running: its browser extension only captures while it is up,
-   and a page visited while it is down is not re-sent. AutoRAG never starts it.
-4. **Install the browser extension** (Chrome Web Store "Hister", or Firefox
-   Add-ons). It must be done in the user's browser; tell the user if you cannot.
-5. **Share the embedding model** (below).
-6. **Before importing past history, install a skip list** in Hister's `rules.json`
-   (login, mail, documents, social and console domains, private hosts, token-bearing
-   URLs). `hister import browser history` re-downloads each URL *without* the
-   browser's cookies. See docs/datasource-skills.md, "Browser history via Hister".
-7. Add `"browser": { "type": "hister", "connector": { "semantic": true } }` under
-   `datasources`, then `autorag refresh` (only probes Hister) and
-   `autorag lite retrieve "<a question>" --scope '/browser/**' --json`.
-
-**Shared embedding model.** Hister keeps its own vector store and embeds with
-whatever its `config.yml` `semantic_search` block says. Pointing it at a different
-model does not fail: vectors simply stop lining up and results get worse. So Hister
-must use the same model as AutoRAG, which is the `minsync serve` daemon (model
-`Qwen/Qwen3-Embedding-0.6B`, 1024 dimensions, with Qwen3's query instruction).
-
-```bash
-autorag setup --format json            # reports hister.embedding.differs: the keys that disagree
-autorag setup --sync-hister            # writes them, restarts Hister, re-embeds pages if needed
-```
-
-- `--sync-hister` rewrites only `enable`, `embedding_endpoint`, `embedding_model`,
-  `dimensions`, `query_prefix`, `document_prefix` in Hister's config (a
-  `config.yml.bak.<time>` is kept next to it), then runs `brew services restart hister`,
-  waits for it to answer, and runs `hister reindex` when a change makes stored
-  vectors stale. Without the flag setup never writes Hister's config.
-- The daemon port is chosen when `minsync serve` starts. After restarting the daemon,
-  run `autorag setup --sync-hister` again. It is idempotent: when nothing differs
-  it changes nothing and restarts nothing.
-- It refuses, and says why, when the shared backend is a remote endpoint (browsing
-  text would leave the machine) or MinSync's in-process engine (Hister cannot reach
-  it; run `minsync serve --idle-timeout 0`, docs/minsync-setup.md).
-- If `restartRequired` or `reindexRequired` is true in the report, the step was
-  not done (no Homebrew service, or it failed): run `brew services restart hister`
-  and `hister reindex` yourself. Check with `hister doctor`: the line
-  `server.index.embeddings` must be `ok`.
-- A changed `query_prefix` alone needs a restart but no reindex. Never hand-edit the
-  `query_prefix` value across two lines: Hister's YAML parser folds the newline into
-  a space and the model's instruction is silently corrupted. `--sync-hister` writes
-  it correctly.
+Hister may share the local FastEmbed OpenAI endpoint only. Use the existing explicit Hister synchronization command to preview/apply its endpoint, model, dimensions and query/document prefixes, then use Hister's own reindex when required. API profiles never automatically export browsing text or write an API key to Hister config. See `docs/embedding-setup.md`; never rewrite native stores.
 
 ## Verify and build indexes
 

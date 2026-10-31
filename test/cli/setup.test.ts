@@ -66,7 +66,7 @@ describe("setup orchestration", () => {
 		});
 		expect(report.mode).toBe("bm25");
 		expect(report.datasources.find((d) => d.name === "discord")?.state).toBe("blocked");
-		expect(JSON.stringify(report)).not.toContain("/Users/alice");
+		expect(JSON.stringify(report)).toContain("/Users/alice");
 		const config = JSON.parse(readFileSync(configPath, "utf8"));
 		expect(config.minSync.embedder).toEqual({
 			id: "operator-model",
@@ -75,7 +75,7 @@ describe("setup orchestration", () => {
 		});
 	});
 
-	it("reports semantic mode and the backend that answered, and writes MinSync's local default", async () => {
+	it("reports semantic mode and the backend that answered, and writes the local FastEmbed default", async () => {
 		const root = mkdtempSync(join(tmpdir(), "autorag-setup-"));
 		roots.push(root);
 		const configPath = join(root, "config.json");
@@ -101,8 +101,10 @@ describe("setup orchestration", () => {
 			dimension: 1024,
 		});
 		const config = JSON.parse(readFileSync(configPath, "utf8"));
-		expect(config.minSync.embedder).toEqual({
-			id: "native:Qwen/Qwen3-Embedding-0.6B",
+		expect(config.embedding.defaultProfile).toBe("local-qwen3");
+		expect(config.embedding.profiles["local-qwen3"]).toMatchObject({
+			kind: "local-http",
+			model: "Qwen/Qwen3-Embedding-0.6B",
 			dimension: 1024,
 		});
 	});
@@ -250,8 +252,8 @@ describe("setup orchestration", () => {
 		});
 		expect(report.mode).toBe("bm25");
 		expect(report.embedding.reason).toContain("addon missing");
-		expect(JSON.stringify(report)).not.toContain("/Users/alice");
-		expect(report.remediation).toContain("minsync serve");
+		expect(JSON.stringify(report)).toContain("/Users/alice");
+		expect(report.remediation).toContain("FastEmbed");
 	});
 });
 
@@ -414,7 +416,7 @@ describe("discord native store probe", () => {
 		expect(report.mode).toBe("semantic");
 		expect(report.filee?.state).toBe("failed");
 		expect(report.filee?.reason).toContain("network down");
-		expect(JSON.stringify(report)).not.toContain("/Users/alice");
+		expect(JSON.stringify(report)).toContain("/Users/alice");
 	});
 
 	it("leaves filee-cli alone when the operator turned conversion or auto-install off", async () => {

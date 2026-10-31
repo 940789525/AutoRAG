@@ -14,7 +14,7 @@ const NATIVE_LANES = Object.freeze([
 	{ name: "slacrawl", binary: "slacrawl" },
 	{ name: "lark", binary: "lark-cli", command: "scripts/manual-qa/run-qa-lark-live.ts", identityPattern: /\/lark\/[^/]+\/(?:messages|docs)\/[^/\s]+/u },
 	{ name: "notcrawl", binary: "notcrawl" },
-	{ name: "obsidian", binary: "minsync", command: "scripts/manual-qa/run-qa-obsidian-live.ts", identityPattern: /\/obsidian\/[^/\s]+\/[^\s]+\.md/u },
+	{ name: "obsidian", binary: "python3", command: "scripts/manual-qa/run-qa-obsidian-live.ts", identityPattern: /\/obsidian\/[^/\s]+\/[^\s]+\.md/u },
 	{ name: "rclone", binary: "rclone" },
 	{ name: "mailcrawl", binary: "mailcrawl", command: "scripts/manual-qa/run-qa-mailcrawl-live.ts", identityPattern: /\/mailcrawl\/[^\s]+/u },
 	{ name: "spotlight", binary: "mdfind", command: "scripts/manual-qa/run-qa-spotlight-live.ts", identityPattern: /\bspotlight:[^\s]+/u },
@@ -32,7 +32,7 @@ const NATIVE_STORE_PROBES = Object.freeze({
 	telecrawl: () => existsSync(join(homedir(), ".telecrawl", "telecrawl.db")),
 	slacrawl: () => existsSync(join(homedir(), ".slacrawl", "config.toml")),
 	notcrawl: () => existsSync(join(homedir(), ".notcrawl", "notcrawl.db")),
-	// Self-contained: the harness builds its own vault fixture, so the lane needs `minsync` and nothing else.
+	// Self-contained: the harness builds its own vault fixture, so the lane uses the prepared FastEmbed service.
 	obsidian: () => true,
 	rclone: () => existsSync(join(homedir(), ".config", "rclone", "rclone.conf")),
 	mailcrawl: () => existsSync(join(homedir(), ".mailcrawl")),

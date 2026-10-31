@@ -82,6 +82,7 @@ export type IndexEvidenceChunk = Pick<
 >;
 
 export interface IndexStore {
+	sampleRow?(): Promise<IndexRow | undefined>;
 	readChunk?(sourceId: string, chunkId: string): Promise<IndexEvidenceChunk | undefined>;
 	countRows(): Promise<number>;
 	findVectors(keys: readonly string[]): Promise<ReadonlyMap<string, readonly number[]>>;
@@ -106,6 +107,9 @@ export interface LexicalAnalyzer {
 }
 
 export interface LocalIndexOptions {
+	readonly embeddingProfile?: string;
+	readonly semanticFingerprint?: string;
+	readonly generation?: string;
 	readonly root: string;
 	readonly embedder: Embedder;
 	readonly identity?: EmbeddingIdentity;

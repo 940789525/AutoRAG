@@ -494,7 +494,7 @@ describe("runInit embedder flags", () => {
 		const config = JSON.parse(readFileSync(homeConfigPath(), "utf8"));
 		expect(config.minSync).toBeDefined();
 		expect(config.minSync.enabled).toBe(true);
-		expect(config.minSync.autoInstall).toBe(true);
+		expect(config.minSync.autoInstall).toBe(false);
 		expect(config.minSync.embedder).toEqual({
 			id: "voyageai/voyage-4-lite",
 			baseUrl: "https://openrouter.ai/api/v1",
@@ -530,7 +530,7 @@ describe("runInit embedder flags", () => {
 		expect(code).toBe(0);
 		const config = JSON.parse(readFileSync(homeConfigPath(), "utf8"));
 		expect(config.minSync.maxChunkSize).toBe(1000);
-		expect(config.minSync.autoInstall).toBe(true);
+		expect(config.minSync.autoInstall).toBe(false);
 	});
 
 	it("does not write minSync.embedder when no embedder flags are given", async () => {
@@ -579,6 +579,6 @@ describe("runInit embedder flags", () => {
 		expect(config.minSync?.enabled).toBe(true);
 		expect(config.minSync).toBeDefined();
 		expect(config.minSync.enabled).toBe(true);
-		expect(config.minSync.autoInstall).toBe(true);
+		expect(config.minSync.autoInstall).toBe(false);
 	});
 });

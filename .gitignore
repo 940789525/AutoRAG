@@ -33,3 +33,5 @@ __pycache__/
 # Generated jikji artifacts (embed absolute checkout paths); never track
 .jikji/
 .jikji_agent_map.md
+
+.venv-embedding/

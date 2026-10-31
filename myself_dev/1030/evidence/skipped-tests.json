@@ -1,0 +1,270 @@
+[
+  {
+    "file": "live-e2e/answer-readability.test.ts",
+    "test": "answer readability, live model answers a Korean question over English sources in Korean, bold-led, flat bullets, with bold key values"
+  },
+  {
+    "file": "live-e2e/automation-agent.test.ts",
+    "test": "automation agent live e2e (real daemon, real model) starts a read-only agent on a new file and leaves the watched folder untouched"
+  },
+  {
+    "file": "live-e2e/automation-agent.test.ts",
+    "test": "automation agent live e2e (real daemon, real model) a writing agent keeps its output outside the watched folder, so the rule fires once"
+  },
+  {
+    "file": "live-e2e/citation-relevance.test.ts",
+    "test": "citation relevance, live Jev drops a cited table of contents and a cited introduction, keeps the lease chunk, and renumbers"
+  },
+  {
+    "file": "live-e2e/filee-agent.test.ts",
+    "test": "live: a real model converts files through the agent calls convert_files with overwrite when asked, then reports dupey's verdict"
+  },
+  {
+    "file": "live-e2e/filee-chain-agent.test.ts",
+    "test": "live: a real model chains conversions and the agent installs filee-cli turns a JSON file into a PNG by way of PDF"
+  },
+  {
+    "file": "live-e2e/filee-convert.test.ts",
+    "test": "live: convert_files with real filee + dupey reports its version-independent contract: formats list and a format's targets"
+  },
+  {
+    "file": "live-e2e/filee-convert.test.ts",
+    "test": "live: convert_files with real filee + dupey converts a Korean-named Markdown file to DOCX in an arbitrary folder"
+  },
+  {
+    "file": "live-e2e/filee-convert.test.ts",
+    "test": "live: convert_files with real filee + dupey numbers an existing output by default and replaces it with overwrite"
+  },
+  {
+    "file": "live-e2e/filee-convert.test.ts",
+    "test": "live: convert_files with real filee + dupey surfaces per-file failures without throwing, and bad targets as errors"
+  },
+  {
+    "file": "live-e2e/filee-convert.test.ts",
+    "test": "live: convert_files with real filee + dupey registers converted copies in dupey families the way dupey scan groups them"
+  },
+  {
+    "file": "live-e2e/filee-install.test.ts",
+    "test": "live: filee-cli installs itself from the pinned release downloads, verifies and unpacks the real archive, then reuses it"
+  },
+  {
+    "file": "live-e2e/filee-install.test.ts",
+    "test": "live: filee-cli installs itself from the pinned release resolves the managed copy when PATH has nothing, and it really converts Korean text"
+  },
+  {
+    "file": "live-e2e/filee-matrix.test.ts",
+    "test": "live: the conversion matrix matches filee-cli every family member converts to every format its family route promises"
+  },
+  {
+    "file": "live-e2e/jev.test.ts",
+    "test": "jev tool over OpenRouter returns a calibrated noul probability for an unambiguous state"
+  },
+  {
+    "file": "live-e2e/jev.test.ts",
+    "test": "jev tool over OpenRouter picks one option for a choice question"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "ask mode with Jev configured asks about even a harmless command, because ask never consults Jev"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification does not ask: ls and grep"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification does not ask: cat"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification does not ask: cp to a new path"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification does not ask: write a new file"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification does not ask: a read-only python one-liner"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification asks: rm"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification asks: trash"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification asks: python script calling trash through subprocess"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification asks: python os.system rm"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification asks: perl unlink"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification asks: find -delete"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification asks: rm through a variable"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification asks: an encoded command"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification asks: mv rename"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification asks: mv into a folder"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification asks: sed -i"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification asks: append with >>"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification asks: redirect onto an existing file"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification asks: python writing to an existing file"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification asks: a script file it cannot see"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification asks: make clean"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "default gate (auto) over live Jev classification lets the agent edit a copy it made itself without asking"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "auto mode over live Jev approves deleting the one file the user named, without asking"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "auto mode over live Jev refuses a delete the request never mentioned and hands it to the user"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "auto mode over live Jev judges against a later turn: the delete was asked for in a follow-up, not the first question"
+  },
+  {
+    "file": "live-e2e/permission-gate.test.ts",
+    "test": "auto mode over live Jev judges against a steer: the user narrowed the request while the agent was working"
+  },
+  {
+    "file": "live-e2e/rerank-dazzi.test.ts",
+    "test": "Dazzi rerank live e2e (real API) requires a stored /login credential"
+  },
+  {
+    "file": "live-e2e/rerank-dazzi.test.ts",
+    "test": "Dazzi rerank live e2e (real API) reranks a pool with blank documents instead of failing with HTTP 400"
+  },
+  {
+    "file": "live-e2e/rerank-dazzi.test.ts",
+    "test": "Dazzi rerank live e2e (real API) drops blank documents when topN is set"
+  },
+  {
+    "file": "live-e2e/rerank-dazzi.test.ts",
+    "test": "Dazzi rerank live e2e (real API) reranks a pool with an oversized document instead of failing with HTTP 400"
+  },
+  {
+    "file": "live-e2e/rerank-dazzi.test.ts",
+    "test": "Dazzi rerank live e2e (real API) reranks the engine's merged evidence without a rerank-failed diagnostic"
+  },
+  {
+    "file": "live-e2e/rerank.test.ts",
+    "test": "OpenRouter rerank live e2e (real API) requires a real credential"
+  },
+  {
+    "file": "live-e2e/rerank.test.ts",
+    "test": "OpenRouter rerank live e2e (real API) reorders real documents by relevance through the reranker seam"
+  },
+  {
+    "file": "live-e2e/rerank.test.ts",
+    "test": "OpenRouter rerank live e2e (real API) honors topN against the real API"
+  },
+  {
+    "file": "live-e2e/rerank.test.ts",
+    "test": "OpenRouter rerank live e2e (real API) reranks the engine's merged evidence against the real API"
+  },
+  {
+    "file": "live-e2e/search-progress.test.ts",
+    "test": "search progress widget, live model is on screen from the moment a question is submitted until the answer is final, and names what ran"
+  },
+  {
+    "file": "live-e2e/telegram-remote.test.ts",
+    "test": "Telegram remote control, live model answers a question from the corpus sent over Telegram, citing the file, and takes a second turn"
+  },
+  {
+    "file": "live-e2e/web-search.test.ts",
+    "test": "web tools live e2e (real internet) web_search returns real results with zero credentials on REPEATED runs"
+  },
+  {
+    "file": "live-e2e/web-search.test.ts",
+    "test": "web tools live e2e (real internet) web_search keeps mean latency low across the issue #1931 benchmark queries"
+  },
+  {
+    "file": "live-e2e/web-search.test.ts",
+    "test": "web tools live e2e (real internet) anonymous Perplexity returns web sources or fails with a provider error, never a zero-source success"
+  },
+  {
+    "file": "live-e2e/web-search.test.ts",
+    "test": "web tools live e2e (real internet) Startpage returns results or a challenge/HTTP provider error, never a silent empty page"
+  },
+  {
+    "file": "live-e2e/web-search.test.ts",
+    "test": "web tools live e2e (real internet) headless-browser escalation is either armed or an explicit diagnostic, never a crash"
+  },
+  {
+    "file": "live-e2e/web-search.test.ts",
+    "test": "web tools live e2e (real internet) web_search public fan-out consolidates answering engines or degrades with per-engine diagnostics"
+  },
+  {
+    "file": "live-e2e/web-search.test.ts",
+    "test": "web tools live e2e (real internet) web_fetch renders a real page as text"
+  },
+  {
+    "file": "live-e2e/web-search.test.ts",
+    "test": "web tools live e2e (real internet) web_fetch reports HTTP failures without throwing"
+  },
+  {
+    "file": "live-e2e/whatsapp.test.ts",
+    "test": "whatsapp-pi hosted by the AutoRAG interactive session installs the package, loads it with the online flag, and reaches WhatsApp"
+  },
+  {
+    "file": "research/service.integration.test.ts",
+    "test": "research inbox with real PostgreSQL and DBOS seeds without LLM calls, freezes batches, deduplicates, cancels late results, retries and records feedback"
+  },
+  {
+    "file": "research/service.integration.test.ts",
+    "test": "research inbox with real PostgreSQL and DBOS enforces the automatic reading budget and allows an explicit deferred retry"
+  },
+  {
+    "file": "research/service.integration.test.ts",
+    "test": "research inbox with real PostgreSQL and DBOS reports active indexing progress and excludes progress left by an earlier batch"
+  },
+  {
+    "file": "research/service.integration.test.ts",
+    "test": "research inbox with real PostgreSQL and DBOS recovers the real reading workflow after SIGKILL without repeating the completed screening step"
+  }
+]

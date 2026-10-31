@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AutoRAGAgent } from "../../src/agent/agent.ts";
 import { buildAgentOptions, ConfigError, normalizeIndexingConfig } from "../../src/cli/config.ts";
 import { MinSyncRequiredError } from "../../src/minsync/errors.ts";
-import { MinSyncVectorMethod } from "../../src/minsync/method.ts";
 import { RetrievalEngine } from "../../src/retrieval/engine.ts";
 import { ParallelRetriever } from "../../src/retrieval/merger.ts";
 import type { RetrievalMethod } from "../../src/retrieval/types.ts";
@@ -46,11 +45,13 @@ function throwingMethod(name: string, error: Error): RetrievalMethod {
 describe("config: MinSync cannot be turned off", () => {
 	it("rejects `minSync: false`", () => {
 		expect(() => normalizeIndexingConfig({ minSync: false as never })).toThrow(ConfigError);
-		expect(() => normalizeIndexingConfig({ minSync: false as never })).toThrow(/MinSync is required/);
+		expect(() => normalizeIndexingConfig({ minSync: false as never })).toThrow(/local index is required/);
 	});
 
 	it("rejects `minSync.enabled: false`", () => {
-		expect(() => normalizeIndexingConfig({ minSync: { enabled: false as never } })).toThrow(/MinSync is required/);
+		expect(() => normalizeIndexingConfig({ minSync: { enabled: false as never } })).toThrow(
+			/local index is required/,
+		);
 	});
 
 	it("still accepts `enabled: true` so existing configs keep loading", () => {
@@ -84,51 +85,6 @@ describe("agent: legacy disable flag and parsed-only refresh", () => {
 	it("does not need the binary to refresh only the parsed mirrors", async () => {
 		const result = await agentWithMissingBinary().refresh(true, { methods: ["parsed"] });
 		expect(result.minsync).toBeUndefined();
-	});
-});
-
-describe("method: no empty result stands in for a missing binary", () => {
-	it("rejects retrieve with MinSyncRequiredError", async () => {
-		const method = new MinSyncVectorMethod({
-			root,
-			workspacePath: join(root, "minsync"),
-			binaryPath: join(root, "missing-minsync"),
-			autoInstall: false,
-		});
-		await expect(method.retrieve("anything", { topK: 3 })).rejects.toBeInstanceOf(MinSyncRequiredError);
-	});
-
-	it("rejects sync with MinSyncRequiredError instead of returning ok:false", async () => {
-		const method = new MinSyncVectorMethod({
-			root,
-			workspacePath: join(root, "minsync"),
-			binaryPath: join(root, "missing-minsync"),
-			autoInstall: false,
-		});
-		await expect(method.sync()).rejects.toBeInstanceOf(MinSyncRequiredError);
-	});
-
-	it("reports a failed auto-install as MinSyncRequiredError carrying the installer's message", async () => {
-		const savedPath = process.env.PATH;
-		process.env.PATH = "/nonexistent";
-		try {
-			const method = new MinSyncVectorMethod({
-				root,
-				workspacePath: join(root, "minsync"),
-				autoInstall: true,
-				installer: {
-					cargoInstaller: async () => {
-						throw new Error("cargo exploded");
-					},
-					releaseProvider: async () => {
-						throw new Error("release feed exploded");
-					},
-				},
-			});
-			await expect(method.sync()).rejects.toThrow(/installing the `minsync` binary failed/);
-		} finally {
-			process.env.PATH = savedPath;
-		}
 	});
 });
 

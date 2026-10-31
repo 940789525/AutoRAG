@@ -14,7 +14,7 @@ Edits inside `src/`, `test/`, `scripts/`, `skills/`, and `docs/` that stay withi
 - Adding or committing secrets (`.env`, `*.key`, tokens, cookies, private corpus dumps)
 - Rewriting git history
 - Attaching `node_modules` to releases
-- Sending corpus text to a remote provider without an explicit trusted-config opt-in (remote embedders and rerankers are supported; the local MinSync embedder remains the zero-config default)
+- Sending corpus text to a remote provider without an explicit trusted-config opt-in (remote embedders and rerankers are supported; the local FastEmbed/Qwen profile remains the default)
 - Hard-coding provider credentials in config files or argv; store only environment-variable, keychain, or profile references
 - Creating git worktrees (this clone is the isolation boundary)
 
@@ -71,7 +71,7 @@ Never merge a PR on your own initiative. Merge only when the user explicitly ask
 
 ## Manual QA on a shared machine (binding)
 
-The maintainer's machine is shared. Several AutoRAG clones on different branches and versions, and several checkouts of the AutoRAG Electron Finder app, are developed **at the same time** by different agent sessions. All of them read one global AutoRAG home: `~/.autorag` (`config.json`, `memory.json`, TUI sessions). MinSync's model cache is separate and shared at `~/.cache/minsync/models`. The Electron app searches with whatever `~/.autorag/config.json` says, and so does the maintainer's real daily AutoRAG usage.
+The maintainer's machine is shared. Several AutoRAG clones on different branches and versions, and several checkouts of the AutoRAG Electron Finder app, are developed **at the same time** by different agent sessions. All of them read one global AutoRAG home: `~/.autorag` (`config.json`, `memory.json`, TUI sessions). The legacy MinSync model cache at `~/.cache/minsync/models` remains untouched; FastEmbed uses its own cache. The Electron app searches with whatever `~/.autorag/config.json` says, and so does the maintainer's real daily AutoRAG usage.
 
 That home belongs to the maintainer, not to your task. Every write your QA makes there silently changes every other clone, every app checkout, and the real setup. This already happened more than once: an ad-hoc QA step ran `autorag init --workspace "$TMP" --search-paths "$TMP/docs" --force` with no `--config` and no `AUTORAG_HOME`. `--workspace` does not move the config, so `--force` replaced the real `~/.autorag/config.json`. It dropped every configured datasource and pointed search at a temp directory that was deleted minutes later. From then on, every search on the machine, the desktop app included, failed with `AutoRAG search root does not exist: /var/folders/.../tmp.XXXX/docs` (#1743).
 
@@ -111,9 +111,7 @@ The container sets an ephemeral `HOME`, `AUTORAG_HOME`, and `AUTORAG_CONFIG`,
 bind-mounts this clone at `/workspace`, and does not mount the host `~/.autorag`
 or native datasource stores. Only the model credential allowlist in `QA_MODEL_ENV`
 is forwarded; set it empty (`QA_MODEL_ENV=`) to forward no credentials at all.
-The live runner starts a `minsync serve` daemon for the run, checks its `/health`
-endpoint for `Qwen/Qwen3-Embedding-0.6B` at 1024 dimensions, and stops it after
-the run. Use `QA_PLATFORM` and `QA_MODEL_ENV` to select a supported architecture
+The live runner starts a loopback FastEmbed service for its run, validates Qwen3-Embedding-0.6B at 1024 dimensions, and stops only that process afterwards. Use `QA_PLATFORM` and `QA_MODEL_ENV` to select a supported architecture
 or credential allowlist.
 The live target keeps runner state inside the clone's `.autorag-e2e` directory;
 evidence remains in the mounted clone under `.omo/evidence`.
@@ -181,17 +179,9 @@ Prerequisites:
   one implicitly:
   `export AUTORAG_LIVE_E2E_ROOT="$PWD/scripts/live-e2e"`
   `node scripts/live-e2e/runner.mjs bootstrap --root "$AUTORAG_LIVE_E2E_ROOT"`
-- MinSync 0.4.12 or newer on `PATH`. The runner starts a `minsync serve` daemon
-  for the run and stops it afterwards; no manual Ollama serve, TEI adapter, or
-  model pull is required. The Docker QA image (`scripts/ci/qa.Dockerfile`) ships
-  the pinned, sha256-verified `minsync` release, so `make e2e-live*` needs
-  nothing on the host. MinSync publishes a Linux build for x86_64 only, so that
-  image is `linux/amd64` (the default `QA_PLATFORM`); on an Apple Silicon host
-  it runs under emulation, and building it for arm64 fails with that reason.
-  Bump `MINSYNC_VERSION`/`MINSYNC_SHA256` in the Dockerfile with
-  `MINSYNC_VERSION` in `src/minsync/installer.ts`.
+- A Python 3.12 environment installed from the hash-locked FastEmbed requirements. The QA Docker image provisions it at `/opt/autorag-embedding`; set `AUTORAG_FASTEMBED_PYTHON` for a host venv. The runner prepares the separate pinned ONNX cache and starts an owned service on a free port. No MinSync executable or addon is required.
 - `OPENAI_API_KEY` and `AUTORAG_OPENAI_API_KEY` unset. Embeddings stay local
-  during live E2E: do not configure a remote `minSync.embedder` endpoint or
+  during live E2E: do not configure a remote embedding API profile or
   send corpus text off the machine.
 
 Run the cold path (fresh runner state and core local-file/MinSync verification):
@@ -243,100 +233,17 @@ only. Leave lazykatok, discrawl, crawler, rclone, mailcrawl, and Spotlight
 native stores untouched.
 Record the cleanup receipt in the task evidence; never stage `.debug-journal.md`.
 
-## Required MinSync Live QA
+## Required local embedding live QA
 
-When validating local-file retrieval changes, run a real semantic query
-through the shared embedder. The local MinSync backend is the default; a remote
-embedding service is used only when the operator explicitly configures
-`minSync.embedder`.
+The default product path uses a local FastEmbed service with the pinned Qwen3-Embedding-0.6B ONNX artifact (1024 dimensions). MinSync execution/installation/native fallback has been removed. Existing `minsync` method names are compatibility aliases for AutoRAG's index. See `docs/embedding-setup.md` for installation, profiles, migration and rollback.
 
-The default product path uses MinSync's Qwen3-Embedding-0.6B engine (1024
-dimensions; queries carry Qwen3's `Instruct: …\nQuery:` header, passages are
-raw). Vectors come from a loopback
-`minsync serve` daemon when one answers, otherwise from MinSync's in-process
-engine through the optional `@nomadamas/minsync-native` addon. AutoRAG never
-starts or stops the daemon: the operator runs `minsync serve --idle-timeout 0`
-(launchd/systemd, see `docs/minsync-setup.md`) or presses Ctrl+Shift+E in the
-TUI. `autorag setup` and `autorag status` only report the resolved
-`embedding.backend` (`daemon`, `in-process`, or `remote`) with the provider,
-model, and dimension, or why none is alive.
+Use an isolated home and config for every manual run, as specified above. Prepare the Python 3.12 runtime from `src/embedding/embedding-requirements.lock` with `--require-hashes`. Start your own loopback service on a free port with a separate cache; never stop another clone's service or alter `~/.cache/minsync/models`. Offline mode verifies every model file against `src/embedding/qwen-model.json`.
 
-Run the isolated experiment. Both AutoRAG variables point inside the temp workspace, so `init --force` cannot reach the shared `~/.autorag` (see the manual-QA rules above):
+Run `scripts/manual-qa/run-qa-fastembed.mts` with `AUTORAG_QA_EMBED_ENDPOINT` and `AUTORAG_QA_TOKENIZER` pointing at that prepared service and matching tokenizer assets. It creates a fresh temp home/config/workspace, builds synthetic Chinese/English documents, checks cache reuse, bidirectional profile switching, failed/cancelled candidate preservation, restart, increment/deletion and readable absolute original sources. It records the real config hash before/after and cleans only its own fixture state. Set `AUTORAG_QA_EVIDENCE` to retain the report, and `AUTORAG_QA_BUILT=1` to test published JS artifacts.
 
-```bash
-WORKSPACE="$(mktemp -d)"
-export AUTORAG_HOME="$WORKSPACE/.autorag-home"
-export AUTORAG_CONFIG="$AUTORAG_HOME/config.json"
-mkdir -p "$WORKSPACE/docs" "$AUTORAG_HOME"
-printf '%s\n' \
-  'Refund exceptions require director approval before payout.' \
-  'Finance acknowledged the policy in the July review.' \
-  > "$WORKSPACE/docs/refund-policy.txt"
+The loopback API profile proves protocol/profile behavior only. Hosted API validation additionally needs a trusted explicit opt-in and credentials for a synthetic fixture; no corpus text is sent remotely without it. Native CLI/store lanes without the necessary environment remain explicit SKIP, not PASS. TUI `/index` commands call the internal task module; this migration adds no MCP features.
 
-cd "$WORKSPACE"
-# Init with the default local MinSync embedder
-autorag init \
-  --search-paths "$WORKSPACE/docs" \
-  --force
-
-autorag refresh --method parsed,minsync --json
-autorag search --json "semantic question about refund approval"
-```
-
-The QA gate is not complete until all of the following are observed:
-
-1. `autorag refresh --method minsync` exits successfully and
-   `.minsync/cursor.json` exists under the workspace.
-2. The semantic query returns a hit for the fixture document.
-3. AutoRAG maps that hit to an OS-absolute original `source` path.
-4. `fs.existsSync(source)` and reading `source` succeed.
-5. The run used a local backend (`daemon` or `in-process`), with no remote
-   `minSync.embedder` endpoint configured.
-
-If MinSync is missing, no daemon answers and the in-process addon is absent or
-fails (`embedder-unavailable`), or MinSync reports a semantic failure, report
-the exact blocking diagnostic and do not claim live MinSync verification.
-
-### Legacy/manual variant (Ollama + TEI adapter)
-
-For an existing workspace pinned to Ollama's EmbeddingGemma (768 dimensions),
-keep the adapter available as a manually-started sidecar:
-
-```bash
-ollama pull embeddinggemma:latest
-ollama serve
-OLLAMA_EMBEDDINGS_URL=http://127.0.0.1:11434/api/embeddings \
-  python3 scripts/manual-qa/ollama-tei-adapter.py
-```
-
-Then initialize the workspace explicitly with the TEI endpoint, in the same shell that exported `AUTORAG_HOME` and `AUTORAG_CONFIG` above:
-
-```bash
-cd "$WORKSPACE"
-autorag init \
-  --search-paths "$WORKSPACE/docs" \
-  --embedder-id tei:embeddinggemma:latest \
-  --embedder-base-url http://127.0.0.1:18080 \
-  --embedder-dimension 768 \
-  --minsync-max-chunk-size 1000 \
-  --force
-autorag refresh --method parsed,minsync --json
-autorag search --json "semantic question about refund approval"
-```
-
-The adapter translates MinSync's `POST /embed` request to Ollama's
-`POST /api/embeddings` request and returns the TEI response shape (a bare JSON
-array of embedding arrays). Do not use this variant as a fresh-install
-requirement or as an implicit fallback from the MinSync embedder.
-
-Docker can reproduce the Linux job on macOS, Linux, or Windows hosts. The
-`test-linux` target uses an isolated container volume for `node_modules`, so it
-does not replace host-native dependencies, and pins `linux/amd64` to match
-GitHub's Ubuntu runner. Windows
-containers require a Windows kernel, so Windows compatibility is run natively
-from Git Bash/MSYS2 with `make test-windows` (or directly with
-`bun run test:windows`) and verified by the `windows-latest` GitHub-hosted
-runner.
+Docker remains the preferred host boundary; see the fixed live-E2E procedure above. Required checks are unchanged: `bun run check`, `bun run lint`, `bun run typecheck`, relevant/full tests, build and the supply-chain gate. Python contract tests run with `python -m unittest discover -s test/embedding -p '*_test.py'` in the pinned venv.
 
 ## Purpose
 
@@ -367,10 +274,9 @@ with any of them should be rejected or reshaped:
    stay with the tool that owns them.
 2. **Just works — no RAG degree required.** A non-developer installs it and
    it works: minimal configuration, no pipeline tuning, no vector-DB
-   operations, no OpenAI keys. The local MinSync embedder (Qwen3-Embedding-0.6B)
-   and MinSync auto-install handle the "RAG plumbing" invisibly.
+   operations, no OpenAI keys. The local FastEmbed profile (Qwen3-Embedding-0.6B) and explicit TUI indexing controls handle embedding and index preparation.
 3. **Fast by design.** One configured model owns the whole loop; retrieval
-   runs locally over MinSync CDC chunks (BM25 / vector / hybrid); interactive
+   runs locally over AutoRAG-owned chunks (BM25 / vector / hybrid); interactive
    search is optimized for low latency across several model turns.
 
 Rationale for value 1 comes from the competitive landscape study
@@ -474,7 +380,7 @@ The librarian agent owns the full workflow:
 | `everything_search` | Windows only: instant file/folder name, extension, path, size, and date search over the configured search roots through the bundled voidtools Everything + ES | Locating files by name before reading them |
 | `fsearch_search` | macOS/Linux only: instant file/folder name, extension, path, size, and date search over the configured search roots through the user's fsearch-cli (FSearch) database + watch daemon; degrades to a slow filesystem walk when fsearch-cli is not installed | Locating files by name before reading them |
 | `search_all_documents` | Fan-out across configured retrieval methods and merge/rank candidates | Combined retrieval |
-| `semantic_search_local_docs` | MinSync semantic/vector retrieval over parsed mirrors | Semantic retrieval |
+| `semantic_search_local_docs` | AutoRAG semantic/vector retrieval over parsed mirrors | Semantic retrieval |
 | `search_datasource_<name>` | Search one datasource connection only; one tool is generated per configured connection (e.g. `search_datasource_discord`, `search_datasource_kakao_work`) and spawns no other datasource CLIs. This is the only datasource search surface — use it instead of any fan-out datasource tool | Targeted single-datasource retrieval |
 | `check_memory` | Look up judged evidence from this conversation, similar past questions (hybrid BM25 + vector), and long-term insights | Advisory reference before searching |
 | `load_datasource_skill` | Load instructions for a configured datasource skill | Datasource-specific searches |
@@ -482,7 +388,7 @@ The librarian agent owns the full workflow:
 | `web_search` | Internet web search through the oh-my-pi-style provider chain; credential-free by default, keyed providers via env vars with quota-fallback | Current/public web information |
 | `web_fetch` | Fetch a public http(s) URL and render it as markdown/text | Reading pages found via `web_search` or known URLs |
 
-There is no `lexical_search_local_docs` tool. BM25 runs inside MinSync (and some datasource methods) and is reached through `search_all_documents`.
+There is no `lexical_search_local_docs` tool. BM25 runs inside AutoRAG (and some datasource methods) and is reached through `search_all_documents`.
 
 `web_search`/`web_fetch` are ported from oh-my-pi's web module: a credential-free-only provider chain — model-native search reusing the agent's own model credentials (`gemini`/`anthropic`/`codex`/`xai`), the anonymous `perplexity` ask endpoint, Parallel's keyless MCP (`parallel`), then the scraped engines (`startpage`/`duckduckgo`/`ecosia`/`google`/`mojeek`, plus the `public` fan-out aggregate) with headless-browser escalation for bot challenges — where quota, auth, and bot-challenge failures automatically fall back to the next provider. No API key or signup is required; a self-hosted `SEARXNG_ENDPOINT` is the only env-gated, explicitly-advanced option. Web queries leave the machine: never include private corpus content or secrets in them.
 
@@ -506,9 +412,9 @@ AutoRAG is designed for **multi-method retrieval** — different methods for dif
 
 | Method | Status | Best for |
 |--------|--------|----------|
-| BM25 (keyword) | Active | MinSync lexical ranking over shared CDC chunks from parsed mirrors |
-| MinSync vector (semantic) | Active | Incrementally indexed semantic retrieval over the same MinSync chunks |
-| Hybrid (vector+BM25) | Active | MinSync hybrid mode over the same canonical chunk IDs |
+| BM25 (keyword) | Active | AutoRAG lexical ranking over parsed chunks |
+| MinSync vector (semantic) | Active | AutoRAG semantic retrieval using FastEmbed or an authorized API |
+| Hybrid (vector+BM25) | Active | AutoRAG hybrid ranking over canonical chunk IDs |
 | Datasource skills | Active | External server-configured sources (e.g. KakaoTalk via `lazykatok`) |
 | Vector (other backends) | Planned | Other dense-document backends, "find similar to X" |
 
@@ -520,7 +426,7 @@ Datasource skills are retrieval-method factories plus indexing hooks for externa
 
 CLI-backed datasources own their archive, lexical index, and vectors: KakaoTalk through the external `lazykatok` CLI, and **Discord** through the external [`discrawl`](https://github.com/openclaw/discrawl) CLI. AutoRAG only spawns them and maps results. AutoRAG never reads KakaoTalk databases directly; failures surface as diagnostics, and remote embedding egress settings are rejected before the CLI is spawned.
 
-External crawler-backed skills cover **WhatsApp** (wacrawl), **Telegram** (telecrawl), **Slack** (slacrawl), and **Notion** (notcrawl); each crawler owns its archive, sync, credentials, and FTS search while AutoRAG provides bounded process execution, diagnostics, and retrieval mapping. The remaining connector-backed datasource skills use the shared framework (`src/datasource/connector.ts`, `chunk-store.ts`, `connector-skill.ts`): **GitHub**, **Google Drive**, **local mail export**, **Obsidian** (vault indexed by MinSync in its own workspace: incremental + BM25 + semantic), **RSS/news**, and **Spotlight**. Gmail, IMAP, and Maildir retrieval is provided by **mailcrawl**. Results remain traceable. Manual QA harnesses live in `scripts/manual-qa/` (see `docs/manual-qa-datasources.md`).
+External crawler-backed skills cover **WhatsApp** (wacrawl), **Telegram** (telecrawl), **Slack** (slacrawl), and **Notion** (notcrawl); each crawler owns its archive, sync, credentials, and FTS search while AutoRAG provides bounded process execution, diagnostics, and retrieval mapping. The remaining connector-backed datasource skills use the shared framework (`src/datasource/connector.ts`, `chunk-store.ts`, `connector-skill.ts`): **GitHub**, **Google Drive**, **local mail export**, **Obsidian** (vault indexed by AutoRAG in its own workspace: incremental + BM25 + semantic), **RSS/news**, and **Spotlight**. Gmail, IMAP, and Maildir retrieval is provided by **mailcrawl**. Results remain traceable. Manual QA harnesses live in `scripts/manual-qa/` (see `docs/manual-qa-datasources.md`).
 
 ## Directory Access
 
@@ -529,13 +435,13 @@ The AutoRAG librarian navigates document collections directly with `bash`, using
 Model authentication stays with the configured provider or authenticated local runtime; corpus indexes remain workspace-local under `<workspace>/.autorag`.
 
 - **Tool surface** — the librarian owns `bash`, `check_memory`, `jikji_find`, `everything_search` (Windows), `fsearch_search` (macOS/Linux), `search_all_documents`, `semantic_search_local_docs`, one `search_datasource_<id>` tool per configured datasource connection, `load_datasource_skill`, and `scan_duplicate_documents`. There is no answer-emitting tool: the fast first answer and the final answer are ordinary assistant messages.
-- **Parsed mirrors** — `AutoRAGAgent.refresh()` parses supported files from configured source directories into `.autorag/parsed`; BM25 and MinSync index those parsed mirrors.
+- **Parsed mirrors** — `AutoRAGAgent.refresh()` parses supported files from configured source directories into `.autorag/parsed`; AutoRAG indexes those parsed mirrors.
 - **Document parsing** — `kordoc` is the default parser for `.hwp`, `.hwpx`, `.hml`, `.hwpml`, `.pdf`, `.docx`, `.xlsx` and `.xls`; it runs in-process (no Java, no subprocess) and keeps nested tables and per-sheet workbook structure. `.pptx`, `.eml` and plain text keep their own parsers. kordoc failures surface as `ParseError` with kordoc's own code and message verbatim, and kordoc warnings become `parser-warning` diagnostics.
 - **Global language setting** — one `languages` list (config `languages`, `--languages`, or `AUTORAG_LANGUAGES`; default `["ko", "en"]`) describes the corpus. Accepted tags are curated in `src/language.ts` because every tag must map to a Tesseract traineddata code. Format parsing is language-agnostic; `languages` only selects the OCR engine when `parserOptions.ocr.enabled` is true: all-`ko`/`en` uses kordoc's built-in PP-OCRv5, any other tag injects Tesseract (all languages joined, e.g. `kor+jpn`) as kordoc's OCR provider. kordoc is the single owner of scanned PDF pages and `.png .jpg .jpeg .webp` images; image extensions are registered only while OCR is enabled, because kordoc OCRs every image it is handed. `.bmp`/`.tiff` are unsupported by kordoc and not claimed. OCR stays opt-in, so a default refresh downloads no recognition model. Tesseract traineddata is cached under `<workspace>/.autorag/models/tessdata` (`ocr.cachePath` overrides), never the working directory.
-- **MinSync BM25 tokenizer** — AutoRAG always sets MinSync's `[lexical].language` to `multilingual` (`src/minsync/lexical-language.ts`, passed to `minsync init --language` and written to an existing workspace's `config.toml`), independent of `languages`. MinSync's default `simple` splits on whitespace, so `인증서를` never matches `인증서`; `ko` indexes Kiwi morphemes only, so a compound (`연구목표`) loses its original form and exact-term queries lose precision; `multilingual` indexes the original words and the morphemes (measured on real Korean documents: best recall on inflected and exact queries). `ko`, `ja`, `zh` and `ar` are never selected. MinSync records the tokenizer an index was built with in its cursor, so a changed tokenizer makes its next sync delete and re-index (re-embed) every chunk; a failed refresh restores the previous `config.toml` and the rebuild retries on the next refresh. `multilingual` loads the Kiwi native library and model at run time and fails every sync without them, so `src/minsync/kiwi.ts` probes for them first (mirroring `kiwi-rs` discovery: `KIWI_LIBRARY_PATH`/`KIWI_MODEL_PATH`, `~/.local/kiwi`, system dirs). Missing Kiwi on a new or differently tokenized workspace falls back to `simple` with a `lexical-tokenizer-unavailable` refresh warning (`MinSyncSyncResult.lexicalFallback`), for every corpus; a workspace already on `multilingual` is never flipped, because that would re-embed every chunk. Tests stand in for Kiwi through `test/setup/kiwi-available.ts`.
+- **Local BM25 tokenizer** — AutoRAG owns lexical analysis in `src/indexing/lexical.ts`; the chunk fingerprint includes the analyzer version. Kiwi is optional for Korean and is loaded by AutoRAG rather than configured in MinSync TOML.
 - **Jikji discovery** — `jikji_find` runs `jikji find ROOT "query" --json` and returns the answer pack to the librarian; direct file reading remains available. `prepare`/`refresh` remain for indexing only; AutoRAG-managed prepare runs with `--no-agent-rules` by default so it never rewrites the consumer repo's `AGENTS.md`/`CLAUDE.md`/`.cursorrules`. An explicit `writeAgentRules: true` opt-in re-enables upstream routing-block injection.
-- **No indexing during inference** — a query (`searchDocuments`, TUI, MCP retrieve) only reads prebuilt indexes. It never runs `jikji prepare`, `minsync sync`/`init`, parsed-mirror sync, fsearch/Everything index builds or instance startup, or a binary auto-install. All of that runs only in `refresh`/`watch` (incremental: MinSync syncs changed mirrors, `jikji prepare` reuses unchanged docs; Jikji roots prepare one at a time, because every root shares one central SQLite file that fails with "database is locked" under concurrent writers, and a search root nested inside or duplicating another is skipped since upstream rejects overlapping roots). A never-refreshed source simply contributes no evidence.
-- **External tool auto-install** — MinSync and Jikji binaries are cached under `<workspace>/.autorag/bin`. MinSync is **required**: it auto-installs from crates.io via `cargo install minsync` by default, falling back to verified GitHub release assets when cargo is unavailable (`minSync.autoInstall: false` only stops the auto-install; there is no way to turn MinSync off, `minSync: false` and `minSync.enabled: false` are config errors). A search, refresh, or MCP tool call with no resolvable `minsync` binary fails with `MinSyncRequiredError` and a non-zero exit instead of answering from the remaining retrieval paths. Jikji auto-installs the `jikji-cli` crate from crates.io via cargo by default (`jikji.autoInstall: false` opts out; requires the Rust toolchain). New `autorag init` configs enable Jikji by default (`jikji: {}`). The KakaoTalk `lazykatok` and Discord `discrawl` CLIs remain manual, optional installs (`brew install openclaw/tap/discrawl`). Jikji, `lazykatok`, and `discrawl` degrade gracefully when missing; MinSync does not.
+- **No indexing during inference** — Queries only read prebuilt indexes and call the configured embedder. Model preparation, parsing and index changes require explicit `/index`, refresh or watch operations. Queries never start a service or binary installer.
+- **External tool installation** — MinSync installation/execution/native fallback was removed. Install the pinned Python FastEmbed runtime explicitly; TUI indexing may prepare its independent model cache and start an owned loopback service. Jikji retains its existing optional cargo installation. Native datasource CLIs remain independently installed and own their stores/credentials.
 - **Everything (Windows)** — the npm package bundles the unmodified voidtools portable Everything 1.4.1.1032 and ES 1.1.0.38 ZIPs (x64/ARM64) in `vendor/everything`, pinned by SHA-256 in `vendor/everything/manifest.json`, with their MIT (and PCRE BSD) texts in `licenses/` and NOTICE. On Windows only, AutoRAG extracts and verifies them into `<workspace>/.autorag/everything/<version>/<arch>/` and starts a named, user-level instance (`autorag-<hash>`) with its own `Everything.ini`/`Everything.db` that indexes only the configured search roots as folder indexes. It never requests elevation, installs the Everything service, indexes whole NTFS/ReFS volumes, or enables the HTTP/ETP servers, and it does not touch a user's own Everything. `refresh` (all methods, any parsed refresh, or `--method everything`) rewrites the config, restarts the instance, and waits for the index; failures surface as `everything-index-failed` with ES's exit code and stderr verbatim. `everything: false` disables it; on macOS/Linux it is absent.
 - **FSearch (macOS/Linux)** — the Everything-analog on non-Windows hosts, via the user's [`fsearch-cli`](https://github.com/NomaDamas/fsearch-mac) (GPL-2.0-or-later). fsearch-cli is NOT bundled: the user installs it separately and AutoRAG only spawns it as a separate process over its CLI and Unix-socket daemon protocol — mere aggregation per the FSF GPL FAQ, never a combined work, so AutoRAG keeps its own license. On macOS/Linux only, AutoRAG builds a per-workspace database at `<workspace>/.autorag/fsearch/fsearch.db` that indexes only the configured search roots (excluding `.autorag` state dirs) and keeps a `fsearch-cli watch` daemon (pid file `watch.pid`) live from FSEvents/inotify so `fsearch-cli search` answers over its socket — an explicit short socket at `/tmp/autorag-fsearch-<uid>-<sha12(db realpath)>.sock`, because fsearch-cli's default `<db>.sock` overflows the 104-byte unix sun_path limit for deep workspace paths and daemon/client rendezvous silently breaks; `stopFsearch()` terminates the daemon, and it never touches the user's own FSearch app database (`$XDG_DATA_HOME/fsearch/fsearch.db`). `refresh` (all methods, any parsed refresh, or `--method fsearch`) rebuilds the database and re-verifies the daemon; a missing binary surfaces as a `fsearch-binary-missing` warning (not an error), other failures as `fsearch-index-failed` with the CLI's exit code and stderr verbatim. When fsearch-cli is not installed, `fsearch_search` still answers through a bounded slow filesystem walk (substring/regex name matching) and labels its output as such. `fsearch: false` disables it; on Windows it is absent (Everything covers it).
 - **Datasource skills** — `AutoRAGAgent` can register `datasourceSkills`; their retrieval methods are merged with the normal retrieval pipeline, filtered before merging by per-query scope, and indexed during `refresh()`.
@@ -627,9 +533,9 @@ configured for the run is never shown. See
 | `src/retrieval/registry.ts` | Method registry for multi-method orchestration |
 | `src/retrieval/merger.ts` | Cross-method result merging and deduplication |
 | `src/retrieval/rerank.ts` | Post-merge reranker seam + OpenRouter implementation (`OpenRouterReranker`, `createReranker`) |
-| `src/minsync/method.ts` | MinSync retrieval method (vector / BM25 / hybrid over shared CDC chunks) |
-| `src/minsync/lexical-language.ts` | The BM25 tokenizer AutoRAG always sets in MinSync (`multilingual`) and why |
-| `src/minsync/kiwi.ts` | Probe for the Kiwi native library and model that MinSync's `multilingual` tokenizer loads at run time |
+| `src/minsync/method.ts` | Deprecated method configuration types; no executable client |
+| `src/minsync/lexical-language.ts` | Legacy tokenizer configuration compatibility |
+| `src/minsync/kiwi.ts` | Legacy compatibility probe; native index lexical analysis is in src/indexing |
 | `src/language.ts` | Curated global language tags, normalization, and defaults |
 | `src/parser/kordoc.ts` | Default document parser (kordoc) for HWP/HWPX/HWPML, PDF, DOCX, XLSX/XLS |
 | `src/parser/ocr-engines.ts` | OCR switch options, Tesseract runtime (worker lifecycle, timeout, cache path) and the language → engine split |

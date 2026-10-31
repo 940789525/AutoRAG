@@ -53,8 +53,9 @@ export class LocalIndexMethod implements RetrievalMethod {
 		signal?: AbortSignal,
 		documents?: AsyncIterable<IndexDocument>,
 		onEvent?: (event: IndexEvent) => void,
+		activate = true,
 	): Promise<MinSyncSyncResult> {
-		const report = await this.index.sync(documents, { force, signal, onEvent });
+		const report = await this.index.sync(documents, { force, signal, onEvent, activate });
 		const failedSources = new Set(report.failures.map((failure) => failure.path)).size;
 		return {
 			ok: report.ok,

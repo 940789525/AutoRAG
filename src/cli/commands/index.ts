@@ -5,8 +5,6 @@ import { AutoRAGAgent, type AutoRAGRefreshResult, type RefreshMethod } from "../
 import { removeRefreshProgress } from "../../agent/refresh-progress.ts";
 import { chunkMarkdown } from "../../indexing/chunker.ts";
 import { loadIndexTokenizer } from "../../indexing/tokenizer.ts";
-import { minSyncWorkspaceRoot } from "../../minsync/paths.ts";
-import { syncMinSyncWorkspace } from "../../minsync/workspace.ts";
 import { loadMirrorIndex, type ParsedMirrorEntry, saveMirrorIndex } from "../../mirror/index-store.ts";
 import { PARSED_MIRROR_SUBDIR, refreshReadinessPath } from "../../mirror/paths.ts";
 import { buildAgentOptions, type CliConfig, readRawConfigObject, resolveConfig, writeConfigObject } from "../config.ts";
@@ -276,7 +274,6 @@ async function runIndexRemove(ctx: CommandContext, initial: CliConfig): Promise<
 	const excluded = excludeSourcePath(initial, entry.sourcePath);
 	removeMirrorEntry(initial.workspacePath, entry);
 	// MinSync drops staged mirrors it no longer sees; keep that staging area in step with the mirror index.
-	if (existsSync(minSyncWorkspaceRoot(initial.workspacePath))) syncMinSyncWorkspace(initial.workspacePath);
 
 	let rebuilt: AutoRAGRefreshResult;
 	try {

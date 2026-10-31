@@ -10,7 +10,7 @@
 
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { Embedder } from "../../embedding/embedder.ts";
+import type { Embedder, ManagedEmbedder } from "../../embedding/embedder.ts";
 import { AliasedDatasourceSkill } from "../aliased-skill.ts";
 import { DescribedDatasourceSkill } from "../described-skill.ts";
 import type { EmbeddingEndpointSource } from "../embedding-env.ts";
@@ -108,7 +108,9 @@ function chatCrawlerArgs(
 		registrationName,
 		instanceId: config.instanceId ?? "default",
 		defaultCrawlerDb,
-		...(embedding.embedder === undefined ? {} : { embedder: embedding.embedder }),
+		...(embedding.embedder === undefined
+			? {}
+			: { embedder: (embedding.embedder as ManagedEmbedder).forConsumer?.("chat-sidecars") ?? embedding.embedder }),
 	});
 	return {
 		datasourceId: registrationName,
@@ -254,12 +256,17 @@ const BUILDERS: Readonly<Record<string, SkillBuilder>> = {
 			registrationName,
 			instanceId: config.instanceId ?? "default",
 			defaultCrawlerDb: join(dataDir, "archive.sqlite3"),
-			...(embedding.embedder === undefined ? {} : { embedder: embedding.embedder }),
+			...(embedding.embedder === undefined
+				? {}
+				: {
+						embedder:
+							(embedding.embedder as ManagedEmbedder).forConsumer?.("chat-sidecars") ?? embedding.embedder,
+					}),
 		});
 		return new LazykatokSkill({
 			client: new LazykatokClient({
 				...connector,
-				...(embedding.cliEndpoint === undefined ? {} : { embeddingEndpoint: embedding.cliEndpoint }),
+				// The CLI cannot forward Qwen role prefixes; retain its own native embedding configuration.
 			}),
 			...(config.instanceId !== undefined ? { instanceId: config.instanceId } : {}),
 			...(config.pollingIntervalMs !== undefined ? { pollingIntervalMs: config.pollingIntervalMs } : {}),
@@ -293,7 +300,11 @@ const BUILDERS: Readonly<Record<string, SkillBuilder>> = {
 				? { semantic: { enabled: false } }
 				: embedding.embedder === undefined
 					? {}
-					: { semantic: { embedder: embedding.embedder } }),
+					: {
+							semantic: {
+								embedder: (embedding.embedder as ManagedEmbedder).forConsumer?.("gist") ?? embedding.embedder,
+							},
+						}),
 		});
 	},
 	"cloud-drive": (config, workspaceRoot, registrationName) =>
@@ -324,7 +335,10 @@ const BUILDERS: Readonly<Record<string, SkillBuilder>> = {
 			...common(config, workspaceRoot),
 			datasourceId: registrationName,
 			...(connector?.vaultPath === undefined ? {} : { vaultPath: connector.vaultPath }),
-			...(embedding.minSync === undefined ? {} : { minSync: embedding.minSync }),
+			minSync: {
+				...embedding.minSync,
+				...(embedding.embedder ? { sharedEmbedder: embedding.minSync?.sharedEmbedder ?? embedding.embedder } : {}),
+			},
 		});
 	},
 	rss: (config, workspaceRoot, registrationName) =>

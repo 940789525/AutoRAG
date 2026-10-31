@@ -1,25 +1,17 @@
-/**
- * Live manual QA for the Obsidian vault datasource: a real vault fixture on disk, the real `minsync`
- * binary, and MinSync's own embedding engine (a running `minsync serve` daemon, started by the shared
- * embedder when none runs). Nothing is mocked and no remote embedder is contacted.
- *
- * It walks the user-visible path: factory-built skill -> `agent.refresh` -> BM25 and semantic
- * search -> folder scope -> incremental re-index (edit, add, delete) -> hidden/attachment skipping.
- * The vault is built in a temp directory, so it needs no existing Obsidian install.
- *
- * Prerequisites: the `minsync` binary on PATH (0.4.12 or newer).
- *
- * Run: bun scripts/manual-qa/run-qa-obsidian-live.ts
- */
-
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+/** Synthetic Obsidian vault QA against an already running local FastEmbed service. */
+import { existsSync, readFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { AutoRAGAgent } from "../../src/agent/agent.ts";
 import { buildDatasourceSkills } from "../../src/datasource/skills/factory.ts";
-import { createEmbedderFromConfig, releaseEmbedders } from "../../src/embedding/index.ts";
+import { createEmbedderFromConfig, defaultEmbeddingConfig, releaseEmbedders } from "../../src/embedding/index.ts";
 
 const tmpRoot = mkdtempSync(join(tmpdir(), "autorag-obsidian-live-qa-"));
+process.env.AUTORAG_HOME = join(tmpRoot,"home");
+process.env.AUTORAG_CONFIG = join(tmpRoot,"home","config.json");
+mkdirSync(process.env.AUTORAG_HOME,{recursive:true});
+const realConfig=join(homedir(),".autorag","config.json");
+const before=existsSync(realConfig)?readFileSync(realConfig,"utf8"):undefined;
 const vault = join(tmpRoot, "vault");
 const decomposed = "계획.md".normalize("NFD");
 
@@ -46,21 +38,26 @@ try {
 	note("Attachments/diagram.png", "hiddenmarker binary attachment");
 	writeFileSync(join(tmpRoot, "readme.txt"), "placeholder corpus for the local-file index");
 
-	const embedder = createEmbedderFromConfig({});
+	const embedding=defaultEmbeddingConfig();
+	if(process.env.AUTORAG_QA_EMBED_ENDPOINT)embedding.profiles["local-qwen3"].baseUrl=process.env.AUTORAG_QA_EMBED_ENDPOINT;
+	if(process.env.AUTORAG_QA_TOKENIZER)embedding.profiles["local-qwen3"].manifest!.tokenizerPath=process.env.AUTORAG_QA_TOKENIZER;
+	const embedder = createEmbedderFromConfig({embedding});
 	const health = await embedder.health();
 	console.log(`embedding backend: ${health.backend} alive=${health.alive}${health.detail ? ` (${health.detail})` : ""}`);
-	check("an embedding backend is alive (run `minsync serve --idle-timeout 0` first)", health.alive);
+	check("an embedding backend is alive (start a local FastEmbed service first)", health.alive);
 
 	const { skills, unknown } = buildDatasourceSkills(
 		{ obsidian: { instanceId: "vault", connector: { vaultPath: vault } } },
 		tmpRoot,
-		{ embedder },
+		{ embedder, minSync: { localIndex: { koreanModelPath: process.env.AUTORAG_QA_KIWI_MODEL } } },
 	);
 	check("factory builds the obsidian skill with no external CLI", skills.length === 1 && unknown.length === 0);
 	check("descriptor does not claim an external CLI", skills[0]?.describe().requiresExternalCli === undefined);
 
 	const agent = new AutoRAGAgent({
 		searchPaths: [tmpRoot],
+		embedder,
+		jikji:false,
 		workspacePath: tmpRoot,
 		minSync: { autoInstall: false },
 		everything: false,
@@ -70,7 +67,7 @@ try {
 
 	const first = await agent.refresh(true, { methods: ["datasources"] });
 	const firstResult = first.datasources?.find((result) => result.skill === "obsidian");
-	check("refresh: obsidian indexed through MinSync", firstResult?.ok === true, JSON.stringify(firstResult?.diagnostics ?? []));
+	check("refresh: obsidian indexed through AutoRAG/FastEmbed", firstResult?.ok === true, JSON.stringify(firstResult?.diagnostics ?? []));
 	check("refresh: only the 5 notes were indexed", firstResult?.ok === true && firstResult.chunkCount === 5);
 
 	const search = (query: string, scope?: string) =>
@@ -143,5 +140,7 @@ try {
 	if (failures > 0) process.exitCode = 1;
 } finally {
 	await releaseEmbedders();
+	const after=existsSync(realConfig)?readFileSync(realConfig,"utf8"):undefined;
+	if(before!==after)throw new Error("Real AutoRAG config changed during isolated QA");
 	rmSync(tmpRoot, { recursive: true, force: true });
 }

@@ -15,9 +15,9 @@ import { createSearchMinSyncDocumentsTool } from "../../src/agent/search-minsync
 import { createSingleDatasourceSearchTools } from "../../src/agent/search-single-datasource-tool.ts";
 import type { ToolBurstGuardOptions } from "../../src/agent/tool-burst-guard.ts";
 import type { DatasourceSkill } from "../../src/datasource/types.ts";
+import type { LocalIndexMethod as MinSyncVectorMethod } from "../../src/indexing/method.ts";
 import { jikjiFindDiagnostic } from "../../src/jikji/diagnostics.ts";
 import type { JikjiAnswerPack, JikjiDiagnostic, JikjiFindResult } from "../../src/jikji/index.ts";
-import type { MinSyncVectorMethod } from "../../src/minsync/method.ts";
 import type { RetrievalDiagnostic, RetrievalResult } from "../../src/retrieval/types.ts";
 
 let root: string;

@@ -1,0 +1,15 @@
+{
+  "model": "Qwen/Qwen3-Embedding-0.6B",
+  "repository": "Qdrant/Qwen3-Embedding-0.6B-onnx",
+  "revision": "af95f2c416ffe9379369ad64f9113e865db6112c",
+  "dimension": 1024,
+  "license": "Apache-2.0",
+  "files": {
+    "config.json": "da2b52e46d1469b9f6ff3a45e2bec36b2bb667de5ea9dd5a076e8bfe3b30cc05",
+    "tokenizer_config.json": "1c45aaa97b2bec1d2e1ab0df53e1b2ed2f9568b871b25ca56095c0b83a5d4e93",
+    "special_tokens_map.json": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd",
+    "tokenizer.json": "def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a",
+    "onnx/model.onnx": "754d6ba1c7a323d7b3af0d85b8268f8b716b0cd362ce73295e0f71d3dd831639",
+    "onnx/model.onnx_data": "15d02a315e3b95296700c73d72a436e79facf4e17d919345bed730e98433bcb4"
+  }
+}

@@ -113,7 +113,10 @@ export type RequestContextTransform = (messages: AgentMessage[], info?: RequestC
  * returns the text pi should queue as steering (pi delivers it before the
  * turn's next model request); every other outcome is fully handled by AutoRAG.
  */
-export type AutoRAGInputDisposition = { readonly kind: "handled" } | { readonly kind: "steer"; readonly text: string };
+export type AutoRAGInputDisposition =
+	| { readonly kind: "handled" }
+	| { readonly kind: "steer"; readonly text: string }
+	| { readonly kind: "native" };
 
 export interface AutoRAGInteractiveInput {
 	readonly text: string;
@@ -481,6 +484,7 @@ function createAutoRAGInteractiveExtension(
 				);
 				return { action: "handled" };
 			}
+			if (disposition.kind === "native") return undefined;
 			return disposition.kind === "steer"
 				? {
 						action: "transform",

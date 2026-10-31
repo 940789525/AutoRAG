@@ -1,3 +1,5 @@
+import { createServer } from "node:net";
+import { defaultEmbeddingConfig } from "../../src/embedding/config.ts";
 import { accessSync, closeSync, constants, mkdirSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
 import { isAbsolute, join, resolve } from "node:path";
@@ -21,13 +23,11 @@ export function buildLiveStackOptions(root, workspace) {
 		// Never let E2E write .jikji state into the shared corpus root or
 		// trigger a jikji/cargo install mid-run: the corpus root is immutable.
 		jikji: false,
-		// AutoRAG owns no embedding model. MinSync's native Qwen3 does the embedding: through a running
-		// `minsync serve` daemon started by this runner, in-process otherwise.
-		minSync: {
-			workspacePath: resolve(workspace),
-			autoInstall: true,
-			embedder: { id: "native:Qwen/Qwen3-Embedding-0.6B", dimension: 1024 },
-		},
+		embedding: (() => {
+			const config = defaultEmbeddingConfig();
+			config.profiles[config.defaultProfile].baseUrl = process.env.AUTORAG_EMBED_ENDPOINT ?? "http://127.0.0.1:18382";
+			return config;
+		})(),
 	};
 }
 export function assertAbsoluteReadableSource(source) { if (!isAbsolute(source)) throw new Error("source-not-absolute"); accessSync(source, constants.R_OK); return realpathSync(source); }
@@ -123,9 +123,9 @@ export async function runWorkflow({ root, mode, evidenceDir }) {
 			OPENAI_API_KEY: "",
 			AUTORAG_OPENAI_API_KEY: "",
 		};
-		// The run owns its daemon: start `minsync serve` here, prove it answers /health as the pinned model,
+		// The run owns its daemon: start FastEmbed here, prove it answers /health as the pinned model,
 		// then let the stack under test discover it exactly as a user's refresh would.
-		const started = await startMinSyncDaemon(childEnv);
+		const started = await startFastEmbedService(childEnv);
 		daemonPid = started.pid;
 		childEnv.AUTORAG_EMBED_ENDPOINT = started.endpoint;
 		const preflight = await runPreflight({ endpoint: started.endpoint });
@@ -169,43 +169,41 @@ export async function runWorkflow({ root, mode, evidenceDir }) {
 	} finally {
 		lock.release?.();
 		evidence.cleanup.lockReleased = true;
-		// The daemon belongs to MinSync and would stop itself when idle; stop it now so the run leaves nothing behind.
+		// Stop only the FastEmbed process this run started.
 		if (daemonPid) { try { process.kill(daemonPid, "SIGTERM"); } catch { /* already gone */ } }
 	}
 	return finish(evidence, diagnostic, evidencePath, exitCode);
 }
 
-async function startMinSyncDaemon(env) {
-	// The daemon reports its endpoint as one JSON line on stdout, then keeps running while the stack under test
-	// blocks this process in synchronous spawns. Nothing may keep reading its pipes after readiness (an
-	// unread pipe, or a closed one, would stall or kill it), so the report goes through a file instead.
-	const reportPath = join(E2E_DIR, "daemon-ready.json");
-	rmSync(reportPath, { force: true });
-	const out = openSync(reportPath, "w");
-	const stderrPath = join(E2E_DIR, "daemon-stderr.log");
+async function startFastEmbedService(env) {
+	const socket = createServer();
+	await new Promise((resolvePort, reject) => { socket.once("error", reject); socket.listen(0, "127.0.0.1", resolvePort); });
+	const port = socket.address().port;
+	await new Promise((done) => socket.close(done));
+	const endpoint = `http://127.0.0.1:${port}`;
+	const stderrPath = join(E2E_DIR, "fastembed-stderr.log");
 	const err = openSync(stderrPath, "w");
-	const child = spawn("minsync", ["serve", "--format", "json", "--idle-timeout", "0"], { env, stdio: ["ignore", out, err], detached: true });
+	const child = spawn(env.AUTORAG_FASTEMBED_PYTHON || "python3", [join(REPO_ROOT, "src", "embedding", "service.py"), "--cache-dir", join(env.AUTORAG_HOME, "models", "fastembed"), "--port", String(port)], { env, stdio: ["ignore", "ignore", err] });
 	closeSync(err);
-	child.unref();
-	closeSync(out);
-	const deadline = Date.now() + 600_000;
 	let exited;
 	let spawnError;
-	child.once("error", (error) => { spawnError = error; });
-	child.once("exit", (code) => { exited = code; });
-	while (Date.now() < deadline) {
-		if (spawnError) throw spawnError;
-		if (exited !== undefined) throw new Error(`live-e2e-daemon-exited:${exited}: ${readFileSync(stderrPath, "utf8")}`);
-		for (const line of readFileSync(reportPath, "utf8").split("\n")) {
+	child.once("error", error => { spawnError = error; });
+	child.once("exit", code => { exited = code; });
+	try {
+		const deadline = Date.now() + 900_000;
+		while (Date.now() < deadline) {
+			if (spawnError) throw spawnError;
+			if (exited !== undefined) throw new Error(`FastEmbed exited ${exited}: ${readFileSync(stderrPath, "utf8")}`);
 			try {
-				const event = JSON.parse(line);
-				if (event.status === "ok" && typeof event.url === "string") return { pid: event.pid ?? child.pid, endpoint: event.url };
-			} catch { /* partial line */ }
+				const health = await fetch(`${endpoint}/health`, { signal: AbortSignal.timeout(2000) });
+				const info = await health.json();
+				if (health.ok && info.ready === true && info.model === "Qwen/Qwen3-Embedding-0.6B" && info.dimension === 1024) return {pid: child.pid, endpoint};
+			} catch { /* Service is preparing the pinned local model. */ }
+			await new Promise(done => setTimeout(done, 500));
 		}
-		await new Promise((resolve) => setTimeout(resolve, 200));
-	}
-	child.kill("SIGTERM");
-	throw new Error(`live-e2e-daemon-readiness-timeout: ${readFileSync(stderrPath, "utf8")}`);
+		throw new Error(`FastEmbed readiness timeout: ${readFileSync(stderrPath, "utf8")}`);
+	} catch (error) { child.kill("SIGTERM"); throw error; }
 }
+
 function finish(evidence, diagnostic, evidencePath, exitCode) { if (diagnostic && !evidence.diagnostics.includes(diagnostic)) evidence.diagnostics.push(diagnostic); evidence.finishedAt = new Date().toISOString(); evidence.exitCode = exitCode; writeFileSync(join(evidencePath, "result.json"), `${JSON.stringify(evidence, null, 2)}\n`); const taskEvidencePath = join(REPO_ROOT, ".omo", "evidence", "task-6-fixed-live-e2e-environment.json"); mkdirSync(join(REPO_ROOT, ".omo", "evidence"), { recursive: true }); writeFileSync(taskEvidencePath, `${JSON.stringify({ ...evidence, task: "6", scenario: "fixed-live-e2e-environment", cleanupReceipt: "runner lock released; native stores untouched" }, null, 2)}\n`); return { ...evidence, evidencePath }; }
 export { REPO_ROOT };

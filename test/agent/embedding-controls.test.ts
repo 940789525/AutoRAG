@@ -1,31 +1,12 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
 	createEmbeddingControls,
 	EMBEDDING_STATUS_KEY,
 	EMBEDDING_TOGGLE_KEY,
 	embeddingStatusText,
 } from "../../src/agent/embedding-controls.ts";
-import { probeMinSyncDaemon } from "../../src/embedding/daemon.ts";
-import type { EmbedderHealth, ManagedEmbedder } from "../../src/embedding/embedder.ts";
-import { createManagedEmbedder } from "../../src/embedding/managed.ts";
-import { writeFakeMinSyncServe } from "../helpers/fake-minsync-serve.ts";
-
-describe("embeddingStatusText", () => {
-	it("names the backend and whether it answers, and tells the user the key when nothing runs", () => {
-		const text = (health: EmbedderHealth) => embeddingStatusText(health);
-		expect(text({ backend: "daemon", alive: true })).toBe("embedding: daemon ● up");
-		expect(text({ backend: "in-process", alive: true })).toBe("embedding: in-process ●");
-		expect(text({ backend: "remote", alive: true })).toBe("embedding: remote ● up");
-		expect(text({ backend: "remote", alive: false, detail: "HTTP 503" })).toBe("embedding: remote ○ down (HTTP 503)");
-		expect(text({ backend: "none", alive: false })).toBe(
-			`embedding: off ○ (/embedding on, or ${EMBEDDING_TOGGLE_KEY}, starts minsync serve)`,
-		);
-	});
-});
+import type { ManagedEmbedder } from "../../src/embedding/embedder.ts";
 
 /** The part of pi's registered command the tests drive. */
 interface RegisteredCommandShape {
@@ -46,10 +27,7 @@ interface Harness {
 }
 
 /** A pi that records what the extension registers and lets the test drive its events and its key. */
-function install(
-	embedder: ManagedEmbedder,
-	options: { remote: boolean; resolveBinary: () => Promise<string> },
-): Harness {
+function install(embedder: ManagedEmbedder, options: { remote: boolean; isIndexing?: () => boolean }): Harness {
 	const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => void>();
 	let shortcut: ((ctx: ExtensionContext) => Promise<void>) | undefined;
 	let command: RegisteredCommandShape | undefined;
@@ -85,241 +63,105 @@ function install(
 	};
 }
 
-describe("createEmbeddingControls", () => {
-	let home: string;
-	let bin: string;
-	beforeEach(() => {
-		home = mkdtempSync(join(tmpdir(), "autorag-controls-home-"));
-		bin = mkdtempSync(join(tmpdir(), "autorag-controls-bin-"));
-		vi.stubEnv("HOME", home);
+function local() {
+	let running = false;
+	const start = vi.fn(async () => {
+		running = true;
 	});
-	afterEach(() => {
-		vi.unstubAllEnvs();
-		rmSync(home, { recursive: true, force: true });
-		rmSync(bin, { recursive: true, force: true });
+	const stop = vi.fn(async () => {
+		if (!running)
+			throw new Error("Embedding service is externally managed or already stopped; no process was stopped");
+		running = false;
 	});
-
-	it("registers the toggle key and shows the probed state as soon as the session starts", async () => {
-		const embedder = createManagedEmbedder({
-			home,
-			inProcess: async () => {
-				throw new Error("no addon");
-			},
-		});
-		const harness = install(embedder, { remote: false, resolveBinary: async () => join(bin, "minsync") });
-		expect(harness.shortcuts).toEqual([EMBEDDING_TOGGLE_KEY]);
-		harness.fire("session_start");
-		await vi.waitFor(() =>
-			expect(harness.statuses).toEqual([embeddingStatusText({ backend: "none", alive: false })]),
-		);
-		harness.fire("session_shutdown");
+	const embedder: ManagedEmbedder = {
+		identity: async () => ({ provider: "fastembed", model: "qwen", dimension: 1024 }),
+		embed: async () => [],
+		health: async () => (running ? { backend: "local-http", alive: true } : { backend: "none", alive: false }),
+		describeEndpoint: async () => undefined,
+		close: async () => {},
+		start,
+		stop,
+	};
+	return { embedder, start, stop };
+}
+describe("FastEmbed TUI lifecycle", () => {
+	it("shows readiness and the service start key", () => {
+		expect(embeddingStatusText({ backend: "local-http", alive: true })).toBe("embedding: FastEmbed ● up");
+		expect(embeddingStatusText({ backend: "api", alive: true })).toBe("embedding: remote ● up");
+		expect(embeddingStatusText({ backend: "none", alive: false })).toContain("starts FastEmbed");
+		expect(EMBEDDING_STATUS_KEY).toBe("autorag-embedding");
 	});
-
-	it("does nothing to a remote endpoint's key press except explain, and shows the remote's /health", async () => {
-		const embedder = createManagedEmbedder({
-			remote: { baseUrl: "https://emb.example.com", model: "m", dimension: 2, protocol: "openai" },
-			fetchImpl: (async () => new Response("{}", { status: 200 })) as unknown as typeof fetch,
-		});
-		let resolved = false;
-		const harness = install(embedder, {
-			remote: true,
-			resolveBinary: async () => {
-				resolved = true;
-				return "unused";
-			},
-		});
-		harness.fire("session_start");
-		await vi.waitFor(() => expect(harness.statuses).toEqual(["embedding: remote ● up"]));
-		await harness.press();
-		expect(harness.notes).toEqual([{ message: expect.stringContaining("remote endpoint"), type: "info" }]);
-		expect(resolved).toBe(false);
-		harness.fire("session_shutdown");
+	it("starts and stops only through the managed service controller", async () => {
+		const { embedder, start, stop } = local();
+		const h = install(embedder, { remote: false });
+		expect(h.shortcuts).toEqual([EMBEDDING_TOGGLE_KEY]);
+		await h.press();
+		expect(start).toHaveBeenCalledOnce();
+		expect(h.statuses.at(-1)).toBe("embedding: FastEmbed ● up");
+		await h.press();
+		expect(stop).toHaveBeenCalledOnce();
+		expect(h.notes.at(-1)?.message).toContain("Stopped this session");
 	});
-
-	it("starts the daemon on the first press and stops it on the second, refreshing the footer each time", async () => {
-		const embedder = createManagedEmbedder({
-			home,
-			inProcess: async () => {
-				throw new Error("no addon");
-			},
-		});
-		const binaryPath = writeFakeMinSyncServe(bin, { dimension: 4 });
-		const harness = install(embedder, { remote: false, resolveBinary: async () => binaryPath });
-
-		await harness.press();
-		expect(await probeMinSyncDaemon({ home })).toBeDefined();
-		expect(harness.notes[0]).toMatchObject({
-			message: expect.stringContaining("Started minsync serve"),
-			type: "info",
-		});
-		expect(harness.statuses.at(-1)).toBe("embedding: daemon ● up");
-
-		await harness.press();
-		expect(await probeMinSyncDaemon({ home })).toBeUndefined();
-		expect(harness.notes[1]).toMatchObject({
-			message: expect.stringContaining("Stopped minsync serve"),
-			type: "info",
-		});
-		expect(harness.statuses.at(-1)).toBe(embeddingStatusText({ backend: "none", alive: false }));
-	}, 60_000);
-
-	it("shows the real reason as an error when the daemon cannot be started, and leaves the footer truthful", async () => {
-		const embedder = createManagedEmbedder({
-			home,
-			inProcess: async () => {
-				throw new Error("no addon");
-			},
-		});
-		const harness = install(embedder, {
-			remote: false,
-			resolveBinary: async () => writeFakeMinSyncServe(bin, { failWith: "cannot load model: no cached weights" }),
-		});
-		await harness.press();
-		expect(harness.notes).toEqual([{ message: expect.stringContaining("no cached weights"), type: "error" }]);
-		expect(harness.statuses.at(-1)).toBe(embeddingStatusText({ backend: "none", alive: false }));
-	}, 60_000);
-
-	it("never touches pi's ctx after its session ended: an in-flight probe is dropped and the poll stops", async () => {
+	it("keeps on idempotent and refuses to stop an external process", async () => {
+		const { embedder, start } = local();
+		const h = install(embedder, { remote: false });
+		await h.run("off");
+		expect(h.notes.at(-1)).toMatchObject({ type: "error", message: expect.stringContaining("externally managed") });
+		await h.run("on");
+		await h.run("on");
+		expect(start).toHaveBeenCalledOnce();
+	});
+	it("never starts, stops or authorizes an API from the toggle", async () => {
+		const { embedder, start, stop } = local();
+		const h = install(embedder, { remote: true });
+		await h.run("on");
+		await h.press();
+		expect(start).not.toHaveBeenCalled();
+		expect(stop).not.toHaveBeenCalled();
+		expect(h.notes.at(-1)?.message).toContain("remote endpoint");
+	});
+	it("preserves startup diagnostics and rejects lifecycle changes during indexing", async () => {
+		const { embedder, start } = local();
+		start.mockRejectedValue(new Error("missing model at /fixture/qwen"));
+		const h = install(embedder, { remote: false });
+		await h.run("on");
+		expect(h.notes.at(-1)?.message).toBe("missing model at /fixture/qwen");
+		const busy = install(embedder, { remote: false, isIndexing: () => true });
+		await busy.run("on");
+		expect(busy.notes.at(-1)?.message).toContain("index task is active");
+		expect(start).toHaveBeenCalledOnce();
+	});
+	it("supports status and completion without starting a service", async () => {
+		const { embedder, start } = local();
+		const h = install(embedder, { remote: false });
+		await h.run("status");
+		expect(start).not.toHaveBeenCalled();
+		expect(h.notes.at(-1)?.message).toContain("/embedding on");
+		expect((await h.complete("o"))?.map((v) => v.value)).toEqual(["on", "off"]);
+		await h.run("restart");
+		expect(h.notes.at(-1)?.type).toBe("warning");
+	});
+	it("drops in-flight probes and polling after session shutdown", async () => {
 		vi.useFakeTimers();
 		try {
-			// tsconfig lib is ES2022, which predates Promise.withResolvers.
-			let release: () => void = () => undefined;
-			const released = new Promise<void>((resolve) => {
-				release = resolve;
-			});
-			let healthCalls = 0;
-			const embedder: ManagedEmbedder = {
-				identity: async () => ({ provider: "minsync", model: "m", dimension: 1 }),
-				embed: async () => [],
-				health: async () => {
-					healthCalls += 1;
-					await released;
-					return { backend: "daemon", alive: true };
-				},
-				describeEndpoint: async () => undefined,
-				close: async () => undefined,
-			};
-			let ended = false;
-			const usesAfterEnd: string[] = [];
-			const ctx = {
-				hasUI: true,
-				ui: {
-					// pi throws on any use of a ctx whose session was replaced; record the attempt first.
-					setStatus: (_key: string, text: string | undefined) => {
-						if (ended) {
-							usesAfterEnd.push(String(text));
-							throw new Error("This extension ctx is stale after session replacement or reload.");
-						}
-					},
-					notify: () => undefined,
-				},
-			} as unknown as ExtensionContext;
-			const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => void>();
-			const pi = {
-				on: (event: string, handler: (event: unknown, ctx: ExtensionContext) => void) =>
-					handlers.set(event, handler),
-				registerShortcut: () => undefined,
-				registerCommand: () => undefined,
-			} as unknown as ExtensionAPI;
-			createEmbeddingControls({ embedder, remote: false, resolveBinary: async () => "unused" })(pi);
-
-			handlers.get("session_start")?.({}, ctx);
-			expect(healthCalls).toBe(1);
-			handlers.get("session_shutdown")?.({}, ctx);
-			ended = true;
-			release();
-			await vi.advanceTimersByTimeAsync(0);
-			expect(usesAfterEnd).toEqual([]);
-
-			// The poll belongs to the ended session: a minute later it has not probed again.
-			await vi.advanceTimersByTimeAsync(60_000);
-			expect(healthCalls).toBe(1);
+			const { embedder } = local();
+			let release!: (v: { backend: "none"; alive: false }) => void;
+			const probe = vi.fn(
+				() =>
+					new Promise<{ backend: "none"; alive: false }>((r) => {
+						release = r;
+					}),
+			);
+			embedder.health = probe;
+			const h = install(embedder, { remote: false });
+			h.fire("session_start");
+			h.fire("session_shutdown");
+			release({ backend: "none", alive: false });
+			await vi.advanceTimersByTimeAsync(60000);
+			expect(h.statuses).toEqual([]);
+			expect(probe).toHaveBeenCalledOnce();
 		} finally {
 			vi.useRealTimers();
 		}
-	});
-
-	describe("/embedding", () => {
-		function localEmbedder(): ManagedEmbedder {
-			return createManagedEmbedder({
-				home,
-				inProcess: async () => {
-					throw new Error("no addon");
-				},
-			});
-		}
-
-		it("starts with `on`, is idempotent, stops with `off`, and says so when there is nothing to do", async () => {
-			const harness = install(localEmbedder(), {
-				remote: false,
-				resolveBinary: async () => writeFakeMinSyncServe(bin, { dimension: 4 }),
-			});
-			await harness.run("off");
-			expect(harness.notes.at(-1)?.message).toBe("minsync serve is not running.");
-
-			await harness.run("on");
-			expect(harness.notes.at(-1)?.message).toContain("Started minsync serve");
-			expect(await probeMinSyncDaemon({ home })).toBeDefined();
-
-			await harness.run("on");
-			expect(harness.notes.at(-1)?.message).toContain("already running");
-
-			await harness.run("off");
-			expect(harness.notes.at(-1)?.message).toContain("Stopped minsync serve");
-			expect(await probeMinSyncDaemon({ home })).toBeUndefined();
-		}, 60_000);
-
-		it("toggles with no argument and with `toggle`, exactly like the key", async () => {
-			const harness = install(localEmbedder(), {
-				remote: false,
-				resolveBinary: async () => writeFakeMinSyncServe(bin, { dimension: 4 }),
-			});
-			await harness.run("");
-			expect(await probeMinSyncDaemon({ home })).toBeDefined();
-			await harness.run("toggle");
-			expect(await probeMinSyncDaemon({ home })).toBeUndefined();
-		}, 60_000);
-
-		it("reports the backend with `status` without starting or stopping anything", async () => {
-			const harness = install(localEmbedder(), { remote: false, resolveBinary: async () => "unused" });
-			await harness.run("status");
-			expect(harness.notes.at(-1)).toMatchObject({
-				type: "warning",
-				message: expect.stringContaining("/embedding on"),
-			});
-			expect(await probeMinSyncDaemon({ home })).toBeUndefined();
-		});
-
-		it("rejects an unknown argument instead of toggling", async () => {
-			const harness = install(localEmbedder(), { remote: false, resolveBinary: async () => "unused" });
-			await harness.run("restart");
-			expect(harness.notes).toEqual([
-				{ message: 'Unknown argument "restart". Use /embedding [on|off|toggle|status].', type: "warning" },
-			]);
-			expect(await probeMinSyncDaemon({ home })).toBeUndefined();
-		});
-
-		it("only explains with a remote endpoint, but `status` still reports its /health", async () => {
-			const embedder = createManagedEmbedder({
-				remote: { baseUrl: "https://emb.example.com", model: "m", dimension: 2, protocol: "openai" },
-				fetchImpl: (async () => new Response("{}", { status: 200 })) as unknown as typeof fetch,
-			});
-			const harness = install(embedder, { remote: true, resolveBinary: async () => "unused" });
-			await harness.run("on");
-			expect(harness.notes.at(-1)?.message).toContain("remote endpoint");
-			await harness.run("status");
-			expect(harness.notes.at(-1)).toMatchObject({ type: "info", message: expect.stringContaining("remote") });
-		});
-
-		it("completes its arguments", async () => {
-			const harness = install(localEmbedder(), { remote: false, resolveBinary: async () => "unused" });
-			expect((await harness.complete(""))?.map((item) => item.value)).toEqual(["on", "off", "toggle", "status"]);
-			expect((await harness.complete("o"))?.map((item) => item.value)).toEqual(["on", "off"]);
-			expect(await harness.complete("zzz")).toBeNull();
-		});
-	});
-
-	it("keeps a footer slot of its own", () => {
-		expect(EMBEDDING_STATUS_KEY).toBe("autorag-embedding");
 	});
 });

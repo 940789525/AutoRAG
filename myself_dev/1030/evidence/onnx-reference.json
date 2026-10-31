@@ -1,0 +1,15 @@
+{
+  "result": "PASS",
+  "reference": "direct ONNX hidden states + independent last-non-padding-token pooling + L2 normalization; not a PyTorch/MinSync equivalence claim",
+  "inputs": [
+    "input_ids",
+    "attention_mask"
+  ],
+  "maxAbsoluteError": 0.0,
+  "cosines": [
+    1.0000000001184242,
+    1.000000045973969,
+    1.0000000131490159
+  ],
+  "maxRssKiB": 1858628
+}

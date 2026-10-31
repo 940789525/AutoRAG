@@ -10,8 +10,8 @@ const response = (body: unknown, status = 200): FetchResponse => ({
 /** What `minsync serve` answers on GET /health. */
 const readyFetch = async (): Promise<FetchResponse> =>
 	response({
-		status: "ok",
-		model_id: "Qwen/Qwen3-Embedding-0.6B",
+		ready: true,
+		model: "Qwen/Qwen3-Embedding-0.6B",
 		dimension: 1024,
 		instance: "Qwen-Qwen3-Embedding-0.6B-9f552f9783e1",
 	});
@@ -22,7 +22,7 @@ const optionalBinaries = Object.freeze({
 	rclone: false,
 	mailcrawl: false,
 	jikji: false,
-	minsync: false,
+	python3: false,
 });
 
 describe("live-e2e preflight", () => {

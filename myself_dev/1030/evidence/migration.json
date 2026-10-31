@@ -1,0 +1,29 @@
+{
+  "result": "PASS",
+  "preview": {
+    "defaultProfile": "local-qwen3",
+    "profiles": [
+      {
+        "id": "local-qwen3",
+        "kind": "local-http",
+        "model": "Qwen/Qwen3-Embedding-0.6B",
+        "dimension": 1024,
+        "allowRemote": false,
+        "allowedConsumers": [
+          "local-documents",
+          "memory",
+          "chat-sidecars",
+          "gist",
+          "native-cli"
+        ]
+      }
+    ],
+    "ignoredMinSyncFields": [
+      "autoInstall"
+    ],
+    "writes": false
+  },
+  "newFileValidated": true,
+  "existingOutputRefused": true,
+  "originalHashUnchanged": true
+}

@@ -1,9 +1,9 @@
-/** Local-only `minsync serve` embedding daemon and optional datasource preflight. */
+/** Local-only FastEmbed Qwen embedding service and optional datasource preflight. */
 
 import { execFileSync } from "node:child_process";
 
 export const DATASOURCE_BINARIES = Object.freeze([
-  "lazykatok", "discrawl", "rclone", "mailcrawl", "jikji", "minsync",
+  "lazykatok", "discrawl", "rclone", "mailcrawl", "jikji", "python3",
 ]);
 
 const EXPECTED_MODEL = "Qwen/Qwen3-Embedding-0.6B";
@@ -50,7 +50,7 @@ export async function runPreflight(options = {}) {
     const health = await fetchImpl(new URL("/health", endpoint).toString(), { method: "GET" });
     if (!health.ok) return result("refused", "live-e2e-embedding-unavailable", endpoint, false, typedLanes, { status: "unavailable" });
     const body = await health.json();
-    if (!body || body.status !== "ok" || body.model_id !== EXPECTED_MODEL || body.dimension !== EXPECTED_DIMENSION) {
+    if (!body || body.ready !== true || body.model !== EXPECTED_MODEL || body.dimension !== EXPECTED_DIMENSION) {
       return result("refused", "live-e2e-embedding-malformed", endpoint, false, typedLanes, { status: "malformed", expectedModel: EXPECTED_MODEL, expectedDimension: EXPECTED_DIMENSION });
     }
     embedding = { status: "ready", expectedModel: EXPECTED_MODEL, dimension: body.dimension };

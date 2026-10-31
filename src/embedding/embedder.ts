@@ -1,13 +1,10 @@
-/**
- * The contract every semantic consumer in AutoRAG codes against. AutoRAG does not run an embedding model:
- * vectors come from MinSync (the `minsync serve` daemon, or MinSync's in-process engine) or from a
- * remote endpoint the operator configured.
- */
+/** Shared semantic contract: local FastEmbed over loopback HTTP or a trusted API profile. */
 
 export interface EmbeddingIdentity {
 	readonly provider: string;
 	readonly model: string;
 	readonly dimension: number;
+	readonly fingerprint?: string;
 }
 
 /**
@@ -22,8 +19,11 @@ export interface EmbedOptions {
 }
 
 export interface Embedder {
+	/** Pin a profile for an entire multi-call consumer operation. */
+	snapshot?(): Embedder;
 	capabilities?(): Promise<{
 		readonly maxInputTokens?: number;
+		readonly handlesRetries?: boolean;
 		readonly queryPrefix?: string;
 		readonly passagePrefix?: string;
 	}>;
@@ -32,7 +32,7 @@ export interface Embedder {
 }
 
 /** Where a {@link ManagedEmbedder} is sending text right now. `none` means nothing can embed. */
-export type EmbeddingBackend = "daemon" | "in-process" | "remote" | "none";
+export type EmbeddingBackend = "local-http" | "api" | "daemon" | "in-process" | "remote" | "none";
 
 /** Whether the embedding backend answers right now. Probed on every call; nothing is cached. */
 export interface EmbedderHealth {
@@ -57,17 +57,20 @@ export interface EmbedderEndpoint {
 	 */
 	readonly queryPrefix?: string;
 	readonly passagePrefix?: string;
-	readonly backend: "daemon" | "remote";
+	readonly backend: "local-http" | "api" | "daemon" | "remote";
 }
 
 /**
- * An {@link Embedder} that reports where it embeds. AutoRAG never starts or stops a server: the operator
- * runs `minsync serve` or configures a remote endpoint, and `health` / `describeEndpoint` only look.
+ * An embedder that reports its endpoint. Only explicit indexing/service controls can start a local child.
  */
 export interface ManagedEmbedder extends Embedder {
-	/** Probes the backend now: the daemon's or the remote's `GET /health`. Never starts anything. */
+	/** Validates local readiness or probes the API with fixed non-corpus text. Never starts anything. */
 	health(): Promise<EmbedderHealth>;
 	/** The HTTP endpoint behind this embedder right now, or undefined while it would embed in-process. */
 	describeEndpoint(): Promise<EmbedderEndpoint | undefined>;
 	close(): Promise<void>;
+	/** Explicit user operations only; health and embedding never start a process. */
+	start?(signal?: AbortSignal, onProgress?: (detail: string) => void): Promise<void>;
+	stop?(): Promise<void>;
+	forConsumer?(consumer: import("./config.ts").EmbeddingConsumer): ManagedEmbedder;
 }

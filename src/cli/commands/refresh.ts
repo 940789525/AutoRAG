@@ -21,6 +21,11 @@ export async function runRefresh(ctx: CommandContext): Promise<number> {
 			localIndex: { ...agentOptions.localIndex, debug: ctx.debug || agentOptions.localIndex?.debug },
 		});
 		const methods = parseMethodFlag(ctx.flags.method);
+		if (
+			typeof ctx.flags.method === "string" &&
+			ctx.flags.method.split(",").some((name) => name.trim().toLowerCase() === "minsync")
+		)
+			ctx.stderr("warning: --method minsync is a deprecated alias for the AutoRAG local index; use --method local");
 		const options = {
 			onIndexEvent: ctx.debug
 				? (event: import("../../indexing/types.ts").IndexEvent) => ctx.stderr(JSON.stringify(event))
@@ -51,13 +56,15 @@ export function parseMethodFlag(flag: string | boolean | undefined): readonly Re
 	const entries = raw
 		.split(",")
 		.map((entry) => entry.trim().toLowerCase())
-		.map((entry) => (entry === "local" ? "minsync" : entry))
+		.map((entry) => (entry === "local" || entry === "local-vector" ? "minsync" : entry))
 		.filter((entry) => entry.length > 0);
 	if (entries.length === 0) return undefined;
 	const valid = new Set<string>(ALL_METHOD_NAMES);
 	for (const entry of entries) {
 		if (!valid.has(entry)) {
-			throw new Error(`Unknown --method value: ${entry}. Valid: ${ALL_METHOD_NAMES.join(", ")}`);
+			throw new Error(
+				`Unknown --method value: ${entry}. Valid: local, local-vector, ${ALL_METHOD_NAMES.join(", ")}`,
+			);
 		}
 	}
 	if (entries.includes("all")) {

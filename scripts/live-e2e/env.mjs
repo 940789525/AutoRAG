@@ -146,7 +146,7 @@ export function buildEnv(root) {
 		gitDirty,
 		embeddingModel: "Qwen/Qwen3-Embedding-0.6B",
 		embeddingDimension: 1024,
-		embeddingService: "minsync:qwen3-embedding-0.6b",
+		embeddingService: "fastembed:qwen3-embedding-0.6b:af95f2c416ffe9379369ad64f9113e865db6112c",
 		parserConfig: "default",
 		minSyncConfig: "autorag-native-index-v1",
 	};

@@ -1,17 +1,19 @@
-import type { MinSyncEmbedderConfig } from "../minsync/types.ts";
-import { DEFAULT_DAEMON_MODEL } from "./daemon.ts";
+import { join } from "node:path";
+import { resolveAutoRAGHome } from "../config/home.ts";
+import {
+	DEFAULT_EMBEDDING_MODEL,
+	type EmbeddingConfig,
+	embeddingConfigFromLegacy,
+	normalizeEmbeddingConfig,
+	QWEN_MANIFEST,
+} from "./config.ts";
 import type { ManagedEmbedder } from "./embedder.ts";
+import type { LegacyEmbedderConfig as MinSyncEmbedderConfig } from "./legacy.ts";
 import { createManagedEmbedder } from "./managed.ts";
-import { resolveEmbeddingPrefixes } from "./prefixes.ts";
-import { remoteEmbedderFromMinSync } from "./settings.ts";
+import { ProfileEmbedder } from "./profiles.ts";
 
-export {
-	DEFAULT_DAEMON_MODEL,
-	ensureMinSyncDaemon,
-	MinSyncDaemonError,
-	probeMinSyncDaemon,
-	stopMinSyncDaemon,
-} from "./daemon.ts";
+export * from "./config.ts";
+export { DEFAULT_EMBEDDING_MODEL as DEFAULT_DAEMON_MODEL } from "./config.ts";
 export type {
 	Embedder,
 	EmbedderEndpoint,
@@ -23,50 +25,54 @@ export type {
 	ManagedEmbedder,
 } from "./embedder.ts";
 export { createHttpEmbedder, type EmbeddingProtocol } from "./http-embedder.ts";
-export { loadNativeEmbedder, NATIVE_ADDON_PACKAGE, NativeAddonMissingError } from "./in-process.ts";
 export { createManagedEmbedder, type ManagedEmbedderOptions, type RemoteEmbedderSettings } from "./managed.ts";
 export { type EmbeddingPrefixes, QWEN3_QUERY_PREFIX, resolveEmbeddingPrefixes } from "./prefixes.ts";
+export { ProfileEmbedder } from "./profiles.ts";
 export { remoteEmbedderFromMinSync } from "./settings.ts";
 
 export interface EmbedderFromConfigOptions {
-	/** The `minSync.embedder` block: it selects the embedding backend for MinSync and every other consumer. */
+	readonly embedding?: EmbeddingConfig;
+	readonly profile?: string;
+	readonly workspaceRoot?: string;
+	/** Deprecated configuration input, never an instruction to execute MinSync. */
 	readonly embedder?: MinSyncEmbedderConfig;
 	readonly env?: NodeJS.ProcessEnv;
-	/** User home that holds MinSync's `minsync serve` state; defaults to the real home. */
 	readonly home?: string;
 }
 
-/** The local model a `native:` id names; MinSync's default Qwen3 when none is configured. */
-function localModel(embedder: MinSyncEmbedderConfig | undefined): string {
-	const id = embedder?.id;
-	return id?.startsWith("native:") ? id.slice("native:".length) : DEFAULT_DAEMON_MODEL;
-}
-
-/**
- * The single embedder AutoRAG shares between its own semantic stores and the datasources: a configured
- * remote endpoint, else the `minsync serve` daemon the operator runs, else MinSync's in-process engine.
- * AutoRAG never starts the daemon for it.
- */
 export function createEmbedderFromConfig(options: EmbedderFromConfigOptions): ManagedEmbedder {
-	const remote = remoteEmbedderFromMinSync(options.embedder);
-	const embedder = createManagedEmbedder({
-		...(remote === undefined ? {} : { remote }),
-		model: localModel(options.embedder),
-		prefixes: resolveEmbeddingPrefixes(options.embedder),
-		...(options.home === undefined ? {} : { home: options.home }),
-		...(options.env === undefined ? {} : { env: options.env }),
-	});
+	if (options.embedding && options.embedder)
+		throw new Error(
+			"Conflicting embedding and minSync.embedder configurations; migrate to embedding profiles explicitly",
+		);
+	const config = options.embedding
+		? normalizeEmbeddingConfig(options.embedding)
+		: embeddingConfigFromLegacy(options.embedder);
+	for (const p of Object.values(config.profiles)) {
+		if (
+			p.kind === "local-http" &&
+			p.model === DEFAULT_EMBEDDING_MODEL &&
+			p.manifest?.revision === QWEN_MANIFEST.revision &&
+			!p.manifest.tokenizerPath
+		)
+			p.manifest.tokenizerPath = join(
+				resolveAutoRAGHome(options.env),
+				"models",
+				"fastembed",
+				"qwen3-0.6b-af95f2c416ffe9379369ad64f9113e865db6112c",
+			);
+	}
+	const name = options.profile ?? config.defaultProfile;
+	const profile = config.profiles[name];
+	if (!profile) throw new Error(`Embedding profile is not configured: ${name}`);
+	const embedder = options.profile
+		? createManagedEmbedder({ profile, env: options.env })
+		: new ProfileEmbedder(config, options);
 	created.add(embedder);
 	return embedder;
 }
 
 const created = new Set<ManagedEmbedder>();
-
-/**
- * Unload every in-process model this process loaded. A short-lived command calls this on the way out so the
- * addon's native threads cannot keep the process alive after its answer is written. A `minsync serve` daemon
- * is not touched: it belongs to the operator.
- */
 export async function releaseEmbedders(): Promise<void> {
 	const embedders = [...created];
 	created.clear();

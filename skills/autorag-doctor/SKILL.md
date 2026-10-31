@@ -134,71 +134,15 @@ autorag search "summarize the collection" --top-k 3 --json --debug
 
 ## 4. Repair playbook
 
-### Stuck embedding daemon
+### Local embedding service and model identity
 
-AutoRAG owns no lock or pid file for embeddings. A running `minsync serve`
-publishes `host`, `port`, and `pid` under `~/.cache/minsync/serve/<instance>/`
-and removes them on a clean stop. A leftover file from a crashed daemon is
-harmless: AutoRAG only adopts a daemon whose `GET /health` answers as a loopback
-server of the wanted model, so a stale entry is skipped.
+Inspect `/embedding status` or `autorag status`. The default is FastEmbed/Qwen3-Embedding-0.6B, 1024 dimensions, with pinned ONNX artifacts; see `docs/embedding-setup.md`. Missing Python packages must be installed from the hash-locked requirements into the configured Python 3.12 venv. `/embedding on` explicitly prepares/starts this session's service. Ordinary search/setup/status never start processes.
 
-```bash
-ls ~/.cache/minsync/serve/* 2>/dev/null
-autorag setup --format json
-```
+Only stop a service owned by the current agent. Never terminate other clones' processes, replace the real home, or delete shared model caches. An externally managed service must be managed by its owner.
 
-To diagnose an embedding backend that is not alive, `setup --format json` and
-`status` say so (`embedding.reason`, and the `embedding-unavailable`
-diagnostic). AutoRAG never starts the daemon: run `minsync serve
---idle-timeout 0` by hand (or as a launchd/systemd service, see
-`docs/minsync-setup.md`) and read its own error, or press Ctrl+Shift+E in the
-TUI. When no daemon answers and the in-process addon
-(`@nomadamas/minsync-native`) is missing, that is the `embedder-unavailable`
-state. The daemon stops itself after `--idle-timeout` seconds (default 300), so
-a semantic failure after a quiet spell usually means it timed out. Stop an
-orphaned daemon by the pid from `~/.cache/minsync/serve/<instance>/pid` after
-confirming no live refresh holds it.
+For a model/revision/prefix change, run `/index build --embedding PROFILE` explicitly. A failed/cancelled candidate leaves the prior active generation intact. `/index status` reports persisted task errors verbatim; dead owners are interrupted. A refresh can preserve already committed documents and must report partial failure. Do not claim old MinSync vectors work in the new engine.
 
-Index locks are owned by their engines: MinSync/tantivy locks under
-`<workspace>/.autorag/`, and per-CLI locks such as
-`<workspace>/.autorag/datasources/discrawl/.discrawl-sync.lock`. Delete one
-only after confirming no owning process is alive; otherwise wait for the run
-that holds it.
-
-### Orphan process
-
-```bash
-pgrep -fl 'autorag|minsync' | grep -v pgrep
-```
-
-A refresh that was killed mid-run can leave a `minsync serve` daemon or a
-`minsync` child alive. A daemon idle-stops itself; stop a confirmed orphan by
-the pid from `~/.cache/minsync/serve/<instance>/pid`, and only kill a PID
-directly when it is confirmed orphaned (no parent CLI, no live refresh).
-Re-run `autorag status --json` afterwards to confirm `inFlight: false`.
-
-### Embedding model mismatch
-
-`embedding-identity-mismatch` or a dimension error means the vectors on disk
-were built with a different embedder than the configured one. Vectors of two
-different dimensions can never be compared, so the index must be rebuilt:
-
-```bash
-autorag index rebuild --method minsync
-```
-
-The default is MinSync's local `Qwen/Qwen3-Embedding-0.6B` engine at 1024
-dimensions, reached through a running `minsync serve` daemon or, failing that,
-MinSync's in-process engine. Both report one identity (`provider: minsync`), so
-a store never re-embeds because the daemon appeared or went away. Vectors
-written by the removed local Q8_0 gateway engine are **not** compatible: their
-identity changed, so the memory store (`memory.json.vectors.db`), chat-sidecar
-semantic DBs, and the gist `vectors.json` re-embed on the next refresh, while a
-MinSync workspace created through the old gateway profile needs
-`autorag index rebuild --method minsync` (or
-`autorag index reset --method minsync --yes` then refresh). Changing the
-embedder's `dimension` in config **without** a rebuild leaves retrieval silently
-empty.
+API failures require checking the trusted profile's opt-in, consumer scope, credential reference and actual response. Never grant remote access as a repair. Memory/sidecar/Gist identity changes need their own refresh and may degrade lexically.
 
 ### Stale index
 
@@ -225,9 +169,7 @@ to retry those files once without re-indexing healthy ones.
   no `"type"`. It is skipped, not fatal — fix the name or add `"type"`.
 - `datasource-index-failed` / `sync-failed`: the backing CLI errored. Run that
   CLI's own check from the table above and fix it there.
-- A missing MinSync binary is not a diagnostic: `autorag search`, `autorag refresh`
-  and MCP tools fail with `MinSync is required ...` and a non-zero exit. Install it
-  (`cargo install minsync`) or leave `minSync.autoInstall` on, then retry.
+- Missing FastEmbed dependencies/service: inspect the raw failure and follow `docs/embedding-setup.md`. Do not install MinSync or a native addon as a fallback.
 - `jikji-unavailable`: the binary is missing and auto-install failed. It
   installs through cargo; verify the Rust toolchain, then `autorag refresh --method jikji` to retry.
 - `datasource-auth-error` / `datasource-rate-limited`: datasource credentials or quota. Report the
@@ -249,7 +191,7 @@ to retry those files once without re-indexing healthy ones.
 | `jikji-unavailable` | Jikji binary missing or install failed | Check cargo, retry refresh |
 | `everything-index-failed` | Windows Everything instance could not start or index; message carries ES exit code and stderr | Fix the reported cause, `autorag refresh --method everything --json` |
 | `embedding-identity-mismatch` | Indexed vectors use a different embedder | `autorag index rebuild --method minsync` |
-| `embedder-unavailable` | No remote endpoint answered, no daemon could start, and the in-process addon is missing or failed | Run `minsync serve` by hand to read its error, install MinSync (`cargo install minsync`) or `@nomadamas/minsync-native`, or configure a remote `minSync.embedder` |
+| `embedder-unavailable` | No remote endpoint answered, no daemon could start, and the in-process addon is missing or failed | Inspect the local FastEmbed service error and the pinned Python setup, or a previously authorized API profile |
 | `datasource-index-failed` | Backing CLI failed to index | Run that CLI's own doctor |
 | `datasource-empty` | Store has no matching content | Re-sync with the CLI, or accept as empty |
 | `unknown-datasource-skill` | Config name is not a known template | Fix the name or add `"type"` |

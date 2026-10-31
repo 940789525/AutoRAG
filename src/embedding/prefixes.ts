@@ -1,5 +1,5 @@
-import type { MinSyncEmbedderConfig } from "../minsync/types.ts";
-import { DEFAULT_DAEMON_MODEL } from "./daemon.ts";
+import { DEFAULT_EMBEDDING_MODEL } from "./config.ts";
+import type { LegacyEmbedderConfig as MinSyncEmbedderConfig } from "./legacy.ts";
 
 /**
  * Qwen3-Embedding is instruction-aware: the query side is `Instruct: {task}\nQuery:{query}` and documents are
@@ -20,7 +20,9 @@ function isLocalQwen3(embedder: MinSyncEmbedderConfig | undefined): boolean {
 	if (embedder?.baseUrl !== undefined) return false;
 	const id = embedder?.id;
 	if (id === undefined) return true;
-	return id.startsWith("native:") && id.slice("native:".length).toLowerCase() === DEFAULT_DAEMON_MODEL.toLowerCase();
+	return (
+		id.startsWith("native:") && id.slice("native:".length).toLowerCase() === DEFAULT_EMBEDDING_MODEL.toLowerCase()
+	);
 }
 
 /**

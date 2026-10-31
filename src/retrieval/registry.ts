@@ -12,7 +12,10 @@ export class RetrievalMethodRegistry {
 	}
 
 	get(name: string): RetrievalMethod | undefined {
-		return this.methods.get(name);
+		return this.methods.get(name === "local-vector" ? "minsync" : name);
+	}
+	replace(method: RetrievalMethod): void {
+		this.methods.set(method.describe().name, method);
 	}
 
 	list(): RetrievalMethod[] {

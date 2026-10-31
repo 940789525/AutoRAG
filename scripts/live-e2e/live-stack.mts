@@ -49,11 +49,8 @@ const QUERY = "semantic question about the sample corpus";
 
 function writeConfig(path: string, embedderOverride: Record<string, unknown> = {}): string {
 	const base = buildLiveStackOptions(root, workspace);
-	const minSync = base.minSync === false || base.minSync === undefined ? {} : base.minSync;
-	const config = {
-		...base,
-		minSync: { ...minSync, embedder: { ...minSync.embedder, ...embedderOverride } },
-	};
+	if (Object.keys(embedderOverride).length) throw new Error("Use an explicit embedding profile for live overrides");
+	const config = base;
 	writeFileSync(path, `${JSON.stringify(config, null, 2)}\n`);
 	return path;
 }
@@ -145,8 +142,14 @@ const remoteEmbedder = {
 const remoteOptions = {
 	...buildLiveStackOptions(root, remoteWorkspace),
 	searchPaths: [remoteCorpus],
-	minSync: { workspacePath: remoteWorkspace, autoInstall: true, embedder: remoteEmbedder },
-	localIndex: { tokenizerPath: join(workspace, ".autorag", "models", "tokenizers", (await import("../../src/indexing/chunker.ts")).contentHash("Qwen/Qwen3-Embedding-0.6B")) },
+	embedding: { defaultProfile: "api-fixture", profiles: { "api-fixture": {
+        kind: "api" as const, protocol: "openai" as const, baseUrl: remoteEmbedder.baseUrl,
+        model: "stub-embedding", dimension: 1024, allowRemote: true, allowedConsumers: ["local-documents" as const],
+        apiKeyEnv: remoteEmbedder.apiKeyEnv, timeoutMs: 5000, maxRetries: 0,
+        manifest: { model: "stub-embedding", dimension: 1024, revision: "live-fixture-v1", maxInputTokens: 2048,
+          queryPrefix: "", passagePrefix: "", pooling: "provider-managed", normalization: "provider-managed" },
+      } } },
+	localIndex: { tokenizerPath: join(process.env.AUTORAG_HOME!, "models", "fastembed", "qwen3-0.6b-af95f2c416ffe9379369ad64f9113e865db6112c") },
 };
 const remoteConfig = join(remoteWorkspace, "config.json");
 // The runner points this process at the main workspace through AUTORAG_* variables, and the environment wins

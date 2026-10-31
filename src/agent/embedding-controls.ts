@@ -1,5 +1,4 @@
 import type { ExtensionAPI, ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
-import { ensureMinSyncDaemon, probeMinSyncDaemon, stopMinSyncDaemon } from "../embedding/daemon.ts";
 import type { EmbedderHealth, ManagedEmbedder } from "../embedding/embedder.ts";
 
 /** The footer and notifications of one pi session; writes after that session is replaced are dropped. */
@@ -10,7 +9,7 @@ interface SessionFooter {
 
 /** Footer slot of the embedding indicator. */
 export const EMBEDDING_STATUS_KEY = "autorag-embedding";
-/** Toggles the local `minsync serve` daemon. Not bound by pi, pi-tui or AutoRAG's own interrupt/follow-up keys. */
+/** Toggles the session-owned local FastEmbed service. Not bound by pi, pi-tui or AutoRAG's own interrupt/follow-up keys. */
 export const EMBEDDING_TOGGLE_KEY = "ctrl+shift+e";
 const POLL_INTERVAL_MS = 15_000;
 
@@ -22,33 +21,28 @@ type EmbeddingAction = (typeof EMBEDDING_ACTIONS)[number];
 function describeHealth(health: EmbedderHealth): string {
 	if (health.alive)
 		return `Embedding backend: ${health.backend}${health.detail === undefined ? "" : ` (${health.detail})`}.`;
-	return `No embedding backend is alive${health.detail === undefined ? "" : `: ${health.detail}`}. Run /embedding on, or set minSync.embedder to a remote endpoint.`;
+	return `No embedding backend is alive${health.detail === undefined ? "" : `: ${health.detail}`}. Run /embedding on, or configure an authorized embedding API profile.`;
 }
 
 export interface EmbeddingControlsOptions {
 	readonly embedder: ManagedEmbedder;
-	/** True when `minSync.embedder` names a remote endpoint: the toggle then has nothing local to start or stop. */
-	readonly remote: boolean;
-	/** Locates the `minsync` executable the toggle starts the daemon with. */
-	readonly resolveBinary: () => Promise<string>;
+	/** True when the active profile is an API: the toggle then has nothing local to start or stop. */
+	readonly remote: boolean | (() => boolean);
+	readonly isIndexing?: () => boolean;
 }
 
 /** The footer text for one probe result. Plain text: pi's footer owns colour. */
 export function embeddingStatusText(health: EmbedderHealth, toggleKey: string = EMBEDDING_TOGGLE_KEY): string {
-	if (health.backend === "remote") {
+	if (health.backend === "remote" || health.backend === "api") {
 		return health.alive ? "embedding: remote ● up" : `embedding: remote ○ down (${health.detail ?? "no answer"})`;
 	}
+	if (health.backend === "local-http" && health.alive) return "embedding: FastEmbed ● up";
 	if (health.backend === "daemon") return "embedding: daemon ● up";
 	if (health.backend === "in-process") return "embedding: in-process ●";
-	return `embedding: off ○ (/embedding on, or ${toggleKey}, starts minsync serve)`;
+	return `embedding: off ○ (/embedding on, or ${toggleKey}, starts FastEmbed)`;
 }
 
-/**
- * pi extension that shows whether embedding is alive in the footer and, for the local daemon, toggles it with
- * a key. Everything is user-driven: no daemon is started or stopped except by the key, so there is no
- * lifecycle to design. The footer re-probes every {@link POLL_INTERVAL_MS} (the daemon's own idle timeout or
- * a launchd restart changes it behind our back) and right after every toggle.
- */
+/** Session-scoped service controls. Existing external processes are never stopped. */
 export function createEmbeddingControls(options: EmbeddingControlsOptions): ExtensionFactory {
 	return (pi: ExtensionAPI) => {
 		let timer: NodeJS.Timeout | undefined;
@@ -108,30 +102,30 @@ export function createEmbeddingControls(options: EmbeddingControlsOptions): Exte
 				}
 				return;
 			}
-			if (options.remote) {
-				target.notify("Embedding uses a remote endpoint; there is no local daemon to start or stop.", "info");
+			if (typeof options.remote === "function" ? options.remote() : options.remote) {
+				target.notify("Embedding uses a remote endpoint; there is no local service to start or stop.", "info");
 				return;
 			}
 			if (busy) {
-				target.notify("The embedding daemon is already being started or stopped.", "info");
+				target.notify("The embedding service is already being started or stopped.", "info");
 				return;
 			}
 			busy = true;
 			try {
-				const running = await probeMinSyncDaemon();
-				if (running !== undefined && action === "on") {
-					target.notify(`minsync serve is already running at ${running.baseUrl}.`, "info");
-				} else if (running === undefined && action === "off") {
-					target.notify("minsync serve is not running.", "info");
-				} else if (running !== undefined) {
-					const stopped = await stopMinSyncDaemon();
-					target.notify(`Stopped minsync serve (pid ${stopped?.pid ?? "?"}).`, "info");
+				if (options.isIndexing?.())
+					throw new Error("An index task is active; cancel it before changing the embedding service lifecycle");
+				const running = (await options.embedder.health()).alive;
+				if (action === "on" && running)
+					target.notify("Embedding is already running; an external service remains externally managed.", "info");
+				else if (action === "off" || (action === "toggle" && running)) {
+					if (!options.embedder.stop) throw new Error("This embedding service is externally managed");
+					await options.embedder.stop();
+					target.notify("Stopped this session's FastEmbed service.", "info");
 				} else {
-					target.setStatus("embedding: starting… (first start may download the model)");
-					const binaryPath = await options.resolveBinary();
-					// idle-timeout 0: the user turned it on, so it stays on until they turn it off.
-					const started = await ensureMinSyncDaemon({ binaryPath, idleTimeoutSeconds: 0 });
-					target.notify(`Started minsync serve at ${started.baseUrl}.`, "info");
+					target.setStatus("embedding: preparing Qwen ONNX model and starting FastEmbed…");
+					if (!options.embedder.start) throw new Error("This embedding service is externally managed");
+					await options.embedder.start();
+					target.notify(describeHealth(await options.embedder.health()), "info");
 				}
 			} catch (error) {
 				target.notify(error instanceof Error ? error.message : String(error), "error");
@@ -142,12 +136,12 @@ export function createEmbeddingControls(options: EmbeddingControlsOptions): Exte
 		};
 
 		pi.registerShortcut(EMBEDDING_TOGGLE_KEY, {
-			description: "Start or stop the local embedding daemon (minsync serve)",
+			description: "Start or stop this session's local FastEmbed service",
 			handler: (ctx) => act("toggle", ctx),
 		});
 
 		pi.registerCommand("embedding", {
-			description: "Embedding daemon: /embedding [on|off|toggle|status] (no argument: toggle)",
+			description: "Embedding service: /embedding [on|off|toggle|status] (no argument: toggle)",
 			getArgumentCompletions: (prefix) => {
 				const matches = EMBEDDING_ACTIONS.filter((name) => name.startsWith(prefix.trim().toLowerCase()));
 				return matches.length === 0 ? null : matches.map((name) => ({ value: name, label: name }));

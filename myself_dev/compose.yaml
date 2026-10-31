@@ -4,8 +4,8 @@ services:
   dev:
     image: autorag-xsy-dev:2.11.0
     build:
-      context: ../scripts/ci
-      dockerfile: ../../myself_dev/Dockerfile
+      context: ..
+      dockerfile: myself_dev/Dockerfile
     platform: linux/amd64
     init: true
     user: "1000:1000"
@@ -26,8 +26,8 @@ services:
       - home:/dev-home
       - cache:/dev-home/.cache
       - workspace:/data/workspace
-    # Keep the dev shell available when /embedding off stops the daemon.
-    command: ["bash", "-c", "minsync serve --idle-timeout 0 & exec sleep infinity"]
+    # Keep the dev shell available when an embedding process exits.
+    command: ["bash", "-c", "/opt/autorag-embedding/bin/python /workspace/src/embedding/service.py --cache-dir /dev-home/.autorag/models/fastembed & exec sleep infinity"]
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     mem_limit: 8g

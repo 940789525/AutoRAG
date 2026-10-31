@@ -72,7 +72,7 @@ export interface HisterServiceDeps {
 const INSTALL = "brew install hister   (other platforms: https://github.com/asciimoo/hister/releases)";
 const START = "brew services start hister";
 const SHARE_DAEMON =
-	"Hister can only share a local embedding server. Start `minsync serve --idle-timeout 0` (docs/minsync-setup.md), then run `autorag setup --sync-hister`.";
+	"Hister can only share a local embedding server. Start a local FastEmbed service (docs/embedding-setup.md), then run `autorag setup --sync-hister`.";
 
 interface HisterEntry {
 	readonly name: string;
@@ -234,11 +234,11 @@ export async function setupHister(options: {
 		if (!embedding.inSync && !embedding.applied && !options.sync && embedding.reason === undefined) {
 			remediation.push("Make Hister embed with the shared model: autorag setup --sync-hister");
 		}
-		if (embedding.reason?.includes("minsync serve"))
+		if (embedding.reason?.includes("FastEmbed"))
 			remediation.push(
 				SHARE_DAEMON.replace(
 					"Hister can only share a local embedding server. ",
-					"Start `minsync serve --idle-timeout 0` (docs/minsync-setup.md), then run `autorag setup --sync-hister`.",
+					"Start a local FastEmbed service (docs/embedding-setup.md), then run `autorag setup --sync-hister`.",
 				),
 			);
 		if (embedding.restartRequired)
@@ -292,7 +292,7 @@ async function syncEmbedding(args: {
 			differs: [],
 			applied: false,
 			reason:
-				"AutoRAG embeds in-process, which Hister cannot reach: it needs the `minsync serve` daemon to share the model",
+				"No shared HTTP embedding endpoint is available; Hister needs a local FastEmbed service to share the model",
 		};
 	}
 	const derived = deriveHisterSemanticSettings(endpoint);

@@ -39,13 +39,15 @@ export {
 } from "./core.ts";
 export * from "./datasource/index.ts";
 export * from "./dupey/index.ts";
+export * from "./embedding/index.ts";
 export * from "./everything/index.ts";
 export * from "./fsearch/index.ts";
 export * from "./indexing/index.ts";
+export type { IndexJob, IndexJobRequest } from "./indexing/jobs.ts";
 export * from "./jikji/index.ts";
 export { type AutoRAGMcpServerOptions, createAutoRAGMcpServer } from "./mcp/server.ts";
 export * from "./memory/index.ts";
-export * from "./minsync/index.ts";
+export type { MinSyncEmbedderConfig, MinSyncSyncResult } from "./minsync/types.ts";
 export * from "./mirror/index.ts";
 export * from "./parser/index.ts";
 export * from "./retrieval/index.ts";

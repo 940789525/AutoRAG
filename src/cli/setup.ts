@@ -11,12 +11,13 @@ import {
 } from "../datasource/skills/hister/setup.ts";
 import {
 	createEmbedderFromConfig,
+	defaultEmbeddingConfig,
 	type EmbeddingBackend,
 	type EmbeddingIdentity,
 	type ManagedEmbedder,
+	normalizeEmbeddingConfig,
 } from "../embedding/index.ts";
 import { acquireFileLock, type FileLockHandle } from "../filesystem/file-lock.ts";
-import { DEFAULT_MINSYNC_EMBEDDER_DIMENSION, DEFAULT_MINSYNC_EMBEDDER_ID } from "../minsync/embedder-config.ts";
 import type { MinSyncEmbedderConfig } from "../minsync/types.ts";
 import { normalizeEmbedder, readRawConfigObject, writeConfigObject } from "./config.ts";
 
@@ -27,7 +28,7 @@ export interface SetupDatasourceReport {
 	readonly reason?: string;
 }
 export interface SetupEmbeddingReport {
-	/** Where text is embedded: a configured remote endpoint, the `minsync serve` daemon, or MinSync in-process. */
+	/** Where text is embedded: a configured remote endpoint, the local FastEmbed service. */
 	readonly backend?: Exclude<EmbeddingBackend, "none">;
 	readonly provider?: string;
 	readonly model?: string;
@@ -76,7 +77,7 @@ export interface SetupDeps {
 const LOCK_TIMEOUT_MS = 10_000;
 const LOCK_STALE_MS = 30_000;
 const REMEDIATION =
-	"Semantic search needs an embedding backend: run `minsync serve --idle-timeout 0` as a service (docs/minsync-setup.md), or point `minSync.embedder` at a remote endpoint, then run `autorag setup` again.";
+	"Semantic search needs FastEmbed: install the pinned embedding Python dependencies, then use /embedding on or /index build in the TUI (docs/embedding-setup.md), or configure an explicitly authorized embedding API profile.";
 const BUILTIN_BINARIES: Readonly<Record<string, string>> = {
 	kakao: "lazykatok",
 	lark: "lark-cli",
@@ -118,11 +119,7 @@ function executableInPath(name: string, env: NodeJS.ProcessEnv): string | undefi
 	return undefined;
 }
 function safeReason(value: unknown): string {
-	const text = value instanceof Error ? value.message : String(value);
-	return text
-		.replace(/(?<![\w@.-])(?:[A-Za-z]:)?\/[^\s'"`]+/g, "<path>")
-		.replace(/\b(?:token|key|secret|password)\s*[=:]\s*\S+/gi, "$1=<redacted>")
-		.slice(0, 180);
+	return (value instanceof Error ? value.message : String(value)).slice(0, 16_384);
 }
 function configuredCredentialNames(entry: Record<string, unknown> | undefined, datasource: string): string[] {
 	const names = [...(DEFAULT_CREDENTIALS[datasource] ?? [])];
@@ -214,7 +211,15 @@ export async function runSetup(options: {
 		} catch {
 			configuredEmbedder = undefined;
 		}
-		embedder = options.deps?.embedder ?? createEmbedderFromConfig({ embedder: configuredEmbedder, env });
+		embedder =
+			options.deps?.embedder ??
+			createEmbedderFromConfig({
+				embedding:
+					raw.embedding === undefined ? undefined : normalizeEmbeddingConfig(raw.embedding, options.configPath),
+				embedder: configuredEmbedder,
+				env,
+				workspaceRoot: options.workspacePath,
+			});
 		let embedding: SetupEmbeddingReport;
 		try {
 			const health = await embedder.health();
@@ -302,20 +307,16 @@ export async function runSetup(options: {
 		}
 		let changed = false;
 		// An existing embedder block is operator-owned, including remote endpoints and dimensions. Only an
-		// absent one is created, and it names MinSync's own local default rather than any AutoRAG runtime.
+		// absent one is created, and it names the local FastEmbed default.
 		if (
 			semantic &&
+			raw.embedding === undefined &&
 			Object.keys(rawMinSync.embedder && typeof rawMinSync.embedder === "object" ? rawMinSync.embedder : {})
 				.length === 0
 		) {
 			const next = {
 				...raw,
-				minSync: {
-					...rawMinSync,
-					enabled: true,
-					autoInstall: rawMinSync.autoInstall !== false,
-					embedder: { id: DEFAULT_MINSYNC_EMBEDDER_ID, dimension: DEFAULT_MINSYNC_EMBEDDER_DIMENSION },
-				},
+				embedding: defaultEmbeddingConfig(),
 			};
 			lock.assertOwned();
 			writeConfigObject(options.configPath, next);

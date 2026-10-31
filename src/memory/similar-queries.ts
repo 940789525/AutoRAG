@@ -73,9 +73,11 @@ function cosine(a: ArrayLike<number>, b: ArrayLike<number>): number {
  */
 class VectorStore {
 	private readonly db: DatabaseSync;
+	private readonly identity: string;
 
-	private constructor(db: DatabaseSync) {
+	private constructor(db: DatabaseSync, identity: string) {
 		this.db = db;
+		this.identity = identity;
 	}
 
 	/**
@@ -99,7 +101,13 @@ class VectorStore {
 PRAGMA journal_mode = WAL;
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS vectors (key TEXT PRIMARY KEY, vector BLOB NOT NULL) WITHOUT ROWID;`);
-			const wanted = JSON.stringify([VECTOR_STORE_VERSION, identity.provider, identity.model, identity.dimension]);
+			const wanted = JSON.stringify([
+				VECTOR_STORE_VERSION,
+				identity.provider,
+				identity.model,
+				identity.dimension,
+				identity.fingerprint,
+			]);
 			const stored = db.prepare("SELECT value FROM meta WHERE key = 'identity'").get() as
 				| { value: string }
 				| undefined;
@@ -109,7 +117,7 @@ CREATE TABLE IF NOT EXISTS vectors (key TEXT PRIMARY KEY, vector BLOB NOT NULL) 
 				db.prepare("INSERT OR REPLACE INTO meta (key, value) VALUES ('identity', ?)").run(wanted);
 				db.exec("COMMIT");
 			}
-			return new VectorStore(db);
+			return new VectorStore(db, wanted);
 		} catch (error) {
 			db.close();
 			throw error;
@@ -118,6 +126,7 @@ CREATE TABLE IF NOT EXISTS vectors (key TEXT PRIMARY KEY, vector BLOB NOT NULL) 
 
 	/** Every stored vector whose size matches the embedding dimension. */
 	load(dimension: number): Map<string, Float32Array> {
+		this.checkIdentity();
 		const vectors = new Map<string, Float32Array>();
 		const rows = this.db.prepare("SELECT key, vector FROM vectors").all() as {
 			key: string;
@@ -135,6 +144,7 @@ CREATE TABLE IF NOT EXISTS vectors (key TEXT PRIMARY KEY, vector BLOB NOT NULL) 
 		const insert = this.db.prepare("INSERT OR REPLACE INTO vectors (key, vector) VALUES (?, ?)");
 		this.db.exec("BEGIN IMMEDIATE");
 		try {
+			this.checkIdentity();
 			for (const [key, vector] of entries) {
 				insert.run(key, new Uint8Array(vector.buffer, vector.byteOffset, vector.byteLength));
 			}
@@ -145,6 +155,12 @@ CREATE TABLE IF NOT EXISTS vectors (key TEXT PRIMARY KEY, vector BLOB NOT NULL) 
 		}
 	}
 
+	private checkIdentity(): void {
+		const active = this.db.prepare("SELECT value FROM meta WHERE key='identity'").get() as
+			| { value: string }
+			| undefined;
+		if (active?.value !== this.identity) throw new Error("Memory embedding profile changed during this operation");
+	}
 	close(): void {
 		this.db.close();
 	}
@@ -157,6 +173,7 @@ async function rankByVector(
 	embedder: Embedder,
 	vectorStorePath: string | undefined,
 ): Promise<number[]> {
+	embedder = embedder.snapshot?.() ?? embedder;
 	const identity = await embedder.identity();
 	// Without a path the vectors live for this call only.
 	let store: VectorStore | undefined;

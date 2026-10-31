@@ -1,0 +1,762 @@
+{
+  "model": "Qwen/Qwen3-Embedding-0.6B",
+  "dimension": 1024,
+  "realConfigBefore": "ABSENT",
+  "hostedApi": "SKIP: no operator fixture profile/credential supplied; loopback API protocol is tested separately",
+  "minsync": "No MinSync runtime path is used",
+  "health": {
+    "ready": true,
+    "model": "Qwen/Qwen3-Embedding-0.6B",
+    "dimension": 1024,
+    "revision": "af95f2c416ffe9379369ad64f9113e865db6112c/fastembed-0.9.1/v1",
+    "maxInputTokens": 2048,
+    "maxInputs": 32,
+    "device": "cpu",
+    "prefixOwner": "client",
+    "pooling": "last-token",
+    "normalization": "l2",
+    "tokenizerPath": "/tmp/autorag-fastembed-model",
+    "artifact": {
+      "model": "Qwen/Qwen3-Embedding-0.6B",
+      "repository": "Qdrant/Qwen3-Embedding-0.6B-onnx",
+      "revision": "af95f2c416ffe9379369ad64f9113e865db6112c",
+      "dimension": 1024,
+      "license": "Apache-2.0",
+      "files": {
+        "config.json": "da2b52e46d1469b9f6ff3a45e2bec36b2bb667de5ea9dd5a076e8bfe3b30cc05",
+        "tokenizer_config.json": "1c45aaa97b2bec1d2e1ab0df53e1b2ed2f9568b871b25ca56095c0b83a5d4e93",
+        "special_tokens_map.json": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd",
+        "tokenizer.json": "def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a",
+        "onnx/model.onnx": "754d6ba1c7a323d7b3af0d85b8268f8b716b0cd362ce73295e0f71d3dd831639",
+        "onnx/model.onnx_data": "15d02a315e3b95296700c73d72a436e79facf4e17d919345bed730e98433bcb4"
+      }
+    }
+  },
+  "query": {
+    "samples": 32,
+    "p50Ms": 256.627833999999,
+    "p95Ms": 359.2668829999966,
+    "failures": 0
+  },
+  "quality": {
+    "en->en": {
+      "questions": 16,
+      "recallAt5": 1,
+      "recallAt10": 1
+    },
+    "en->中文": {
+      "questions": 16,
+      "recallAt5": 1,
+      "recallAt10": 1
+    },
+    "zh->en": {
+      "questions": 16,
+      "recallAt5": 1,
+      "recallAt10": 1
+    },
+    "zh->中文": {
+      "questions": 16,
+      "recallAt5": 1,
+      "recallAt10": 1
+    }
+  },
+  "labels": [
+    {
+      "scenario": "en->en",
+      "query": "Who approves refund exceptions?",
+      "expected": "refund-en.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->中文",
+      "query": "Who approves refund exceptions?",
+      "expected": "refund-中文.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->en",
+      "query": "退款例外需要谁批准？",
+      "expected": "refund-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->中文",
+      "query": "退款例外需要谁批准？",
+      "expected": "refund-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->en",
+      "query": "What receipt is required for international travel reimbursement?",
+      "expected": "travel-en.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->中文",
+      "query": "What receipt is required for international travel reimbursement?",
+      "expected": "travel-中文.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->en",
+      "query": "国际差旅报销需要什么收据？",
+      "expected": "travel-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->中文",
+      "query": "国际差旅报销需要什么收据？",
+      "expected": "travel-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->en",
+      "query": "When must a lost access badge be reported?",
+      "expected": "security-en.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->中文",
+      "query": "When must a lost access badge be reported?",
+      "expected": "security-中文.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->en",
+      "query": "门禁卡丢失后多久内必须报告？",
+      "expected": "security-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->中文",
+      "query": "门禁卡丢失后多久内必须报告？",
+      "expected": "security-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->en",
+      "query": "When does the finance committee approve the annual budget?",
+      "expected": "budget-en.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->中文",
+      "query": "When does the finance committee approve the annual budget?",
+      "expected": "budget-中文.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->en",
+      "query": "财务委员会何时批准年度预算？",
+      "expected": "budget-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->中文",
+      "query": "财务委员会何时批准年度预算？",
+      "expected": "budget-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->en",
+      "query": "Which supplier contracts require legal review?",
+      "expected": "contract-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "en->中文",
+      "query": "Which supplier contracts require legal review?",
+      "expected": "contract-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "zh->en",
+      "query": "哪些供应商合同需要法律审查？",
+      "expected": "contract-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->中文",
+      "query": "哪些供应商合同需要法律审查？",
+      "expected": "contract-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->en",
+      "query": "How long are payroll records retained?",
+      "expected": "retention-en.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->中文",
+      "query": "How long are payroll records retained?",
+      "expected": "retention-中文.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->en",
+      "query": "员工工资记录必须保存多久？",
+      "expected": "retention-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->中文",
+      "query": "员工工资记录必须保存多久？",
+      "expected": "retention-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->en",
+      "query": "Where are nightly database backups stored?",
+      "expected": "backup-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "en->中文",
+      "query": "Where are nightly database backups stored?",
+      "expected": "backup-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "zh->en",
+      "query": "每晚的数据库备份存放在哪里？",
+      "expected": "backup-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->中文",
+      "query": "每晚的数据库备份存放在哪里？",
+      "expected": "backup-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->en",
+      "query": "What must research experiments record for reproducibility?",
+      "expected": "research-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "en->中文",
+      "query": "What must research experiments record for reproducibility?",
+      "expected": "research-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "zh->en",
+      "query": "研究实验为了复现需要记录什么？",
+      "expected": "research-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->中文",
+      "query": "研究实验为了复现需要记录什么？",
+      "expected": "research-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->en",
+      "query": "According to company policy, Who approves refund exceptions?",
+      "expected": "refund-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "en->中文",
+      "query": "According to company policy, Who approves refund exceptions?",
+      "expected": "refund-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "zh->en",
+      "query": "根据公司的规定，退款例外需要谁批准？",
+      "expected": "refund-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->中文",
+      "query": "根据公司的规定，退款例外需要谁批准？",
+      "expected": "refund-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->en",
+      "query": "According to company policy, What receipt is required for international travel reimbursement?",
+      "expected": "travel-en.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->中文",
+      "query": "According to company policy, What receipt is required for international travel reimbursement?",
+      "expected": "travel-中文.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->en",
+      "query": "根据公司的规定，国际差旅报销需要什么收据？",
+      "expected": "travel-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->中文",
+      "query": "根据公司的规定，国际差旅报销需要什么收据？",
+      "expected": "travel-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->en",
+      "query": "According to company policy, When must a lost access badge be reported?",
+      "expected": "security-en.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->中文",
+      "query": "According to company policy, When must a lost access badge be reported?",
+      "expected": "security-中文.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->en",
+      "query": "根据公司的规定，门禁卡丢失后多久内必须报告？",
+      "expected": "security-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->中文",
+      "query": "根据公司的规定，门禁卡丢失后多久内必须报告？",
+      "expected": "security-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->en",
+      "query": "According to company policy, When does the finance committee approve the annual budget?",
+      "expected": "budget-en.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->中文",
+      "query": "According to company policy, When does the finance committee approve the annual budget?",
+      "expected": "budget-中文.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->en",
+      "query": "根据公司的规定，财务委员会何时批准年度预算？",
+      "expected": "budget-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->中文",
+      "query": "根据公司的规定，财务委员会何时批准年度预算？",
+      "expected": "budget-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->en",
+      "query": "According to company policy, Which supplier contracts require legal review?",
+      "expected": "contract-en.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->中文",
+      "query": "According to company policy, Which supplier contracts require legal review?",
+      "expected": "contract-中文.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->en",
+      "query": "根据公司的规定，哪些供应商合同需要法律审查？",
+      "expected": "contract-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->中文",
+      "query": "根据公司的规定，哪些供应商合同需要法律审查？",
+      "expected": "contract-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->en",
+      "query": "According to company policy, How long are payroll records retained?",
+      "expected": "retention-en.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->中文",
+      "query": "According to company policy, How long are payroll records retained?",
+      "expected": "retention-中文.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->en",
+      "query": "根据公司的规定，员工工资记录必须保存多久？",
+      "expected": "retention-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->中文",
+      "query": "根据公司的规定，员工工资记录必须保存多久？",
+      "expected": "retention-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->en",
+      "query": "According to company policy, Where are nightly database backups stored?",
+      "expected": "backup-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "en->中文",
+      "query": "According to company policy, Where are nightly database backups stored?",
+      "expected": "backup-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "zh->en",
+      "query": "根据公司的规定，每晚的数据库备份存放在哪里？",
+      "expected": "backup-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->中文",
+      "query": "根据公司的规定，每晚的数据库备份存放在哪里？",
+      "expected": "backup-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "en->en",
+      "query": "According to company policy, What must research experiments record for reproducibility?",
+      "expected": "research-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "en->中文",
+      "query": "According to company policy, What must research experiments record for reproducibility?",
+      "expected": "research-中文.txt",
+      "rank": 1
+    },
+    {
+      "scenario": "zh->en",
+      "query": "根据公司的规定，研究实验为了复现需要记录什么？",
+      "expected": "research-en.txt",
+      "rank": 2
+    },
+    {
+      "scenario": "zh->中文",
+      "query": "根据公司的规定，研究实验为了复现需要记录什么？",
+      "expected": "research-中文.txt",
+      "rank": 1
+    }
+  ],
+  "jobs": [
+    {
+      "version": 1,
+      "jobId": "14f2a560-cc46-400a-8e17-553c972092d3",
+      "requestId": "b0ca501c-b981-498f-bf18-baa61c69f3a3",
+      "configurationFingerprint": "d31cd164e55c4c3bbad5f459ac920c9d96afbdb0f19f12626b375a9ae243d6b3",
+      "owner": "8a16005f-7661-4120-ad41-ba9c3bf4a4e5",
+      "pid": 129156,
+      "birth": "1b8da3b4-b018-414f-b4c6-f32b4f49b5bc:2015801",
+      "mode": "build",
+      "embeddingProfile": "local-qwen3",
+      "state": "succeeded",
+      "startedAt": "2026-10-31T06:58:22.912Z",
+      "updatedAt": "2026-10-31T06:58:59.326Z",
+      "phase": "done",
+      "event": {
+        "runId": "373c9a9b-4d48-4a6b-b40d-f7072e03bdff",
+        "elapsedMs": 36052.295888,
+        "phase": "done",
+        "state": "end"
+      },
+      "report": {
+        "runId": "373c9a9b-4d48-4a6b-b40d-f7072e03bdff",
+        "backend": "autorag",
+        "ok": true,
+        "durationMs": 36052.240915999995,
+        "timings": {
+          "prepare": 869.9816590000005,
+          "write": 130.75175799999442,
+          "parse": 1393.0939070000022,
+          "chunk": 321.06183799999917,
+          "lexical": 29.29004699999814,
+          "cache": 21.015784999999596,
+          "embed": 33990.042310000004,
+          "maintain": 62.91361799999868
+        },
+        "documents": 18,
+        "unchanged": 0,
+        "chunks": 26,
+        "embedded": 25,
+        "reused": 1,
+        "deleted": 0,
+        "failures": [],
+        "reportPath": "/tmp/autorag-fastembed-live-mCnWZ2/workspace/.autorag/local-index/runs/373c9a9b-4d48-4a6b-b40d-f7072e03bdff/report.json"
+      },
+      "partial": false
+    },
+    {
+      "version": 1,
+      "jobId": "c63076d6-5934-4cdb-abcc-c58c69549485",
+      "requestId": "93b98e49-3c5b-4b6c-a637-208e0b8f69d6",
+      "configurationFingerprint": "d31cd164e55c4c3bbad5f459ac920c9d96afbdb0f19f12626b375a9ae243d6b3",
+      "owner": "8a16005f-7661-4120-ad41-ba9c3bf4a4e5",
+      "pid": 129156,
+      "birth": "1b8da3b4-b018-414f-b4c6-f32b4f49b5bc:2015801",
+      "mode": "refresh",
+      "embeddingProfile": "local-qwen3",
+      "state": "succeeded",
+      "startedAt": "2026-10-31T06:58:59.369Z",
+      "updatedAt": "2026-10-31T06:58:59.416Z",
+      "phase": "done",
+      "event": {
+        "runId": "f5dfae85-233f-40e6-a9d3-44e9e7cdd349",
+        "elapsedMs": 13.510483999998542,
+        "phase": "done",
+        "state": "end"
+      },
+      "report": {
+        "runId": "f5dfae85-233f-40e6-a9d3-44e9e7cdd349",
+        "backend": "autorag",
+        "ok": true,
+        "durationMs": 13.500108000000182,
+        "timings": {
+          "prepare": 1.3841709999978775,
+          "write": 0.34050500000012107,
+          "parse": 0
+        },
+        "documents": 18,
+        "unchanged": 18,
+        "chunks": 0,
+        "embedded": 0,
+        "reused": 0,
+        "deleted": 0,
+        "failures": [],
+        "reportPath": "/tmp/autorag-fastembed-live-mCnWZ2/workspace/.autorag/local-index/runs/f5dfae85-233f-40e6-a9d3-44e9e7cdd349/report.json"
+      },
+      "partial": false
+    },
+    {
+      "version": 1,
+      "jobId": "0277c84b-eb5d-482c-8b04-f992990496d6",
+      "requestId": "a3b82b19-bc06-4dd9-87fc-fb3ce0b5cf9f",
+      "configurationFingerprint": "3494cd48a66112ad267b9203d6a91ad867db2f234a0d2cf60420b50251fd7b72",
+      "owner": "8a16005f-7661-4120-ad41-ba9c3bf4a4e5",
+      "pid": 129156,
+      "birth": "1b8da3b4-b018-414f-b4c6-f32b4f49b5bc:2015801",
+      "mode": "build",
+      "embeddingProfile": "api-protocol-fixture",
+      "state": "succeeded",
+      "startedAt": "2026-10-31T06:59:08.348Z",
+      "updatedAt": "2026-10-31T06:59:42.556Z",
+      "phase": "done",
+      "event": {
+        "runId": "443c2965-d280-49db-a2ff-5263fd4b4e9b",
+        "elapsedMs": 33906.42361400001,
+        "phase": "done",
+        "state": "end"
+      },
+      "report": {
+        "runId": "443c2965-d280-49db-a2ff-5263fd4b4e9b",
+        "backend": "autorag",
+        "ok": true,
+        "durationMs": 33906.383201,
+        "timings": {
+          "prepare": 572.9337310000046,
+          "write": 100.39974799999618,
+          "parse": 0,
+          "chunk": 249.3222869999954,
+          "lexical": 11.468080999999074,
+          "cache": 8.476910000004864,
+          "embed": 32868.924781999995,
+          "maintain": 54.07086100000015
+        },
+        "documents": 18,
+        "unchanged": 0,
+        "chunks": 26,
+        "embedded": 25,
+        "reused": 1,
+        "deleted": 0,
+        "failures": [],
+        "reportPath": "/tmp/autorag-fastembed-live-mCnWZ2/workspace/.autorag/local-index/runs/443c2965-d280-49db-a2ff-5263fd4b4e9b/report.json"
+      },
+      "partial": false
+    },
+    {
+      "version": 1,
+      "jobId": "f11b435f-0987-4ba9-a203-cd72ef9ed996",
+      "requestId": "50bb4ed3-aa5d-4db8-a1b9-bea96cd713c2",
+      "configurationFingerprint": "3494cd48a66112ad267b9203d6a91ad867db2f234a0d2cf60420b50251fd7b72",
+      "owner": "8a16005f-7661-4120-ad41-ba9c3bf4a4e5",
+      "pid": 129156,
+      "birth": "1b8da3b4-b018-414f-b4c6-f32b4f49b5bc:2015801",
+      "mode": "build",
+      "embeddingProfile": "failed-candidate",
+      "state": "failed",
+      "startedAt": "2026-10-31T06:59:42.816Z",
+      "updatedAt": "2026-10-31T06:59:43.464Z",
+      "phase": "done",
+      "event": {
+        "runId": "d8120cb9-e937-4e7a-88ea-28617204e5ed",
+        "elapsedMs": 627.7843980000034,
+        "phase": "done",
+        "state": "error",
+        "detail": "fetch failed\nfetch failed\nfetch failed\nfetch failed"
+      },
+      "error": "fetch failed",
+      "partial": true
+    },
+    {
+      "version": 1,
+      "jobId": "de1d251b-b8b8-477d-a4a6-77c9c1ecc42b",
+      "requestId": "c21b91b2-86a5-4022-92bc-71b239c674f3",
+      "configurationFingerprint": "d31cd164e55c4c3bbad5f459ac920c9d96afbdb0f19f12626b375a9ae243d6b3",
+      "owner": "8a16005f-7661-4120-ad41-ba9c3bf4a4e5",
+      "pid": 129156,
+      "birth": "1b8da3b4-b018-414f-b4c6-f32b4f49b5bc:2015801",
+      "mode": "build",
+      "embeddingProfile": "local-qwen3",
+      "state": "cancelled",
+      "startedAt": "2026-10-31T06:59:43.700Z",
+      "updatedAt": "2026-10-31T06:59:43.704Z",
+      "error": "Index task cancelled by user",
+      "partial": true
+    },
+    {
+      "version": 1,
+      "jobId": "5474af16-a6d5-477d-b92c-dbd96f0e11bd",
+      "requestId": "50353dac-09d3-4e92-b057-5c02e8c95b6a",
+      "configurationFingerprint": "d31cd164e55c4c3bbad5f459ac920c9d96afbdb0f19f12626b375a9ae243d6b3",
+      "owner": "8a16005f-7661-4120-ad41-ba9c3bf4a4e5",
+      "pid": 129156,
+      "birth": "1b8da3b4-b018-414f-b4c6-f32b4f49b5bc:2015801",
+      "mode": "build",
+      "embeddingProfile": "local-qwen3",
+      "state": "succeeded",
+      "startedAt": "2026-10-31T06:59:43.759Z",
+      "updatedAt": "2026-10-31T07:00:22.351Z",
+      "phase": "done",
+      "event": {
+        "runId": "05524795-6a76-45c8-8ec9-aceccd215038",
+        "elapsedMs": 37428.747711,
+        "phase": "done",
+        "state": "end"
+      },
+      "report": {
+        "runId": "05524795-6a76-45c8-8ec9-aceccd215038",
+        "backend": "autorag",
+        "ok": true,
+        "durationMs": 37428.709053,
+        "timings": {
+          "prepare": 511.9765869999974,
+          "write": 100.79203199998301,
+          "parse": 0,
+          "chunk": 235.01699800003553,
+          "lexical": 9.320074000017485,
+          "cache": 9.107732000004034,
+          "embed": 36454.22950600002,
+          "maintain": 70.59068300000217
+        },
+        "documents": 18,
+        "unchanged": 0,
+        "chunks": 26,
+        "embedded": 25,
+        "reused": 1,
+        "deleted": 0,
+        "failures": [],
+        "reportPath": "/tmp/autorag-fastembed-live-mCnWZ2/workspace/.autorag/local-index/runs/05524795-6a76-45c8-8ec9-aceccd215038/report.json"
+      },
+      "partial": false
+    },
+    {
+      "version": 1,
+      "jobId": "4b2694bc-1257-4560-89fe-43f608aa9388",
+      "requestId": "e1b1ef98-188e-4c98-8f22-d7c465ac76c0",
+      "configurationFingerprint": "d31cd164e55c4c3bbad5f459ac920c9d96afbdb0f19f12626b375a9ae243d6b3",
+      "owner": "66a1d1ef-6ee8-42f1-b6c9-452b9db124b8",
+      "pid": 129156,
+      "birth": "1b8da3b4-b018-414f-b4c6-f32b4f49b5bc:2015801",
+      "mode": "refresh",
+      "embeddingProfile": "local-qwen3",
+      "state": "succeeded",
+      "startedAt": "2026-10-31T07:00:23.353Z",
+      "updatedAt": "2026-10-31T07:00:23.695Z",
+      "phase": "done",
+      "event": {
+        "runId": "8e6fd7ad-3df6-4420-a098-e3fe1cf7e0c0",
+        "elapsedMs": 310.16598499999964,
+        "phase": "done",
+        "state": "end"
+      },
+      "report": {
+        "runId": "8e6fd7ad-3df6-4420-a098-e3fe1cf7e0c0",
+        "backend": "autorag",
+        "ok": true,
+        "durationMs": 310.150919000007,
+        "timings": {
+          "prepare": 3.4806489999900805,
+          "write": 35.47296700000879,
+          "parse": 2.546329999997397,
+          "chunk": 3.4942270000028657,
+          "lexical": 0.6457760000048438,
+          "cache": 2.9659100000135368,
+          "embed": 211.16721099999268,
+          "maintain": 35.550084000002244
+        },
+        "documents": 18,
+        "unchanged": 17,
+        "chunks": 1,
+        "embedded": 1,
+        "reused": 0,
+        "deleted": 0,
+        "failures": [],
+        "reportPath": "/tmp/autorag-fastembed-live-mCnWZ2/workspace/.autorag/local-index/runs/8e6fd7ad-3df6-4420-a098-e3fe1cf7e0c0/report.json"
+      },
+      "partial": false
+    },
+    {
+      "version": 1,
+      "jobId": "3c767679-071d-4a32-876c-49481274f0d4",
+      "requestId": "21aa872e-9a46-4019-a728-c9f356b9ea00",
+      "configurationFingerprint": "d31cd164e55c4c3bbad5f459ac920c9d96afbdb0f19f12626b375a9ae243d6b3",
+      "owner": "66a1d1ef-6ee8-42f1-b6c9-452b9db124b8",
+      "pid": 129156,
+      "birth": "1b8da3b4-b018-414f-b4c6-f32b4f49b5bc:2015801",
+      "mode": "refresh",
+      "embeddingProfile": "local-qwen3",
+      "state": "succeeded",
+      "startedAt": "2026-10-31T07:00:23.713Z",
+      "updatedAt": "2026-10-31T07:00:23.809Z",
+      "phase": "done",
+      "event": {
+        "runId": "097ebdbd-4d45-4269-b1a7-1952343681d8",
+        "elapsedMs": 68.9282200000016,
+        "phase": "done",
+        "state": "end"
+      },
+      "report": {
+        "runId": "097ebdbd-4d45-4269-b1a7-1952343681d8",
+        "backend": "autorag",
+        "ok": true,
+        "durationMs": 68.90700799999468,
+        "timings": {
+          "prepare": 1.195504000002984,
+          "write": 16.67489400001068,
+          "parse": 0,
+          "maintain": 38.20584300000337
+        },
+        "documents": 17,
+        "unchanged": 17,
+        "chunks": 0,
+        "embedded": 0,
+        "reused": 0,
+        "deleted": 1,
+        "failures": [],
+        "reportPath": "/tmp/autorag-fastembed-live-mCnWZ2/workspace/.autorag/local-index/runs/097ebdbd-4d45-4269-b1a7-1952343681d8/report.json"
+      },
+      "partial": false
+    }
+  ],
+  "nodeMaxRssKiB": 854624,
+  "result": "PASS",
+  "realConfigAfter": "ABSENT",
+  "cleanup": "Removed only this run's synthetic fixture/home/workspace; external embedding service retained"
+}

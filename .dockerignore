@@ -1,0 +1,9 @@
+**
+!src
+!src/embedding
+!src/embedding/embedding-requirements.lock
+!scripts
+!scripts/ci
+!scripts/ci/qa.Dockerfile
+!myself_dev
+!myself_dev/Dockerfile

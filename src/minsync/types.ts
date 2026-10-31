@@ -2,20 +2,9 @@
 
 import type { MinSyncLexicalLanguage } from "./lexical-language.ts";
 
-export interface MinSyncEmbedderConfig {
-	readonly id?: string;
-	readonly baseUrl?: string;
-	/** Environment variable name whose value holds the embedder API key. /^[A-Za-z_][A-Za-z0-9_]*$/ */
-	readonly apiKeyEnv?: string;
-	/** Positive integer embedding dimension. */
-	readonly dimension?: number;
-	readonly queryPrefix?: string;
-	readonly passagePrefix?: string;
-	readonly timeoutMs?: number;
-	readonly batchSize?: number;
-	readonly maxRetries?: number;
-	readonly maxConcurrent?: number;
-}
+export type { LegacyEmbedderConfig as MinSyncEmbedderConfig } from "../embedding/legacy.ts";
+
+import type { LegacyEmbedderConfig as MinSyncEmbedderConfig } from "../embedding/legacy.ts";
 
 /** MinSync chunker settings exposed by AutoRAG's public configuration. */
 export interface MinSyncChunkerConfig {

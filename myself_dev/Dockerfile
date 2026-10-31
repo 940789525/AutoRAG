@@ -16,7 +16,7 @@ RUN apt-get update \
 
 ARG TARGETARCH
 
-# MinSync's Korean BM25 tokenizer loads the Kiwi native library and base model at run time, and AutoRAG selects it
+# AutoRAG's optional Korean BM25 tokenizer loads the Kiwi native library and base model at run time, and AutoRAG selects it
 # only when both exist. They are pinned and verified here so the live E2E exercises Korean tokenization for real
 # instead of reporting a whitespace fallback. curl is installed only for this step.
 RUN set -eu; \
@@ -41,26 +41,14 @@ RUN set -eu; \
 ENV KIWI_LIBRARY_PATH=/opt/kiwi/lib/libkiwi.so \
 	KIWI_MODEL_PATH=/opt/kiwi/models/cong/base
 
-# The live E2E starts `minsync serve` and every index runs through the `minsync` CLI, so the image must carry it on
-# PATH; nothing in the run installs it. The release ships a Linux build for x86_64 only, so this image is amd64
-# (the default QA_PLATFORM) and any other architecture fails here instead of at run time. Keep the version in step
-# with MINSYNC_VERSION in src/minsync/installer.ts; the sha256 is the release asset digest.
-ARG MINSYNC_VERSION=0.4.11
-ARG MINSYNC_SHA256=66229f0a5999715f7c30ffed51b346465e761cc041ec580f44b1f6557494b4b1
-RUN set -eu; \
-	if [ "${TARGETARCH:-amd64}" != "amd64" ]; then \
-		echo "MinSync ${MINSYNC_VERSION} publishes no Linux ${TARGETARCH} build; build this image with QA_PLATFORM=linux/amd64" >&2; \
-		exit 1; \
-	fi; \
-	apt-get update; \
-	apt-get install --no-install-recommends --yes curl; \
-	mkdir -p /tmp/minsync; \
-	curl --retry 5 --retry-all-errors --connect-timeout 20 --max-time 300 -fsSL -o /tmp/minsync/minsync.tar.gz "https://github.com/NomaDamas/MinSync/releases/download/v${MINSYNC_VERSION}/minsync-v${MINSYNC_VERSION}-x86_64-unknown-linux-gnu.tar.gz"; \
-	echo "${MINSYNC_SHA256}  /tmp/minsync/minsync.tar.gz" | sha256sum -c -; \
-	tar -xzf /tmp/minsync/minsync.tar.gz -C /usr/local/bin minsync; \
-	chmod 0755 /usr/local/bin/minsync; \
-	apt-get purge --yes --auto-remove curl; \
-	rm -rf /tmp/minsync /var/lib/apt/lists/*
+# CPU embedding runtime; models are prepared explicitly into an isolated persistent cache.
+RUN apt-get update \
+    && apt-get install --no-install-recommends --yes python3 python3-venv \
+    && python3 -m venv /opt/autorag-embedding \
+    && rm -rf /var/lib/apt/lists/*
+COPY src/embedding/embedding-requirements.lock /opt/autorag-embedding/requirements.lock
+RUN /opt/autorag-embedding/bin/pip install --no-cache-dir --require-hashes -r /opt/autorag-embedding/requirements.lock
+ENV AUTORAG_FASTEMBED_PYTHON=/opt/autorag-embedding/bin/python
 
 COPY --from=node /usr/local/bin/node /usr/local/bin/node
 COPY --from=bun /usr/local/bin/bun /usr/local/bin/bun
@@ -70,4 +58,4 @@ RUN mkdir -p /dev-home/.cache /data/workspace /workspace/node_modules /workspace
 USER 1000:1000
 WORKDIR /workspace
 
-CMD ["minsync", "serve", "--idle-timeout", "0"]
+CMD ["bash"]

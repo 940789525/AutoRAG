@@ -281,11 +281,17 @@ export class CrawlerSidecar {
 
 	/** Best `pool` stored vectors for `query`, reusing the previous ranking when it already covers `pool`. */
 	private async rankSemantic(query: string, pool: number): Promise<ScoredKey[]> {
+		const embedder = this.options.embedder?.snapshot?.() ?? this.options.embedder;
+		if (!embedder) return [];
+		const identity = await embedder.identity();
+		const storedIdentity = this.db.prepare("select v from sidecar_meta where k = ?").get(IDENTITY_KEY) as
+			| Row
+			| undefined;
+		if (storedIdentity?.v !== JSON.stringify(identity))
+			throw new Error("Sidecar embedding identity changed; refresh this datasource before semantic search");
 		const now = Date.now();
 		let cached = this.lastSemantic;
 		if (cached === undefined || cached.query !== query || now - cached.at > SEMANTIC_REUSE_MS) {
-			const embedder = this.options.embedder;
-			if (embedder === undefined) return [];
 			cached = {
 				query,
 				at: now,
@@ -339,7 +345,7 @@ export class CrawlerSidecar {
 	 * Database errors (for example a lock held past the busy timeout) throw.
 	 */
 	async sync(): Promise<SidecarSyncResult> {
-		const { embedder } = this.options;
+		const embedder = this.options.embedder?.snapshot?.() ?? this.options.embedder;
 		if (embedder === undefined) return { ok: false, message: "no embedder configured" };
 		if (!this.attachCrawler()) return { ok: false, message: "crawler archive not available yet" };
 		let identity: EmbeddingIdentity;

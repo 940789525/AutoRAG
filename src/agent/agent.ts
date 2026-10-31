@@ -22,7 +22,10 @@ import { DupeyCliError, type DupeyCliOptions, scanWithDupey, selectExactDuplicat
 import {
 	createEmbedderFromConfig,
 	type Embedder,
+	type EmbeddingConfig,
+	embeddingFingerprint,
 	type ManagedEmbedder,
+	ProfileEmbedder,
 	remoteEmbedderFromMinSync,
 } from "../embedding/index.ts";
 import {
@@ -39,6 +42,9 @@ import {
 	type FSearchSearchResult,
 } from "../fsearch/index.ts";
 import { DocumentChannel } from "../indexing/channel.ts";
+import { contentHash } from "../indexing/chunker.ts";
+import { type IndexJobRequest, IndexJobs } from "../indexing/jobs.ts";
+import { acquireIndexLease } from "../indexing/lease.ts";
 import { LocalIndexMethod } from "../indexing/method.ts";
 import type { IndexDocument, IndexEvent, IndexReport, LocalIndexOptions } from "../indexing/types.ts";
 import { jikjiFindDiagnostic, jikjiPrepareDiagnostic } from "../jikji/diagnostics.ts";
@@ -66,7 +72,6 @@ import { loadMemoryContext, type MemoryContext, type MemoryContextOptions } from
 import { EVIDENCE_SUPPORT_THRESHOLD, type JudgedEvidenceRecord } from "../memory/judged-evidence.ts";
 import { RetrievalMemory } from "../memory/memory.ts";
 import { memoryVectorStorePath } from "../memory/similar-queries.ts";
-import { resolveMinSyncBinary } from "../minsync/binary.ts";
 import { MinSyncRequiredError } from "../minsync/errors.ts";
 import type {
 	MinSyncDiagnostic,
@@ -146,6 +151,13 @@ import { EvidenceLedger } from "./evidence-ledger.ts";
 import { EvidenceOriginIndex } from "./evidence-origins.ts";
 import { createEvidencePersistence } from "./evidence-persistence.ts";
 import { createFSearchSearchTool, FSEARCH_SEARCH_TOOL_NAME } from "./fsearch-search-tool.ts";
+import {
+	createIndexControls,
+	createIndexTool,
+	INDEX_TOOL_NAME,
+	indexWriteOperations,
+	isIndexOperationInput,
+} from "./index-controls.ts";
 import { intentOfMessage } from "./intent-tracing.ts";
 import {
 	createJevExtension,
@@ -587,6 +599,7 @@ export interface AutoRAGThinkingOptions {
 }
 
 export interface AutoRAGAgentOptions {
+	embedding?: EmbeddingConfig;
 	contextSelection?: ContextSelectionConfig;
 	/** One complete answer by default; `progressive` explicitly opts into the legacy fast-answer/verification flow. */
 	answerMode?: "single" | "progressive";
@@ -664,7 +677,7 @@ export interface AutoRAGAgentOptions {
 	jev?: JevToolOptions | false;
 	/**
 	 * The embedder shared by memory and the datasources. Omitted, it is built from `minSync.embedder`: a
-	 * configured remote endpoint, else MinSync's `minsync serve` daemon, else MinSync's in-process engine.
+	 * local FastEmbed service or an explicitly authorized API profile.
 	 * `refresh` brings it up (starting the daemon when none runs); a search only reads from it.
 	 */
 	embedder?: ManagedEmbedder;
@@ -929,9 +942,12 @@ export class AutoRAGAgent {
 	private readonly reranker: Reranker | undefined;
 	private readonly rerankTopN: number | undefined;
 
-	private readonly minSyncMethod: LocalIndexMethod;
+	private minSyncMethod: LocalIndexMethod;
+	private readonly localIndexOptions: LocalIndexOptions;
+	private readonly localIndexRevision?: string;
+	readonly indexJobs: IndexJobs;
+	private nativeIndexIntent: ReadonlySet<"build" | "refresh" | "cancel"> = new Set();
 	private readonly minSyncEmbedderConfig: MinSyncEmbedderConfig | undefined;
-	private readonly minSyncBinaryPath: string | undefined;
 	private readonly jikjiClient: JikjiClient | undefined;
 	private readonly everythingClient: EverythingClient | undefined;
 	private readonly fsearchClient: FSearchClient | undefined;
@@ -1048,39 +1064,50 @@ export class AutoRAGAgent {
 		// Retain the saved MinSync configuration key for the built-in index and its embedding settings.
 		if ((options.minSync as unknown) === false) {
 			throw new MinSyncRequiredError(
-				"MinSync is required and cannot be disabled; remove `minSync: false`. Local indexing is built into AutoRAG; MinSync supplies the default embeddings.",
+				"The local index cannot be disabled using the legacy minSync key; remove minSync:false. Embeddings use FastEmbed or an explicitly authorized API.",
 			);
 		}
-		this.embedder = options.embedder ?? createEmbedderFromConfig({ embedder: options.minSync?.embedder });
+		this.embedder =
+			options.embedder ??
+			createEmbedderFromConfig({
+				embedding: options.embedding,
+				embedder: options.minSync?.embedder,
+				workspaceRoot: this.workspaceProjectRoot,
+			});
 		const configuredEmbedder = options.minSync?.embedder;
-		const native =
-			configuredEmbedder?.baseUrl === undefined &&
-			(configuredEmbedder?.id === undefined || configuredEmbedder.id.startsWith("native:"));
 		const minSyncDefaults: LocalIndexOptions & {
 			defaultTopK: number;
 			canReadSource: (source: string, sourceId: string) => boolean;
 		} = {
 			...options.localIndex,
 			root: this.workspaceProjectRoot,
-			embedder: this.embedder,
+			embedder:
+				this.embedder instanceof ProfileEmbedder
+					? this.embedder.forProfile(this.embedder.profileId)
+					: this.embedder,
 			identity:
 				options.localIndex?.identity ??
-				(native && options.embedder === undefined
-					? {
-							provider: "minsync",
-							model: configuredEmbedder?.id?.slice("native:".length) ?? "Qwen/Qwen3-Embedding-0.6B",
-							dimension: configuredEmbedder?.dimension ?? 1024,
-						}
-					: undefined),
+				(this.embedder instanceof ProfileEmbedder ? this.profileIdentity(this.embedder.profileId) : undefined),
 			embeddingFingerprint: JSON.stringify({
-				id: configuredEmbedder?.id,
-				baseUrl: configuredEmbedder?.baseUrl,
-				passagePrefix: configuredEmbedder?.passagePrefix,
+				semantic:
+					this.embedder instanceof ProfileEmbedder
+						? embeddingFingerprint(this.embedder.profile())
+						: configuredEmbedder?.id,
+				roots: this.retrievalScopeBindings.map((binding) => binding.virtualPrefix).sort(),
 				revision: options.localIndex?.embeddingFingerprint,
 			}),
+			embeddingProfile: this.embedder instanceof ProfileEmbedder ? this.embedder.profileId : undefined,
+			semanticFingerprint:
+				this.embedder instanceof ProfileEmbedder ? embeddingFingerprint(this.embedder.profile()) : undefined,
+			tokenizerPath:
+				options.localIndex?.tokenizerPath ??
+				(this.embedder instanceof ProfileEmbedder ? this.embedder.profile().manifest?.tokenizerPath : undefined),
 			defaultTopK: this.limits.minSyncTopK,
 			canReadSource: (source, sourceId) => this.canReadLocalEvidence(source, sourceId),
 		};
+		this.localIndexOptions = minSyncDefaults;
+		this.localIndexRevision = options.localIndex?.embeddingFingerprint;
+		this.indexJobs = new IndexJobs(this.workspaceProjectRoot);
 		this.minSyncMethod = new LocalIndexMethod(minSyncDefaults);
 		this.methodRegistry.register(this.minSyncMethod);
 		this.methodRegistry.register(
@@ -1125,8 +1152,10 @@ export class AutoRAGAgent {
 		this.memory.load();
 		this.memoryVectorPath = memoryVectorStorePath(memPath);
 		this.minSyncEmbedderConfig = options.minSync?.embedder;
-		this.minSyncBinaryPath = options.minSync?.binaryPath;
-		this.memoryEmbedder = options.memoryEmbedder === false ? undefined : (options.memoryEmbedder ?? this.embedder);
+		this.memoryEmbedder =
+			options.memoryEmbedder === false
+				? undefined
+				: (options.memoryEmbedder ?? this.embedder.forConsumer?.("memory") ?? this.embedder);
 		this.runLogger = new AutoRAGRunLogger(join(dirname(memPath), "logs", "runs.jsonl"));
 		this.contextSelection = new ContextSelectionProjector(options.contextSelection, (report) => {
 			this.runLogger.write({
@@ -1221,6 +1250,7 @@ export class AutoRAGAgent {
 		// Reserved AutoRAG tool names the agent always owns. Caller tools with
 		// these names are dropped (reserved wins), never rejected.
 		const reservedNames = new Set<string>([
+			INDEX_TOOL_NAME,
 			...PI_BUILTIN_TOOL_NAMES,
 			"check_memory",
 			...singleDatasourceTools.map((tool) => tool.name),
@@ -1252,6 +1282,7 @@ export class AutoRAGAgent {
 		// pi owns the built-in tools; AutoRAG contributes caller and domain tools.
 		const orderedTools: AgentTool[] = [
 			...callerTools,
+			createIndexTool(this.indexOperations()),
 			checkMemoryTool,
 			searchMinSyncTool,
 			searchAllTool,
@@ -1797,6 +1828,12 @@ export class AutoRAGAgent {
 			onKey: (key) => this.handleInteractiveKey(key),
 			extensionFactories: [
 				this.permissionGate,
+				createIndexControls(this.indexOperations()),
+				(pi) => {
+					pi.on("agent_end", () => {
+						this.nativeIndexIntent = new Set();
+					});
+				},
 				...(options.extensionFactories ?? []),
 				createUserRequestPersistence(this.userRequests),
 				createEvidencePersistence(this.evidenceLedger, this.citationNumbers, this.conversationQueries),
@@ -1804,13 +1841,11 @@ export class AutoRAGAgent {
 				createSearchProgressExtension(this.searchProgress, () => keyText("app.interrupt")),
 				createEmbeddingControls({
 					embedder: this.embedder,
-					remote: remoteEmbedderFromMinSync(this.minSyncEmbedderConfig) !== undefined,
-					resolveBinary: () =>
-						resolveMinSyncBinary({
-							root: this.workspaceProjectRoot,
-							...(this.minSyncBinaryPath === undefined ? {} : { binaryPath: this.minSyncBinaryPath }),
-							autoInstall: false,
-						}),
+					remote: () =>
+						this.embedder instanceof ProfileEmbedder
+							? this.embedder.profile().kind === "api"
+							: remoteEmbedderFromMinSync(this.minSyncEmbedderConfig) !== undefined,
+					isIndexing: () => ["queued", "running", "cancelling"].includes(this.indexJobs.status()?.state ?? ""),
 				}),
 				...(this.jevExtension !== undefined ? [this.jevExtension] : []),
 				...(telegramBridge !== undefined ? [telegramBridge] : []),
@@ -1830,6 +1865,8 @@ export class AutoRAGAgent {
 		return {
 			...runtime,
 			dispose: async () => {
+				await this.indexJobs.close();
+				await this.embedder.close();
 				if (this.boundPiRuntime === runtime.runtime) {
 					this.boundPiRuntime = undefined;
 					// A disposed session must not receive later numbers.
@@ -1971,6 +2008,28 @@ export class AutoRAGAgent {
 	 */
 	private routeInteractiveInput(input: AutoRAGInteractiveInput, pi: ExtensionAPI): AutoRAGInputDisposition {
 		const state = this.interactive;
+		if (state.run === undefined && isIndexOperationInput(input.text)) {
+			if (!this.boundPiRuntime?.session.model) {
+				pi.sendMessage(
+					{
+						customType: "autorag.index",
+						content: [
+							{
+								type: "text",
+								text: "Natural-language indexing needs a conversation model. Use /index build --embedding local-qwen3, /index refresh, /index status or /index cancel.",
+							},
+						],
+						display: true,
+					},
+					{ triggerTurn: false },
+				);
+				return { kind: "handled" };
+			}
+			this.nativeIndexIntent = indexWriteOperations(input.text);
+			this.userRequests.record(input.text);
+			return { kind: "native" };
+		}
+		this.nativeIndexIntent = new Set();
 		const followUp = input.streamingBehavior === "followUp" || state.nextSubmitIsFollowUp;
 		state.nextSubmitIsFollowUp = false;
 		if (state.run === undefined) {
@@ -2179,7 +2238,7 @@ export class AutoRAGAgent {
 			throw new Error("AutoRAG agent is busy; await the in-flight searchDocuments() call before starting another");
 		}
 
-		// Local indexing uses library calls; only embedding may use a MinSync daemon/addon.
+		// Local indexing uses library calls; embedding uses the configured local FastEmbed service or authorized API.
 
 		const sessionId = randomUUID();
 		const trimmedQuery = query.trim();
@@ -3432,7 +3491,143 @@ export class AutoRAGAgent {
 		);
 	}
 
+	private profileIdentity(id: string) {
+		if (!(this.embedder instanceof ProfileEmbedder)) return undefined;
+		const p = this.embedder.profile(id);
+		return {
+			provider: p.kind === "local-http" ? "fastembed" : "api",
+			model: p.model,
+			dimension: p.dimension,
+			fingerprint: embeddingFingerprint(p),
+		};
+	}
+
+	private indexOperations() {
+		return {
+			jobs: this.indexJobs,
+			activeIndex: () => ({
+				embeddingProfile: this.embedder instanceof ProfileEmbedder ? this.embedder.profileId : "injected",
+				ready: this.minSyncMethod.index.isReady(),
+			}),
+			start: (request: IndexJobRequest) => this.startIndexJob(request),
+			profiles: () =>
+				this.embedder instanceof ProfileEmbedder
+					? Object.entries(this.embedder.config.profiles).map(([id, p]) => ({ id, kind: p.kind, model: p.model }))
+					: [],
+			canWriteFromModel: (operation: "build" | "refresh" | "cancel") => this.nativeIndexIntent.has(operation),
+		};
+	}
+
+	startIndexJob(request: IndexJobRequest) {
+		if (request.mode !== "build" && request.mode !== "refresh")
+			throw new Error("Index mode must be build or refresh");
+		if (request.scopeIds !== undefined) {
+			const known = this.searchPaths.map((p) => `local-${contentHash(p).slice(0, 12)}`).sort();
+			if (JSON.stringify([...new Set(request.scopeIds)].sort()) !== JSON.stringify(known))
+				throw new Error("Index tasks require all configured local root ids; omit scopeIds to select them all");
+		}
+		const manager = this.embedder instanceof ProfileEmbedder ? this.embedder : undefined;
+		const id =
+			request.embeddingProfile ??
+			(request.mode === "build" ? manager?.config.defaultProfile : manager?.profileId) ??
+			"injected";
+		if (request.mode === "refresh" && id !== (manager?.profileId ?? "injected"))
+			throw new Error("Switching embedding profiles requires build, not refresh");
+		const profile = manager?.profile(id);
+		const target = manager?.forProfile(id) ?? this.embedder;
+		if (profile?.kind === "api" && (!profile.allowRemote || !profile.allowedConsumers?.includes("local-documents")))
+			throw new Error("API embedding is not authorized for local-documents in trusted configuration");
+		return this.indexJobs.start(
+			{
+				...request,
+				embeddingProfile: id,
+				configurationFingerprint: contentHash(
+					JSON.stringify([
+						profile ? embeddingFingerprint(profile) : "injected",
+						this.searchPaths,
+						this.localIndexRevision,
+					]),
+				),
+			},
+			async (signal, onIndexEvent) => {
+				const release = acquireIndexLease(join(this.workspaceProjectRoot, ".autorag", "refresh-writer"));
+				try {
+					onIndexEvent({
+						runId: "prepare",
+						phase: "prepare",
+						state: "start",
+						elapsedMs: 0,
+						detail: `Preparing ${profile?.kind ?? "injected"} ${profile?.model ?? id}; first local start may prepare pinned ONNX model files`,
+					});
+					await target.start?.(signal, (detail) =>
+						onIndexEvent({ runId: "prepare", phase: "prepare", state: "start", elapsedMs: 0, detail }),
+					);
+					if (request.mode === "refresh" && this.minSyncMethod.index.readinessError())
+						throw new Error("Active index is not ready; run /index build before refresh");
+					const candidate =
+						request.mode === "build"
+							? new LocalIndexMethod({
+									...this.localIndexOptions,
+									embedder: target,
+									identity: this.profileIdentity(id),
+									embeddingProfile: id,
+									generation: randomUUID(),
+									semanticFingerprint: profile ? embeddingFingerprint(profile) : undefined,
+									tokenizerPath: profile?.manifest?.tokenizerPath ?? this.localIndexOptions.tokenizerPath,
+									embeddingFingerprint: JSON.stringify({
+										semantic: profile ? embeddingFingerprint(profile) : undefined,
+										roots: this.retrievalScopeBindings.map((binding) => binding.virtualPrefix).sort(),
+										revision: this.localIndexRevision,
+									}),
+									canReadSource: (source, sourceId) => this.canReadLocalEvidence(source, sourceId),
+								})
+							: undefined;
+					const result = await this.refreshUnlocked(
+						false,
+						{ methods: ["parsed", "minsync"], signal, onIndexEvent },
+						candidate,
+					);
+					const report = result.minsync?.report;
+					if (!report) throw new Error("Index run did not produce a report");
+					if (!report.ok) return report;
+					if (candidate) {
+						const errors = result.diagnostics.filter((d) => d.severity === "error");
+						if (errors.length) throw new Error(errors.map((d) => d.message).join("\n"));
+						await candidate.index.activateCandidate(signal);
+						manager?.activate(id);
+						this.minSyncMethod = candidate;
+						this.methodRegistry.replace(candidate);
+						const hybrid = new LocalIndexMethod({
+							...this.localIndexOptions,
+							index: candidate.index,
+							mode: "hybrid",
+						});
+						this.methodRegistry.replace(hybrid);
+						this.retrievalEngine?.getMethodRegistry().replace(this.remoteFilteredRetrievalMethod(candidate));
+						this.retrievalEngine?.getMethodRegistry().replace(this.remoteFilteredRetrievalMethod(hybrid));
+					}
+					return report;
+				} finally {
+					release();
+				}
+			},
+		);
+	}
+
 	async refresh(force = false, opts?: AutoRAGRefreshOptions): Promise<AutoRAGRefreshResult> {
+		const release = acquireIndexLease(join(this.workspaceProjectRoot, ".autorag", "refresh-writer"));
+		try {
+			return await this.refreshUnlocked(force, opts);
+		} finally {
+			release();
+		}
+	}
+
+	private async refreshUnlocked(
+		force = false,
+		opts?: AutoRAGRefreshOptions,
+		candidate?: LocalIndexMethod,
+	): Promise<AutoRAGRefreshResult> {
 		const indexAbort = new AbortController();
 		const signal = opts?.signal ? AbortSignal.any([opts.signal, indexAbort.signal]) : indexAbort.signal;
 		signal?.throwIfAborted();
@@ -3483,7 +3678,10 @@ export class AutoRAGAgent {
 			opts?.onIndexEvent?.(event);
 		};
 		const indexing = documents
-			? this.syncMinSync(force, signal, documents, observeIndex).catch((error) => {
+			? (candidate
+					? candidate.sync(force, signal, documents, observeIndex, false)
+					: this.minSyncMethod.sync(force, signal, documents, observeIndex)
+				).catch((error) => {
 					documents.fail(error);
 					indexAbort.abort(error);
 					throw error;
@@ -3695,7 +3893,7 @@ export class AutoRAGAgent {
 				message:
 					health.backend === "remote"
 						? `The configured remote embedding endpoint is not answering (${health.detail ?? "no response"}); semantic search is unavailable until it is back.`
-						: "No embedding backend is running, so semantic search is unavailable (keyword search still works). Start `minsync serve --idle-timeout 0` (docs/minsync-setup.md), press Ctrl+Shift+E in the TUI, or set minSync.embedder to a remote endpoint.",
+						: "Embedding service is unavailable. Use /embedding on or /index build to prepare FastEmbed, or configure an authorized embedding API profile (docs/embedding-setup.md).",
 				source: "embedding",
 			},
 		];
@@ -3953,9 +4151,14 @@ export class AutoRAGAgent {
 		documents?: AsyncIterable<IndexDocument>,
 		onEvent?: (event: IndexEvent) => void,
 	): Promise<MinSyncSyncResult> {
-		const result = await this.minSyncMethod.sync(force, signal, documents, onEvent);
-		this.refreshState = { ...this.refreshState, minsync: result };
-		return result;
+		const release = acquireIndexLease(join(this.workspaceProjectRoot, ".autorag", "refresh-writer"));
+		try {
+			const result = await this.minSyncMethod.sync(force, signal, documents, onEvent);
+			this.refreshState = { ...this.refreshState, minsync: result };
+			return result;
+		} finally {
+			release();
+		}
 	}
 
 	/** Provider for the Windows-only everything_search tool. */

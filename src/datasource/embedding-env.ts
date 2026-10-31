@@ -63,7 +63,8 @@ export function mailcrawlEmbeddingEnv(
 		MAILCRAWL_EMBED_MODEL: endpoint.model,
 		MAILCRAWL_EMBED_DIM: String(endpoint.dimension),
 	};
-	if (endpoint.backend === "remote" && !isLoopback(endpoint.baseUrl)) env.MAILCRAWL_EMBED_ALLOW_REMOTE = "1";
+	if ((endpoint.backend === "api" || endpoint.backend === "remote") && !isLoopback(endpoint.baseUrl))
+		env.MAILCRAWL_EMBED_ALLOW_REMOTE = "1";
 	// mailcrawl prefixes its own query and passage text, because the server embeds text as sent.
 	if (endpoint.queryPrefix) env.MAILCRAWL_QUERY_PREFIX = endpoint.queryPrefix;
 	if (endpoint.passagePrefix) env.MAILCRAWL_PASSAGE_PREFIX = endpoint.passagePrefix;
@@ -83,7 +84,7 @@ export function lazykatokEmbeddingEnv(
 	endpoint: ResolvedEmbeddingEndpoint,
 	parentEnv: NodeJS.ProcessEnv = process.env,
 ): Record<string, string> | undefined {
-	if (endpoint.protocol !== "openai") return undefined;
+	if (endpoint.protocol !== "openai" || endpoint.queryPrefix || endpoint.passagePrefix) return undefined;
 	const env: Record<string, string> = {
 		KATOK_EMBEDDER: "openai-compatible",
 		KATOK_EMBED_URL: endpoint.baseUrl,

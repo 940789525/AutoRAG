@@ -129,10 +129,11 @@ describe("parent-agent skill docs", () => {
 		}
 	});
 
-	it("documents MinSync auto-install as on by default", () => {
-		expect(normalizeIndexingConfig({}).minSync.autoInstall).toBe(true);
+	it("documents the explicit FastEmbed setup and disables legacy auto-install", () => {
+		expect(normalizeIndexingConfig({}).minSync.autoInstall).toBe(false);
 		const setup = readSkill("autorag-setup");
-		expect(setup).not.toMatch(/MinSync auto-install is off by default/);
+		expect(setup).toContain("docs/embedding-setup.md");
+		expect(setup).not.toContain("cargo install minsync");
 	});
 
 	it("documents search JSON sessionId as debug-only", () => {

@@ -377,3 +377,33 @@ describe("ObsidianSkill description", () => {
 		expect(existsSync(join(root, ".autorag", "minsync"))).toBe(false);
 	});
 });
+
+it("rebuilds independently when the shared embedding fingerprint changes at the same dimension", async () => {
+	note("policy.md", "Director approval is required for refunds.");
+	const fixture = nativeIndexFixture();
+	let revision = "one";
+	let embedded = 0;
+	const base = fixture.embedder!;
+	const shared = {
+		...base,
+		identity: async () => ({ ...(await base.identity()), fingerprint: revision }),
+		embed: async (texts: readonly string[]) => {
+			embedded += texts.length;
+			return base.embed(texts);
+		},
+	};
+	const skill = new ObsidianSkill({
+		instanceId: "vault-1",
+		vaultPath: vault,
+		workspaceRoot: root,
+		minSync: { sharedEmbedder: shared, localIndex: fixture.localIndex },
+	});
+	expect((await skill.index()).ok).toBe(true);
+	const first = embedded;
+	expect((await method(skill, "obsidian-semantic").retrieve("approval", { topK: 5 })).length).toBe(1);
+	revision = "two";
+	await expect(method(skill, "obsidian-semantic").retrieve("approval", { topK: 5 })).rejects.toThrow(/not indexed/);
+	expect((await skill.index()).ok).toBe(true);
+	expect(embedded).toBeGreaterThan(first);
+	expect((await method(skill, "obsidian-semantic").retrieve("approval", { topK: 5 })).length).toBe(1);
+});

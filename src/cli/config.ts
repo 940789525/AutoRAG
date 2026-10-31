@@ -32,7 +32,13 @@ import { resolveAutoRAGHome } from "../config/home.ts";
 import { embeddingEndpointSource } from "../datasource/embedding-env.ts";
 import { discrawlEmbeddingRuntimeFor } from "../datasource/skills/discrawl/embedding.ts";
 import { buildDatasourceSkills, type DatasourcesConfig } from "../datasource/skills/factory.ts";
-import { createEmbedderFromConfig } from "../embedding/index.ts";
+import {
+	createEmbedderFromConfig,
+	type EmbeddingConfig,
+	embeddingFingerprint,
+	normalizeEmbeddingConfig,
+	ProfileEmbedder,
+} from "../embedding/index.ts";
 import { acquireFileLock, type FileLockHandle } from "../filesystem/file-lock.ts";
 import { type LocalIndexConfig, normalizeLocalIndex } from "../indexing/config.ts";
 import { LanguageError, type LanguageTag, normalizeLanguages } from "../language.ts";
@@ -63,7 +69,7 @@ export class ConfigError extends Error {
 
 /**
  * Typed MinSync method config persisted in `config.json`. Missing `enabled`
- * means enabled (true); `autoInstall` defaults to true. `embedder` carries
+ * means enabled (true); `autoInstall` is ignored and normalized to false. `embedder` carries
  * the MinSync vector embedder settings validated by {@link normalizeEmbedder}.
  */
 export interface MinSyncMethodConfig {
@@ -77,7 +83,7 @@ export interface MinSyncMethodConfig {
 }
 
 const MINSYNC_REQUIRED_MESSAGE =
-	"MinSync is required and cannot be disabled; remove `minSync: false` / `minSync.enabled: false` from the config.";
+	"The built-in local index is required; remove the legacy minSync:false or minSync.enabled:false flag.";
 
 /** Indexing method config as it appears in a raw config file (before normalization). */
 export interface RawIndexingMethods {
@@ -190,6 +196,7 @@ export interface AgentModelConfig {
 }
 
 export interface CliConfig {
+	embedding?: EmbeddingConfig;
 	contextSelection?: ContextSelectionConfig;
 	/** `single` (default) delivers one complete answer; `progressive` enables legacy two-phase delivery. */
 	answerMode?: "single" | "progressive";
@@ -723,15 +730,14 @@ const MINSYNC_ALLOWLIST = new Set<string>([
 ]);
 
 /**
- * Fields that older configs may still carry. MinSync is now resolved from PATH
- * and the workspace cache, so a persisted `binaryPath` is ignored rather than
+ * Fields that older configs may still carry. MinSync execution was removed, so a persisted `binaryPath` is ignored rather than
  * rejected; failing here would break every command for existing installs.
  */
 const MINSYNC_LEGACY_IGNORED = new Set<string>(["binaryPath"]);
 
 function normalizeMinSyncMethod(raw: MinSyncMethodConfig | false | undefined): MinSyncMethodConfig {
 	if (raw === false) throw new ConfigError(MINSYNC_REQUIRED_MESSAGE);
-	if (raw === undefined || raw === null) return { enabled: true, autoInstall: true };
+	if (raw === undefined || raw === null) return { enabled: true, autoInstall: false };
 	if (typeof raw !== "object" || Array.isArray(raw)) {
 		throw new ConfigError("minSync must be an object");
 	}
@@ -743,7 +749,7 @@ function normalizeMinSyncMethod(raw: MinSyncMethodConfig | false | undefined): M
 		}
 	}
 	if (record.enabled === false) throw new ConfigError(MINSYNC_REQUIRED_MESSAGE);
-	const out: MinSyncMethodConfig = { enabled: true, autoInstall: record.autoInstall !== false };
+	const out: MinSyncMethodConfig = { enabled: true, autoInstall: false };
 	if (typeof record.workspacePath === "string" && record.workspacePath.length > 0) {
 		out.workspacePath = record.workspacePath;
 	}
@@ -974,6 +980,11 @@ export function resolveConfig(input: ResolveConfigInput): CliConfig {
 		minSync: file.minSync as MinSyncMethodConfig | false | undefined,
 	});
 	config.minSync = normalized.minSync;
+	if (file.embedding !== undefined) {
+		if (config.minSync.embedder !== undefined)
+			throw new ConfigError("Conflicting embedding and minSync.embedder; migrate the legacy block explicitly");
+		config.embedding = normalizeEmbeddingConfig(file.embedding, config.configPath);
+	}
 	config.jikji = file.jikji === false ? false : (file.jikji ?? {});
 	if (file.everything !== undefined) {
 		if (
@@ -1359,6 +1370,7 @@ export function buildAgentOptions(config: CliConfig, agentDir?: string): Omit<Au
 	// MinSync is required, so options are always passed; `enabled` is config-only.
 	const { enabled: _omitMinSyncEnabled, ...minSyncFields } = config.minSync ?? {};
 	opts.minSync = minSyncFields;
+	if (config.embedding !== undefined) opts.embedding = config.embedding;
 	opts.jikji = config.jikji === false ? false : (config.jikji ?? {});
 	if (config.everything === false || config.everything?.enabled === false) {
 		opts.everything = false;
@@ -1421,32 +1433,37 @@ export function buildAgentOptions(config: CliConfig, agentDir?: string): Omit<Au
 	if (config.refresh !== undefined) opts.refresh = config.refresh;
 	// One embedder serves memory and every datasource, so a single `minSync.embedder` block (local MinSync or a
 	// remote endpoint) decides where all of AutoRAG's text is embedded.
-	const embedder = createEmbedderFromConfig({ embedder: config.minSync?.embedder });
+	const embedder = createEmbedderFromConfig({
+		embedding: config.embedding,
+		embedder: config.minSync?.embedder,
+		workspaceRoot: config.workspacePath,
+	});
 	opts.embedder = embedder;
-	const localEmbedder = config.minSync?.embedder;
+	opts.memoryEmbedder = embedder.forConsumer?.("memory") ?? embedder;
 	let localIndexOptions: AutoRAGAgentOptions["localIndex"] = config.localIndex;
-	if (
-		localEmbedder?.baseUrl === undefined &&
-		(localEmbedder?.id === undefined || localEmbedder.id.startsWith("native:"))
-	) {
+	if (embedder instanceof ProfileEmbedder) {
+		const profile = embedder.profile();
 		localIndexOptions = {
 			...config.localIndex,
 			identity: {
-				provider: "minsync",
-				model: localEmbedder?.id?.slice("native:".length) ?? "Qwen/Qwen3-Embedding-0.6B",
-				dimension: localEmbedder?.dimension ?? 1024,
+				provider: profile.kind === "local-http" ? "fastembed" : "api",
+				model: profile.model,
+				dimension: profile.dimension,
+				fingerprint: embeddingFingerprint(profile),
 			},
+			tokenizerPath: config.localIndex?.tokenizerPath ?? profile.manifest?.tokenizerPath,
 		};
 	}
 	opts.localIndex = localIndexOptions;
 	if (config.datasources !== undefined) {
 		const { skills, unknown } = buildDatasourceSkills(config.datasources, config.workspacePath, {
 			embedder,
-			discrawl: async () => discrawlEmbeddingRuntimeFor(await embedder.describeEndpoint()),
-			cliEndpoint: embeddingEndpointSource(embedder),
+			discrawl: async () =>
+				discrawlEmbeddingRuntimeFor(await (embedder.forConsumer?.("native-cli") ?? embedder).describeEndpoint()),
+			cliEndpoint: embeddingEndpointSource(embedder.forConsumer?.("native-cli") ?? embedder),
 			minSync: {
 				sharedEmbedder: embedder,
-				localIndex: localIndexOptions,
+				localIndex: config.localIndex,
 				...(config.minSync?.autoInstall === undefined ? {} : { autoInstall: config.minSync.autoInstall }),
 				...(config.minSync?.installer === undefined ? {} : { installer: config.minSync.installer }),
 				...(config.minSync?.embedder === undefined ? {} : { embedder: config.minSync.embedder }),
@@ -2102,6 +2119,11 @@ export function writeDefaultConfig(
 		minSync: partial.minSync as MinSyncMethodConfig | false | undefined,
 	});
 	full.minSync = normalizedMethods.minSync;
+	if (partial.embedding !== undefined || full.minSync.embedder === undefined) {
+		if (full.minSync.embedder !== undefined)
+			throw new ConfigError("Conflicting embedding and minSync.embedder; migrate the legacy block explicitly");
+		full.embedding = normalizeEmbeddingConfig(partial.embedding, partial.configPath);
+	}
 	// Jikji find-first discovery is enabled by default for new configs; the CLI
 	// auto-installs the jikji binary on first use when cargo is available.
 	full.jikji = partial.jikji ?? {};

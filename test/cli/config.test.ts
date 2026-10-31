@@ -42,7 +42,7 @@ describe("single-model CLI config", () => {
 		expect(config.model).toEqual({ provider: "openai", id: "gpt-6-luna" });
 		expect(config.searchPaths).toEqual(["docs", "notes"]);
 		expect(config.minSync?.enabled).toBe(true);
-		expect(config.minSync?.autoInstall).toBe(true);
+		expect(config.minSync?.autoInstall).toBe(false);
 		expect(config.jikji).toEqual({});
 		expect(config.excludeExactDuplicates).toBe(true);
 	});

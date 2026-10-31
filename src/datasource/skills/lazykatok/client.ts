@@ -174,13 +174,13 @@ export class LazykatokClient {
 				const endpoint = await this.options.embeddingEndpoint();
 				if (endpoint === undefined) {
 					return unavailable(
-						"no embedding endpoint is available: start `minsync serve` (docs/minsync-setup.md) or set minSync.embedder to a remote endpoint",
+						"no embedding endpoint is available: start a local FastEmbed service (docs/embedding-setup.md) or configure an explicitly authorized API profile",
 					);
 				}
 				const shared = lazykatokEmbeddingEnv(endpoint);
 				if (shared === undefined) {
 					return unavailable(
-						"lazykatok embeds through an OpenAI-compatible endpoint only; the configured embedding endpoint speaks TEI",
+						"lazykatok needs an OpenAI-compatible endpoint without role prefixes; TEI and Qwen role prefixes cannot be shared through this CLI interface. Retain its independent native embedding configuration",
 					);
 				}
 				for (const key of Object.keys(env)) {

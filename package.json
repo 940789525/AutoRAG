@@ -32,6 +32,8 @@
   "files": [
     "dist",
     "skills",
+    "docs/embedding-setup.md",
+    "docs/embedding-dependencies.json",
     "README.md",
     "NOTICE",
     "licenses",

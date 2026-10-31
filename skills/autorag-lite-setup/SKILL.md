@@ -148,66 +148,13 @@ select configured connections before retrieval; discover their IDs with
 
 ### Browser history (Hister) and the shared embedding model
 
-`hister` needs a separately installed, always-running Hister server (AGPL-3.0, never
-bundled by AutoRAG). Run `autorag setup --format json` and read the `hister` object
-(`installed`, `running`, `embedding`); each problem carries the exact command to run:
-`brew install hister`, `brew services start hister`, then install the Hister browser
-extension in the user's browser.
-
-Hister embeds with its own `semantic_search` config, so it must use the same model as
-AutoRAG (the `minsync serve` daemon, `Qwen/Qwen3-Embedding-0.6B`, 1024 dimensions) or
-its vectors stop lining up without any error. `autorag setup --sync-hister` copies the
-shared settings into Hister's `config.yml` (backup kept), restarts the service, waits
-for it, and runs `hister reindex` when needed; it is idempotent, and it refuses a
-remote or in-process backend. Re-run it after restarting the `minsync serve` daemon
-(its port changes). Verify with `hister doctor`: `server.index.embeddings` must be `ok`.
-Install a skip list in Hister's `rules.json` before importing past history, because the
-importer re-downloads URLs without the browser's cookies (docs/datasource-skills.md).
+The local FastEmbed service exposes the Qwen3-Embedding-0.6B model (1024 dimensions). Hister keeps its own store; only its explicit synchronization operation may apply a local endpoint and prefixes. A remote API is not automatically exported to Hister.
 
 ## Build and refresh indexes
 
-After connecting, call MCP `autorag.refresh` with `{}` for an incremental run.
-Use `{"methods":["parsed","minsync"]}` to narrow indexing, or
-`{"force":true}` only when a full resync is needed. Omit `methods` to run all
-configured methods; MCP does not accept `"all"` as a method value.
+Install the pinned Python 3.12 runtime and prepare the independent ONNX cache as described in `docs/embedding-setup.md`. Start the service explicitly before CLI/MCP refresh. The model-free TUI commands `/index build --embedding local-qwen3`, `/index status`, `/index refresh`, `/index cancel` also work without a conversation-model login. They call the internal TypeScript task controller; no new MCP tools are needed.
 
-CLI refresh remains available for bootstrap, read-only deployments, and repair:
-
-```bash
-AUTORAG_CONFIG=/absolute/path/to/.autorag/config.json autorag lite refresh --json
-```
-
-- Refresh syncs parsed mirrors, MinSync, Jikji, and configured datasources.
-- CLI `--full` and `--force` request a full resync; MCP uses `force: true`.
-- CLI `--method <csv>` accepts `parsed`, `minsync`, `datasources`, `jikji`,
-  `everything` (Windows), `fsearch` (macOS/Linux), and `all`. MCP `methods`
-  accepts the same individual methods, not `all`. Unknown values are rejected.
-- Indexing never runs while answering: retrieval only reads what refresh built.
-  MinSync and Jikji auto-install during refresh (never during a query). If they
-  are missing or broken, run a full refresh or return to setup rather than
-  silently degrading to lexical-only search.
-- AutoRAG owns no embedding model; MinSync provisions
-  `Qwen/Qwen3-Embedding-0.6B` (1024 dimensions) in `~/.cache/minsync/models`. A
-  configured remote `minSync.embedder` is used first; otherwise a running
-  `minsync serve` daemon (started by `refresh`/`watch`, never by a search), and
-  failing that MinSync's in-process engine via the optional
-  `@nomadamas/minsync-native` addon. The local default needs no embedder flags
-  and no API key. Override the embedder only when intentionally using a remote
-  provider.
-- Exact duplicate exclusion during refresh is enabled by default via the
-  external `dupey` CLI. Install dupey during setup when it is missing
-  (`command -v dupey || cargo install dupey --locked`) and tell the user the feature is
-  available; when installation is impossible, refresh continues without it
-  and the user is told duplicate exclusion is off. Set
-  `"excludeExactDuplicates": false` to index every copy.
-
-Content search requires a completed refresh. MCP `autorag.search` returns
-`isError: true` with `errorCode: "index-not-ready"` until refresh completes.
-Always refresh first, and refresh again when roots change. Stale indexes can
-still return results with `stale: true` and diagnostics; use `strict: true`
-to reject stale answers, or call `autorag.refresh` before searching. Sources
-deliberately skipped during refresh do not count as stale.
-Jikji is a discovery/indexing preparer, not a lite retrieval method.
+CLI `autorag lite refresh --method parsed,minsync` updates the parsed mirrors and local index; use `--full` only when intentionally forcing a full rebuild. Index reset/rebuild accepts `--force` only when explicitly requested. Existing MCP refresh/read-only behavior is unchanged. `--method minsync` is a compatibility alias for the AutoRAG local index; the new `local-vector` selection resolves the same method once. Build explicitly after changing embedding profiles. An API requires trusted configuration opt-in, a consumer allowlist and environment-variable credential reference. Ordinary search never builds an index or starts a model. Never auto-grant authorization to fix a failed API call.
 
 ## Watch and scheduled freshness
 
@@ -247,7 +194,7 @@ proof that the whole corpus was searched. Preserve the underlying error text
 when reporting unavailable components such as `retrieval-method-failed`.
 MinSync is required: when its binary is missing the call fails with an
 `MinSync is required ...` error rather than returning partial results, so
-install it (`cargo install minsync`) instead of working around it. Repair the
+install the pinned FastEmbed runtime described in `docs/embedding-setup.md`. Repair the
 component rather than silently accepting degraded search.
 
 ## Normal MCP workflow and curation lifecycle

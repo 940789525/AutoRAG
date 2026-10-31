@@ -124,7 +124,7 @@ describe("live-e2e core workflow invariants", () => {
 		expect(assertAbsoluteReadableSource(alias)).toBe(realpathSync(actual));
 	});
 
-	it("builds the agent with clone-local workspace, shared search path, and MinSync's own embedder", () => {
+	it("builds the agent with clone-local workspace, shared search path, and FastEmbed's pinned Qwen embedder", () => {
 		const root = tempRoot();
 		const workspace = join(root, ".autorag-e2e", "workspace");
 		const options = buildLiveStackOptions(root, workspace);
@@ -133,11 +133,11 @@ describe("live-e2e core workflow invariants", () => {
 		expect(options.workspacePath).not.toBe(root);
 		// The corpus root is immutable fixture state: jikji must never run against it.
 		expect(options.jikji).toBe(false);
-		// AutoRAG owns no embedding model: MinSync's native Qwen3 is the only local embedder, and the live
-		// lane may install MinSync because the run is the one place a daemon is allowed to start.
-		expect(options.minSync).toMatchObject({
-			autoInstall: true,
-			embedder: { id: "native:Qwen/Qwen3-Embedding-0.6B", dimension: 1024 },
+		expect(options.minSync).toBeUndefined();
+		expect(options.embedding!.profiles["local-qwen3"]).toMatchObject({
+			kind: "local-http",
+			model: "Qwen/Qwen3-Embedding-0.6B",
+			dimension: 1024,
 		});
 	});
 

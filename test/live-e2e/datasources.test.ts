@@ -30,9 +30,9 @@ describe("live-e2e datasource matrix", () => {
 		expect(existsSync(lazykatok?.command ?? "")).toBe(true);
 	});
 
-	it("registers a self-contained obsidian lane that runs on MinSync alone and no longer registers qmd", () => {
+	it("registers a self-contained obsidian lane that runs on the local FastEmbed service and no longer registers qmd", () => {
 		const lanes = buildDatasourceMatrix();
-		expect(lanes.find((lane) => lane.name === "obsidian")).toMatchObject({ kind: "native", binary: "minsync" });
+		expect(lanes.find((lane) => lane.name === "obsidian")).toMatchObject({ kind: "native", binary: "python3" });
 		expect(existsSync(lanes.find((lane) => lane.name === "obsidian")?.command ?? "")).toBe(true);
 		expect(lanes.some((lane) => lane.name === "qmd")).toBe(false);
 	});
@@ -41,7 +41,7 @@ describe("live-e2e datasource matrix", () => {
 		const result = await runDatasourceMatrix({
 			root: fixtureRoot(),
 			selection: ["obsidian"],
-			which: (binary: string) => binary === "minsync",
+			which: (binary: string) => binary === "python3",
 			run: async () => ({ ok: true, stdout: "PASS  x — /obsidian/vault/Projects/Budget.md", stderr: "", code: 0 }),
 		});
 		expect(result.lanes[0]).toMatchObject({ name: "obsidian", status: "PASS" });
@@ -57,9 +57,9 @@ describe("live-e2e datasource matrix", () => {
 		expect(result.lanes[0]).toMatchObject({ name: "obsidian", status: "FAIL" });
 	});
 
-	it("skips the obsidian lane, never passes it, when minsync is not installed", async () => {
+	it("skips the obsidian lane, never passes it, when python3 is not installed", async () => {
 		const result = await runDatasourceMatrix({ root: fixtureRoot(), selection: ["obsidian"], which: () => false });
-		expect(result.lanes[0]).toMatchObject({ name: "obsidian", status: "SKIP", reason: "minsync-not-installed" });
+		expect(result.lanes[0]).toMatchObject({ name: "obsidian", status: "SKIP", reason: "python3-not-installed" });
 	});
 
 	it("rejects a successful native command without a lane-native identity", async () => {

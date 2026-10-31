@@ -5,9 +5,8 @@
  * entries are keyed by chunk id with a content hash so unchanged chunks are
  * never re-embedded, removed chunks are pruned, and an embedding-identity
  * change (provider/model/dimension) forces a full re-embed. The embedder is
- * the one AutoRAG shares with every consumer (MinSync's daemon or in-process
- * engine, or the configured remote endpoint). Every failure degrades —
- * indexing stays lexical-only and retrieval returns [].
+ * the consumer-scoped FastEmbed/API profile. Indexing can retain lexical data on a semantic failure;
+ * semantic retrieval propagates the original provider error to diagnostics.
  */
 
 import { createHash } from "node:crypto";
@@ -54,7 +53,9 @@ function contentHash(chunk: StoredChunk): string {
 }
 
 function sameIdentity(a: EmbeddingIdentity, b: EmbeddingIdentity): boolean {
-	return a.provider === b.provider && a.model === b.model && a.dimension === b.dimension;
+	return (
+		a.provider === b.provider && a.model === b.model && a.dimension === b.dimension && a.fingerprint === b.fingerprint
+	);
 }
 
 function cosine(a: readonly number[], b: readonly number[]): number {
@@ -89,6 +90,7 @@ export class GistSemanticIndex {
 	 * an embedder failure leaves prior entries intact and reports ok:false.
 	 */
 	async sync(chunks: readonly StoredChunk[], embedder: Embedder): Promise<GistSemanticSyncOk | GistSemanticSyncFail> {
+		embedder = embedder.snapshot?.() ?? embedder;
 		this.ensureLoaded();
 		let identity: EmbeddingIdentity;
 		try {
@@ -132,7 +134,7 @@ export class GistSemanticIndex {
 		return { ok: true, embedded: pending.length };
 	}
 
-	/** Cosine-ranked chunk ids for a query vector. Never throws. */
+	/** Cosine-ranked chunk ids for a query vector. Failures retain the provider diagnostic. */
 	searchByVector(queryVector: readonly number[], topK: number): readonly { chunkId: string; score: number }[] {
 		this.ensureLoaded();
 		const scored: { chunkId: string; score: number }[] = [];
@@ -175,6 +177,10 @@ export class GistSemanticIndex {
 			// Persistence is best-effort; in-memory entries stay authoritative.
 		}
 	}
+	matchesIdentity(identity: EmbeddingIdentity): boolean {
+		this.ensureLoaded();
+		return this.identity !== undefined && sameIdentity(this.identity, identity);
+	}
 }
 
 export interface GitHubGistSemanticMethodOptions {
@@ -189,7 +195,7 @@ export interface GitHubGistSemanticMethodOptions {
 
 const DEFAULT_TOP_K = 20;
 
-/** Cosine similarity retrieval over the gist vector sidecar. Never throws. */
+/** Cosine similarity retrieval over the gist vector sidecar. Failures retain the provider diagnostic. */
 export class GitHubGistSemanticMethod implements RetrievalMethod {
 	private readonly options: GitHubGistSemanticMethodOptions;
 
@@ -214,12 +220,10 @@ export class GitHubGistSemanticMethod implements RetrievalMethod {
 		const trimmed = query.trim();
 		if (trimmed.length === 0) return [];
 		const topK = options.topK ?? DEFAULT_TOP_K;
-		let queryVector: readonly number[] | undefined;
-		try {
-			queryVector = (await this.options.embedder.embed([trimmed], { role: "query" }))[0];
-		} catch {
-			return [];
-		}
+		const embedder = this.options.embedder.snapshot?.() ?? this.options.embedder;
+		if (!this.options.index.matchesIdentity(await embedder.identity()))
+			throw new Error("Gist embedding identity changed; refresh this datasource before semantic search");
+		const queryVector = (await embedder.embed([trimmed], { role: "query" }))[0];
 		if (queryVector === undefined) return [];
 		const hits = this.options.index.searchByVector(queryVector, Math.max(topK * 3, topK));
 		if (hits.length === 0) return [];

@@ -5,7 +5,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileSha256 } from "../../src/filesystem/content-fingerprint.ts";
-import { probeMinSyncDaemon } from "../../src/embedding/daemon.ts";
+import { createEmbedderFromConfig, defaultEmbeddingConfig } from "../../src/embedding/index.ts";
 import { releaseEmbedders } from "../../src/embedding/index.ts";
 import { createResearchRuntime } from "../../src/research/runtime.ts";
 import { AutoRAGLite } from "../../src/core.ts";
@@ -35,10 +35,13 @@ try {
 	const root = join(qaRoot, "papers"); const workspace = join(qaRoot, "workspace"); const agentDir = join(qaRoot, "agent");
 	await mkdir(root); await mkdir(agentDir); await mkdir(process.env.AUTORAG_HOME);
 	await writeFile(join(root, "baseline.pdf"), pdf("Research baseline: retrieval experiments require reproducible evaluation and source evidence."));
-	await writeFile(process.env.AUTORAG_CONFIG, JSON.stringify({ searchPaths: [root], workspacePath: workspace, memoryPath: join(qaRoot, "home", "memory.json"), languages: ["en"], ...(process.env.AUTORAG_RESEARCH_QA_TOKENIZER ? { localIndex: { tokenizerPath: process.env.AUTORAG_RESEARCH_QA_TOKENIZER } } : {}), jev: false, dupey: { enabled: false } }));
+	const embedding=defaultEmbeddingConfig();
+	if(process.env.AUTORAG_QA_EMBED_ENDPOINT)embedding.profiles["local-qwen3"].baseUrl=process.env.AUTORAG_QA_EMBED_ENDPOINT;
+	if(process.env.AUTORAG_QA_TOKENIZER)embedding.profiles["local-qwen3"].manifest!.tokenizerPath=process.env.AUTORAG_QA_TOKENIZER;
+	await writeFile(process.env.AUTORAG_CONFIG, JSON.stringify({ embedding, searchPaths: [root], workspacePath: workspace, memoryPath: join(qaRoot, "home", "memory.json"), languages: ["en"], ...(process.env.AUTORAG_RESEARCH_QA_TOKENIZER ? { localIndex: { tokenizerPath: process.env.AUTORAG_RESEARCH_QA_TOKENIZER } } : {}), jev: false, dupey: { enabled: false } }));
 	assert(process.env.AUTORAG_CONFIG.startsWith(qaRoot));
-	const daemon = await probeMinSyncDaemon();
-	assert(daemon, "A local Qwen3 MinSync daemon must already be running; this smoke never starts or stops it");
+	const daemon = await createEmbedderFromConfig({embedding}).health();
+	assert(daemon.alive, "A local FastEmbed Qwen service must already be running; this smoke never starts or stops it");
 	const runtime = await createResearchRuntime({ root, workspace, runtimeConfig: process.env.AUTORAG_CONFIG, agentDir, allowModelProcessing: false });
 	await runtime.refresh();
 	const revision = await runtime.revision(await fileSha256(join(root, "baseline.pdf")));
@@ -51,7 +54,7 @@ try {
 	assert.equal(result.unsearched.length, 0, JSON.stringify(result.diagnostics));
 	await assert.rejects(runtime.screen({ ...revision, id: "fixture", paperId: "fixture" }, { id: "topic", library_id: "library", title: "Evaluation", question: "evaluation", focus: [], exclusions: [], revision: 1, active: true }, new AbortController().signal), /allowModelProcessing/);
 	assert.equal(await hash(), before);
-	console.log(JSON.stringify({ ok: true, backend: "daemon", model: daemon.model, dimension: daemon.dimension, parsed: true, semanticHit: true, sourceReadable: existsSync(revision.source), modelOptInEnforced: true, sharedConfigBefore: before, sharedConfigAfter: await hash(), cleanup: "only this run's temporary root" }, null, 2));
+	console.log(JSON.stringify({ ok: true, backend: daemon.backend, model: embedding.profiles["local-qwen3"].model, dimension: 1024, parsed: true, semanticHit: true, sourceReadable: existsSync(revision.source), modelOptInEnforced: true, sharedConfigBefore: before, sharedConfigAfter: await hash(), cleanup: "only this run's temporary root" }, null, 2));
 } finally {
 	await releaseEmbedders();
 	if (oldHome === undefined) delete process.env.AUTORAG_HOME; else process.env.AUTORAG_HOME = oldHome;

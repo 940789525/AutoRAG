@@ -87,6 +87,10 @@ export class LanceIndexStore implements IndexStore {
 	async countRows(): Promise<number> {
 		return this.table.countRows();
 	}
+	async sampleRow(): Promise<IndexRow | undefined> {
+		const [row] = await this.table.query().limit(1).toArray();
+		return row ? decodeRow(row) : undefined;
+	}
 	async findVectors(keys: readonly string[]): Promise<ReadonlyMap<string, readonly number[]>> {
 		const vectors = new Map<string, readonly number[]>();
 		for (let offset = 0; offset < keys.length; offset += 256) {

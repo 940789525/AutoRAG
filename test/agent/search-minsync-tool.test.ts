@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -6,8 +6,7 @@ import {
 	createSearchMinSyncDocumentsTool,
 	SEARCH_MINSYNC_DOCUMENTS_TOOL_NAME,
 } from "../../src/agent/search-minsync-tool.ts";
-import { MinSyncRequiredError } from "../../src/minsync/errors.ts";
-import { MinSyncVectorMethod } from "../../src/minsync/method.ts";
+import { LocalIndexMethod as MinSyncVectorMethod } from "../../src/indexing/method.ts";
 import { RetrievalScopeError } from "../../src/retrieval/scope.ts";
 import type { RetrievalResult } from "../../src/retrieval/types.ts";
 
@@ -45,19 +44,16 @@ describe("semantic_search_local_docs tool", () => {
 		expect(keys.sort()).toEqual(["query", "scope", "topK"]);
 	});
 
-	it("fails with MinSyncRequiredError when the binary is missing, without leaking the machine's paths", async () => {
-		// Real MinSyncVectorMethod with a binaryPath that does not exist.
-		const missing = join(tmpDir, "does-not-exist", "minsync");
-		const method = new MinSyncVectorMethod({ root: tmpDir, binaryPath: missing });
-		expect(method.isBinaryMissing()).toBe(true);
-		expect(existsSync(missing)).toBe(false);
-
+	it("reports an unbuilt local index without trying to execute MinSync", async () => {
+		const method = new MinSyncVectorMethod({
+			root: tmpDir,
+			embedder: {
+				identity: async () => ({ provider: "fixture", model: "fixture", dimension: 2 }),
+				embed: async () => [[1, 1]],
+			},
+		});
 		const tool = createSearchMinSyncDocumentsTool(() => method);
-		const failure = await tool.execute("call-2", { query: "meaning" }).catch((error: unknown) => error);
-
-		expect(failure).toBeInstanceOf(MinSyncRequiredError);
-		expect((failure as Error).message).toContain("cargo install minsync");
-		expect((failure as Error).message).not.toContain(tmpDir);
+		await expect(tool.execute("unbuilt", { query: "meaning" })).rejects.toThrow(/not ready/);
 	});
 
 	it("returns a zero-result message for an empty query without calling MinSync", async () => {

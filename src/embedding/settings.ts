@@ -1,4 +1,4 @@
-import type { MinSyncEmbedderConfig } from "../minsync/types.ts";
+import type { LegacyEmbedderConfig as MinSyncEmbedderConfig } from "./legacy.ts";
 import type { RemoteEmbedderSettings } from "./managed.ts";
 
 const OPENAI_DEFAULT_BASE_URL = "https://api.openai.com";

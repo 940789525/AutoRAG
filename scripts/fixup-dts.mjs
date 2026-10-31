@@ -1,7 +1,7 @@
 // Rewrite relative `.ts` specifiers in emitted declaration files to `.js`.
 // tsc emits d.ts with the original `.ts` extensions (allowImportingTsExtensions);
 // shipped packages only contain .js/.d.ts, so the specifiers must point at .js.
-import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { copyFileSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.argv[2] ?? "dist";
@@ -20,4 +20,10 @@ function walk(dir) {
 	}
 }
 
+// Removed runtime modules must not survive as stale declarations from a prior build.
+for (const name of ["embedding/daemon", "embedding/in-process", "minsync/binary", "minsync/client", "minsync/installer", "minsync/local-embedder"]) rmSync(join(root, `${name}.d.ts`), {force:true});
 walk(root);
+
+for (const name of ["service.py", "qwen-model.json", "embedding-requirements.lock"]) {
+	copyFileSync(join("src", "embedding", name), join(root, name === "service.py" ? "embedding-service.py" : name));
+}

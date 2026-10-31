@@ -313,7 +313,7 @@ describe("setup: Hister shares the global embedding model", () => {
 		expect(readFileSync(hisSterOf(f), "utf8")).toBe(before);
 	});
 
-	it("explains that in-process embedding cannot be shared, instead of guessing an address", async () => {
+	it("explains that a shared HTTP endpoint is needed instead of guessing an address", async () => {
 		const f = fixture();
 		const report = await runSetup({
 			configPath: f.configPath,
@@ -322,8 +322,8 @@ describe("setup: Hister shares the global embedding model", () => {
 			deps: deps(f, { embedder: embedder(null) }),
 		});
 		expect(report.hister?.embedding).toMatchObject({ inSync: false, applied: false });
-		expect(report.hister?.embedding?.reason).toContain("minsync serve");
-		expect(report.hister?.remediation).toContain("minsync serve --idle-timeout 0");
+		expect(report.hister?.embedding?.reason).toContain("local FastEmbed");
+		expect(report.hister?.remediation).toContain("FastEmbed");
 	});
 
 	it("does not sync when the datasource has semantic switched off", async () => {
