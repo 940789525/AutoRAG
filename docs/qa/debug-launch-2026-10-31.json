@@ -1,0 +1,68 @@
+{
+  "configs": [
+    {
+      "name": "AutoRAG：TUI（连接论文研读服务）",
+      "workspace": "/data/workspace",
+      "tokenizerExists": true,
+      "reusesDailyIndex": true
+    },
+    {
+      "name": "AutoRAG：调试论文研读服务",
+      "workspace": "/data/workspace/index-debug",
+      "tokenizerExists": true,
+      "reusesDailyIndex": false
+    },
+    {
+      "name": "AutoRAG：仅调试 TUI（无论文收件箱）",
+      "workspace": "/data/workspace",
+      "tokenizerExists": true,
+      "reusesDailyIndex": true
+    },
+    {
+      "name": "AutoRAG：调试索引（逐条向量化）",
+      "workspace": "/data/workspace/index-debug",
+      "tokenizerExists": true,
+      "reusesDailyIndex": false
+    },
+    {
+      "name": "AutoRAG：索引测速（正常批处理）",
+      "workspace": "/data/workspace/index-debug",
+      "tokenizerExists": true,
+      "reusesDailyIndex": false
+    }
+  ],
+  "inspectorConnected": true,
+  "sourceBreakpointHit": true,
+  "source": "/workspace/src/cli/index.ts",
+  "line": 284,
+  "queryPassed": true,
+  "resultCount": 50,
+  "protectedFilesUnchanged": true,
+  "remoteModelCalls": 0,
+  "indexRebuilt": false,
+  "result": "PASS",
+  "completedAt": "2026-10-31T19:31:44.073114+08:00",
+  "baseCommit": "c1996934fbba98396eedb195cbb6d97b59b7bb35",
+  "checks": {
+    "check": "PASS; 8 existing informational suggestions",
+    "lint": "PASS; 8 existing informational suggestions",
+    "typecheck": "PASS",
+    "focusedRegression": {
+      "files": 4,
+      "passed": 54,
+      "failed": 0
+    }
+  },
+  "dailyTuiConfig": "/dev-home/.autorag/config.fastembed.json",
+  "separateIndexConfig": ".vscode/index-debug.config.json",
+  "sharedModelCache": "/workspace/.autorag/embedding-models",
+  "remoteRerankDisabledInIndexDebug": true,
+  "hostConfigBefore": "ABSENT",
+  "hostConfigAfter": "ABSENT",
+  "notRun": [
+    "Cursor GUI F5/breakpoint interaction",
+    "Research-service startup and paid model inference",
+    "Forced refresh of the separate debug index"
+  ],
+  "cleanup": "Temporary container HOME/config removed; owned inspector child exited; existing FastEmbed service and daily index retained."
+}

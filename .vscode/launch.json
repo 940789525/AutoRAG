@@ -10,7 +10,7 @@
       "args": [
         "tui",
         "--config",
-        "${workspaceFolder}/.vscode/index-debug.config.json",
+        "/dev-home/.autorag/config.fastembed.json",
         "--research-url",
         "http://127.0.0.1:8765"
       ],
@@ -22,8 +22,8 @@
       ],
       "env": {
         "HOME": "/dev-home",
-        "AUTORAG_HOME": "/dev-home/.autorag-index-debug",
-        "AUTORAG_CONFIG": "${workspaceFolder}/.vscode/index-debug.config.json",
+        "AUTORAG_HOME": "/dev-home/.autorag",
+        "AUTORAG_CONFIG": "/dev-home/.autorag/config.fastembed.json",
         "PI_CODING_AGENT_DIR": "/dev-home/.pi/agent"
       },
       "preLaunchTask": "AutoRAG：等待论文研读服务",
@@ -68,7 +68,7 @@
       "args": [
         "tui",
         "--config",
-        "${workspaceFolder}/.vscode/index-debug.config.json"
+        "/dev-home/.autorag/config.fastembed.json"
       ],
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
@@ -78,8 +78,8 @@
       ],
       "env": {
         "HOME": "/dev-home",
-        "AUTORAG_HOME": "/dev-home/.autorag-index-debug",
-        "AUTORAG_CONFIG": "${workspaceFolder}/.vscode/index-debug.config.json",
+        "AUTORAG_HOME": "/dev-home/.autorag",
+        "AUTORAG_CONFIG": "/dev-home/.autorag/config.fastembed.json",
         "PI_CODING_AGENT_DIR": "/dev-home/.pi/agent"
       },
       "presentation": {

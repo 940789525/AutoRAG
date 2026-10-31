@@ -4,9 +4,36 @@
   ],
   "workspacePath": "/data/workspace/index-debug",
   "memoryPath": "/data/workspace/index-debug/memory.json",
-  "minSync": {
-    "autoInstall": false
+  "embedding": {
+    "defaultProfile": "local-qwen3",
+    "profiles": {
+      "local-qwen3": {
+        "kind": "local-http",
+        "protocol": "openai",
+        "baseUrl": "http://127.0.0.1:18382",
+        "model": "Qwen/Qwen3-Embedding-0.6B",
+        "dimension": 1024,
+        "allowedConsumers": ["local-documents", "memory", "chat-sidecars", "gist", "native-cli"],
+        "batchSize": 4,
+        "maxConcurrent": 1,
+        "manifest": {
+          "model": "Qwen/Qwen3-Embedding-0.6B",
+          "dimension": 1024,
+          "revision": "af95f2c416ffe9379369ad64f9113e865db6112c/fastembed-0.9.1/v1",
+          "maxInputTokens": 2048,
+          "queryPrefix": "Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery:",
+          "passagePrefix": "",
+          "pooling": "last-token",
+          "normalization": "l2",
+          "tokenizerPath": "/workspace/.autorag/embedding-models/qwen3-0.6b-af95f2c416ffe9379369ad64f9113e865db6112c"
+        }
+      }
+    }
   },
+  "localIndex": {
+    "koreanModelPath": "/workspace/.autorag/embedding-models/kiwi-0.24.1"
+  },
+  "rerank": false,
   "jikji": false,
   "everything": false,
   "fsearch": false,

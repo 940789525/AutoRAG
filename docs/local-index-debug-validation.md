@@ -53,3 +53,20 @@ the temporary TUI exited normally. Both config hashes still matched, the old
 profile was present, and the final ready marker remained Qwen3/1024. Git fetch
 was blocked by GitHub connectivity, and signing a commit requires the missing
 Git author name/email; no commit or push was performed.
+
+
+## FastEmbed debug configuration update — 2026-10-31
+
+The TUI launch entries now reuse the ready daily configuration and index. The
+index-only and research runtime configurations remain separate, sharing the
+existing FastEmbed service and clone-local Qwen/Kiwi assets. No model download or
+index rebuild was needed for this update; remote reranking is disabled for the
+index-debug profile.
+
+All five launch configurations resolved with readable tokenizer assets. A real
+Node Inspector connection hit a breakpoint in `src/cli/index.ts` at line 284 and
+continued to a successful model-free query against the existing index. The daily
+configurations and ready marker were unchanged. Repository check/lint/typecheck
+and 54 focused tests passed. Temporary HOME/config and the owned inspector child
+were cleaned up. No Cursor GUI interaction, research service startup or paid
+model inference was performed. Details: [debug launch evidence](qa/debug-launch-2026-10-31.json).

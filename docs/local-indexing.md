@@ -127,16 +127,26 @@ vector profiles; changing only the query prefix does not force re-embedding.
 
 ### Container debugging
 
-When opening this checkout inside the development container, the configurations
-in `.vscode/launch.json` use the source CLI, the same explicit
-`.vscode/index-debug.config.json`, and `/data/workspace/index-debug` as the
-workspace. Run **AutoRAG：索引测速（正常批处理）** once to build the local index,
-then start **AutoRAG：调试 TUI**. Use **AutoRAG：调试索引（逐条向量化）** to step
-through individual embedding requests. The latter forces a refresh and uses
-single-input batches; matching cached vectors can still be reused. All three
-configurations use the existing container Pi authentication directory and attach
-to child processes. They require the existing local MinSync daemon or native
-addon; they do not start or restart an embedding service.
+Open `/workspace` inside the running `autorag-xsy-dev-dev-1` development container.
+For ordinary source debugging, select **AutoRAG：仅调试 TUI（无论文收件箱）** and
+press F5. Both TUI launch entries reuse `/dev-home/.autorag/config.fastembed.json`
+and the ready daily index in `/data/workspace`; no preliminary rebuild is needed.
+Their indexing commands act on that daily workspace, so use the dedicated index
+launch entries when testing writes separately.
+
+**AutoRAG：调试索引（逐条向量化）** and **AutoRAG：索引测速（正常批处理）** retain
+the separate `.vscode/index-debug.config.json` and `/data/workspace/index-debug`.
+They explicitly request a forced refresh; the first FastEmbed build in this
+separate workspace can require new vectors. The single-input launch uses debug
+batches; matching cached vectors can still be reused. The research service also
+retains its separate runtime configuration. All launches use the existing Pi
+authentication directory and can attach to child processes.
+
+These configurations share the already running loopback FastEmbed Qwen service,
+the clone's `/workspace/.autorag/embedding-models` tokenizer/model assets and Kiwi
+cache. They do not download another model, start MinSync, or restart the service.
+The **AutoRAG：调试 TUI** compound additionally starts the research service; choose
+the standalone TUI entry when the paper inbox is not needed.
 
 An index marked `native-index-fixture` is a deterministic test index, not a real
 semantic model. Queries using Qwen3 must reject it. Refresh with the same explicit
