@@ -65,6 +65,33 @@ class DeleteNextFileParser extends PlainTextParser {
 }
 
 describe("syncParsedMirrors", () => {
+	it("retains the original parser warning when propagating Chinese diagnostics", async () => {
+		writeFileSync(join(source, "warning.txt"), "Synthetic warning fixture.");
+		class WarningParser extends PlainTextParser {
+			override async parse(input: ParseInput): Promise<ParseOutput> {
+				return {
+					...(await super.parse(input)),
+					diagnostics: [
+						{
+							code: "parser-warning",
+							severity: "warning",
+							message: "已过滤 1 个隐藏文本元素",
+							originalMessage: "HIDDEN_TEXT_FILTERED: 1개 숨겨진 텍스트 요소 필터링됨",
+						},
+					],
+				};
+			}
+		}
+		const registry = new ParserRegistry();
+		registry.register(new WarningParser());
+		const result = await syncParsedMirrors({ root, searchPaths: [source], registry });
+		expect(result.diagnostics[0]).toMatchObject({
+			message: "已过滤 1 个隐藏文本元素",
+			originalMessage: "HIDDEN_TEXT_FILTERED: 1개 숨겨진 텍스트 요소 필터링됨",
+			source: "/docs/warning.txt",
+		});
+	});
+
 	it("does not stamp a parsed body with a source revision changed by its parser", async () => {
 		const path = join(source, "changing.txt");
 		writeFileSync(path, "original body");

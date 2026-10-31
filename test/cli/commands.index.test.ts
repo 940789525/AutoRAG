@@ -8,11 +8,26 @@ import type { CliConfig } from "../../src/cli/config.ts";
 import { saveMirrorIndex } from "../../src/mirror/index-store.ts";
 import { nativeIndexFixture } from "../helpers/native-index.ts";
 
+const embeddingControl = vi.hoisted(() => ({ beforeEmbed: undefined as (() => Promise<void>) | undefined }));
+
 vi.mock("../../src/cli/config.ts", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("../../src/cli/config.ts")>();
 	return {
 		...actual,
-		buildAgentOptions: (config: CliConfig) => ({ ...actual.buildAgentOptions(config), ...nativeIndexFixture() }),
+		buildAgentOptions: (config: CliConfig) => {
+			const fixture = nativeIndexFixture();
+			return {
+				...actual.buildAgentOptions(config),
+				...fixture,
+				embedder: {
+					...fixture.embedder!,
+					embed: async (...args: Parameters<NonNullable<typeof fixture.embedder>["embed"]>) => {
+						await embeddingControl.beforeEmbed?.();
+						return fixture.embedder!.embed(...args);
+					},
+				},
+			};
+		},
 	};
 });
 
@@ -20,6 +35,7 @@ let tmpDir: string;
 let previousHome: string | undefined;
 
 beforeEach(() => {
+	embeddingControl.beforeEmbed = undefined;
 	tmpDir = mkdtempSync(join(tmpdir(), "autorag-cli-index-"));
 	previousHome = process.env.HOME;
 	process.env.HOME = join(tmpDir, "home");
@@ -114,6 +130,47 @@ function seedWorkspace(): WorkspaceFixture {
 }
 
 describe("runIndex", () => {
+	it("streams rebuild progress before completion and keeps JSON stdout separate", async () => {
+		const fx = seedWorkspace();
+		const docs = join(tmpDir, "progress-docs");
+		mkdirSync(docs);
+		writeFileSync(join(docs, "note.txt"), "A synthetic document for progress verification.");
+		let began!: () => void;
+		let release!: () => void;
+		const started = new Promise<void>((resolve) => {
+			began = resolve;
+		});
+		const held = new Promise<void>((resolve) => {
+			release = resolve;
+		});
+		embeddingControl.beforeEmbed = async () => {
+			began();
+			await held;
+		};
+		const { ctx, stdout, stderr } = makeCtx({
+			positionals: ["rebuild"],
+			flags: { yes: true, method: "local", "search-paths": docs },
+			cwd: fx.workspace,
+			json: true,
+		});
+		const pending = runIndex(ctx);
+		try {
+			await started;
+			expect(stdout).toHaveLength(0);
+			expect(stderr.join("\n")).toContain("向量化：进行中");
+			expect(stderr.join("\n")).toContain("note.txt");
+		} finally {
+			release();
+			await pending;
+		}
+		expect(stdout).toHaveLength(1);
+		const result = JSON.parse(stdout[0]);
+		expect(result.rebuilt.localIndex.report.embedded).toBeGreaterThan(0);
+		expect(result.removed).toEqual(["local"]);
+		expect(stdout[0]).not.toMatch(/minsync/i);
+		expect(stderr.join("\n")).not.toMatch(/minsync/i);
+	});
+
 	it("returns exit 2 for an unknown subcommand", async () => {
 		const { ctx, stderr } = makeCtx({ positionals: ["frobnicate"], flags: { yes: true } });
 		const code = await runIndex(ctx);
@@ -151,7 +208,7 @@ describe("runIndex", () => {
 		const parsed = JSON.parse(stdout[0]);
 		expect(parsed.ok).toBe(true);
 		expect(parsed.action).toBe("reset");
-		expect(parsed.removed).toEqual(["parsed", "minsync"]);
+		expect(parsed.removed).toEqual(["parsed", "local"]);
 	});
 
 	it("declined reset returns exit 2 and removes nothing", async () => {
@@ -261,7 +318,7 @@ describe("runIndex", () => {
 		const parsed = JSON.parse(stdout[0]);
 		expect(parsed.ok).toBe(true);
 		expect(parsed.action).toBe("rebuild");
-		expect(parsed.removed).toEqual(["parsed", "minsync"]);
+		expect(parsed.removed).toEqual(["parsed", "local"]);
 		expect(parsed.rebuilt).toBeDefined();
 	});
 });
@@ -283,7 +340,7 @@ describe("runIndex --method scoped reset", () => {
 		expect(existsSync(fx.parsed)).toBe(true);
 
 		const parsed = JSON.parse(stdout[0]);
-		expect(parsed.removed).toEqual(["minsync"]);
+		expect(parsed.removed).toEqual(["local"]);
 	});
 
 	it("reset --method all removes the parsed mirror and shared MinSync index", async () => {
@@ -303,7 +360,7 @@ describe("runIndex --method scoped reset", () => {
 		expect(existsSync(join(fx.workspace, ".autorag", "minsync", "legacy.bin"))).toBe(true);
 
 		const parsed = JSON.parse(stdout[0]);
-		expect(parsed.removed).toEqual(["parsed", "minsync"]);
+		expect(parsed.removed).toEqual(["parsed", "local"]);
 	});
 });
 

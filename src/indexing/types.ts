@@ -11,6 +11,8 @@ export interface IndexEvent {
 	readonly source?: string;
 	readonly count?: number;
 	readonly detail?: string;
+	/** Cumulative completed work; count above describes only this stage/batch. */
+	readonly progress?: Pick<IndexReport, "documents" | "unchanged" | "chunks" | "embedded" | "reused" | "deleted">;
 }
 
 export interface IndexReport {

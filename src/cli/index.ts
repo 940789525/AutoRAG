@@ -108,8 +108,8 @@ Commands:
   search <query>       Search and curate documents (requires a configured model)
   evidence <session>   Show persisted source/chunk evidence (--result N)
   memory inspect       Inspect the retrieval memory snapshot
-  index reset          Remove parsed/minsync indexes (--method)
-  index rebuild        Reset then re-run a refresh (--method minsync|all)
+  index reset          Remove parsed/local indexes (--method)
+  index rebuild        Reset then re-run a refresh (--method local|all)
   index remove <source>
                        Delete every index built from one source file and free its space
   index inspect <source>
@@ -132,7 +132,7 @@ Commands:
 
 Setup:
   autorag init --search-paths /path/to/docs,/path/to/notes   # choose folders
-  autorag refresh                                            # parsed + MinSync + datasources + Jikji
+  autorag refresh                                            # parsed + local index + datasources + Jikji
   autorag watch --once                                       # single index refresh tick (cron)
   autorag search "your question"                             # curated answer
 
@@ -148,7 +148,7 @@ Global flags:
   --once               For watch: run one refresh tick and exit (for cron)
   --immediate          For watch: refresh once before reading fs events (default true)
   --debounce-ms <n>    For watch: debounce milliseconds for fs events (default 1500)
-  --method <csv>       For refresh/index: minsync,parsed,datasources,jikji,everything,fsearch,all
+  --method <csv>       For refresh/index: local,parsed,datasources,jikji,everything,fsearch,all
   --skip-probes        For health: skip the network completion probe (auth checks still run)
   --timeout-ms <n>     For health: per-probe timeout in ms (default 10000)
   --version, -V        Print the package version

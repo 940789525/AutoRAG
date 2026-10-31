@@ -1,5 +1,6 @@
 import { AutoRAGAgent, type RefreshMethod } from "../../agent/agent.ts";
 import { buildAgentOptions, ConfigError, resolveConfig } from "../config.ts";
+import { createIndexProgress } from "../index-progress.ts";
 import { renderError, renderRefresh } from "../output.ts";
 import type { CommandContext } from "./types.ts";
 
@@ -13,6 +14,7 @@ import type { CommandContext } from "./types.ts";
  * methods run. Parsed mirrors are always synced when MinSync is selected.
  */
 export async function runRefresh(ctx: CommandContext): Promise<number> {
+	let progress: ReturnType<typeof createIndexProgress> | undefined;
 	try {
 		const config = resolveConfig({ flags: ctx.flags, cwd: ctx.cwd });
 		const agentOptions = buildAgentOptions(config);
@@ -21,15 +23,10 @@ export async function runRefresh(ctx: CommandContext): Promise<number> {
 			localIndex: { ...agentOptions.localIndex, debug: ctx.debug || agentOptions.localIndex?.debug },
 		});
 		const methods = parseMethodFlag(ctx.flags.method);
-		if (
-			typeof ctx.flags.method === "string" &&
-			ctx.flags.method.split(",").some((name) => name.trim().toLowerCase() === "minsync")
-		)
-			ctx.stderr("warning: --method minsync is a deprecated alias for the AutoRAG local index; use --method local");
+		progress = createIndexProgress(ctx);
 		const options = {
-			onIndexEvent: ctx.debug
-				? (event: import("../../indexing/types.ts").IndexEvent) => ctx.stderr(JSON.stringify(event))
-				: undefined,
+			onIndexEvent: progress.onIndexEvent,
+			onProgress: progress.onProgress,
 			...(methods ? { methods } : {}),
 			...(ctx.flags["retry-failed"] === true ? { retrySkipped: true } : {}),
 		};
@@ -39,6 +36,8 @@ export async function runRefresh(ctx: CommandContext): Promise<number> {
 	} catch (error) {
 		ctx.stderr(renderError(error, { json: ctx.json, debug: ctx.debug }));
 		return error instanceof ConfigError ? 2 : 1;
+	} finally {
+		progress?.close();
 	}
 }
 
@@ -63,7 +62,7 @@ export function parseMethodFlag(flag: string | boolean | undefined): readonly Re
 	for (const entry of entries) {
 		if (!valid.has(entry)) {
 			throw new Error(
-				`Unknown --method value: ${entry}. Valid: local, local-vector, ${ALL_METHOD_NAMES.join(", ")}`,
+				`Unknown --method value: ${entry}. Valid: local, local-vector, ${ALL_METHOD_NAMES.filter((name) => name !== "minsync").join(", ")}`,
 			);
 		}
 	}

@@ -2,6 +2,7 @@ import type { AgentTool } from "@earendil-works/pi-agent-core";
 import type { ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { IndexJob, IndexJobRequest, IndexJobs } from "../indexing/jobs.ts";
+import { formatIndexEvent } from "../indexing/progress.ts";
 
 export const INDEX_TOOL_NAME = "manage_local_index";
 export interface IndexOperations {
@@ -107,17 +108,22 @@ export function createIndexControls(operations: IndexOperations): ExtensionFacto
 	return (pi) => {
 		let context: ExtensionContext | undefined;
 		let unsubscribe: (() => void) | undefined;
-		const render = (job: IndexJob) => {
+		let timer: ReturnType<typeof setInterval> | undefined;
+		let latest: IndexJob | undefined;
+		const render = (job: IndexJob, notify = true) => {
 			if (!context?.hasUI) return;
+			const active = ["queued", "running", "cancelling"].includes(job.state);
+			const elapsedMs = (active ? Date.now() : Date.parse(job.updatedAt)) - Date.parse(job.startedAt);
 			context.ui.setWidget("autorag-index-progress", [
-				`Index ${job.jobId}: ${job.state} · ${job.embeddingProfile} · ${job.phase ?? "prepare"}`,
-				job.event?.detail ?? "",
+				`AutoRAG 索引 ${job.jobId}: ${job.state} · ${job.embeddingProfile}`,
+				job.event ? formatIndexEvent(job.event) : "正在准备索引",
 				job.report
-					? `documents ${job.report.documents}, embedded ${job.report.embedded}, reused ${job.report.reused}, unchanged ${job.report.unchanged}`
-					: `phase count ${job.event?.count ?? "?"}`,
+					? `文档 ${job.report.documents}，向量化 ${job.report.embedded}，复用 ${job.report.reused}，未变更 ${job.report.unchanged}`
+					: "",
 				job.error ?? "",
+				`累计 ${Math.max(0, Math.floor(elapsedMs / 1000))} 秒${active ? " · 任务尚未结束，等待下一阶段事件" : ""}`,
 			]);
-			if (["succeeded", "failed", "cancelled"].includes(job.state))
+			if (notify && ["succeeded", "failed", "cancelled"].includes(job.state))
 				context.ui.notify(
 					`Index ${job.jobId}: ${job.state}${job.error ? `\n${job.error}` : ""}`,
 					job.state === "failed" ? "error" : "info",
@@ -126,12 +132,22 @@ export function createIndexControls(operations: IndexOperations): ExtensionFacto
 		pi.on("session_start", (_event, ctx) => {
 			context = ctx;
 			unsubscribe?.();
-			unsubscribe = operations.jobs.subscribe(render);
+			unsubscribe = operations.jobs.subscribe((job) => {
+				latest = job;
+				render(job);
+			});
+			clearInterval(timer);
+			timer = setInterval(() => {
+				if (latest && ["queued", "running", "cancelling"].includes(latest.state)) render(latest, false);
+			}, 1000);
+			timer.unref();
 			const job = operations.jobs.status();
+			latest = job;
 			if (job) render(job);
 		});
 		pi.on("session_shutdown", async () => {
 			context = undefined;
+			clearInterval(timer);
 			unsubscribe?.();
 			unsubscribe = undefined;
 			await operations.jobs.close();

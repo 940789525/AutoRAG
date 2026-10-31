@@ -26,6 +26,21 @@ function installedKordocVersion(): string {
 
 const KORDOC_VERSION = installedKordocVersion();
 
+function chineseWarning(code: string | undefined, message: string): string | undefined {
+	if (code === "HIDDEN_TEXT_FILTERED") {
+		const hidden = /^(\d+)개 숨겨진 텍스트 요소 필터링됨$/.exec(message);
+		if (hidden) return `已过滤 ${hidden[1]} 个隐藏或被遮挡的文本元素`;
+		const headers = /^(\d+)개 머리글\/바닥글 요소 제거됨$/.exec(message);
+		if (headers) return `已移除 ${headers[1]} 个页眉、页脚元素`;
+	}
+	if (code === "SKIPPED_IMAGE") {
+		const image = /^(\d+)개 이미지 영역에 추출 가능한 텍스트 없음(?: \(.*\))?$/.exec(message);
+		if (image)
+			return `${image[1]} 个图片区域没有可直接提取的文字，可能遗漏图表或印章内容；如需识别图片文字，请启用 OCR`;
+	}
+	return undefined;
+}
+
 /** Image mime types kordoc hands to an injected OCR provider. */
 export type KordocOcrMimeType = "image/png" | "image/jpeg" | "image/webp";
 
@@ -148,11 +163,16 @@ export class KordocParser extends Parser {
 			);
 		}
 
-		const diagnostics: ParseDiagnostic[] = (result.warnings ?? []).map((warning) => ({
-			code: "parser-warning",
-			severity: "warning",
-			message: warning.code ? `${warning.code}: ${warning.message}` : warning.message,
-		}));
+		const diagnostics: ParseDiagnostic[] = (result.warnings ?? []).map((warning) => {
+			const original = warning.code ? `${warning.code}: ${warning.message}` : warning.message;
+			const translated = chineseWarning(warning.code, warning.message);
+			return {
+				code: "parser-warning",
+				severity: "warning",
+				message: translated ? `${warning.code}: ${translated}` : original,
+				...(translated ? { originalMessage: original } : {}),
+			};
+		});
 
 		return {
 			markdown: result.markdown,

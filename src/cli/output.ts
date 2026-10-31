@@ -14,19 +14,22 @@ function diagnosticProjection(d: {
 	readonly code: string;
 	readonly severity: string;
 	readonly message: string;
+	readonly originalMessage?: string;
 	readonly source?: string;
 }): {
 	code: string;
 	severity: string;
 	message: string;
+	originalMessage?: string;
 	source?: string;
 } {
-	const out: { code: string; severity: string; message: string; source?: string } = {
-		code: d.code,
+	const out: { code: string; severity: string; message: string; source?: string; originalMessage?: string } = {
+		code: d.code.replace(/^minsync-/, "local-index-"),
 		severity: d.severity,
 		message: d.message,
 	};
-	if (d.source !== undefined) out.source = d.source;
+	if (d.source !== undefined) out.source = d.source === "minsync" ? "local" : d.source;
+	if (d.originalMessage !== undefined) out.originalMessage = d.originalMessage;
 	return out;
 }
 
@@ -80,7 +83,7 @@ function refreshEnvelope(result: AutoRAGRefreshResult) {
 		if (result.minsync.stagingExcludedCount !== undefined) {
 			minsyncObj.stagingExcludedCount = result.minsync.stagingExcludedCount;
 		}
-		envelope.minsync = minsyncObj;
+		envelope.localIndex = minsyncObj;
 	}
 	if (result.datasources && result.datasources.length > 0) {
 		envelope.datasources = result.datasources.map((ds) => ({
@@ -109,7 +112,7 @@ function renderRefreshHuman(result: AutoRAGRefreshResult, debug: boolean): strin
 		if (result.minsync.reason !== undefined) {
 			parts.push(`reason=${result.minsync.reason}`);
 		}
-		lines.push(`  ${result.minsync.report ? "local index (AutoRAG)" : "minsync"}: ${parts.join(" ")}`);
+		lines.push(`  local index (AutoRAG): ${parts.join(" ")}`);
 		if (result.minsync.report) {
 			const report = result.minsync.report;
 			lines.push(
@@ -143,9 +146,10 @@ function renderRefreshHuman(result: AutoRAGRefreshResult, debug: boolean): strin
 		if (result.fsearch.message !== undefined) parts.push(`message=${result.fsearch.message}`);
 		lines.push(`  fsearch: ${parts.join(" ")}`);
 	}
-	if ((debug || !ok) && result.diagnostics && result.diagnostics.length > 0) {
-		for (const d of result.diagnostics) {
+	if (result.diagnostics && result.diagnostics.length > 0) {
+		for (const d of result.diagnostics.map(diagnosticProjection)) {
 			lines.push(`  diagnostic: [${d.severity}] ${d.code}: ${d.message}`);
+			if (debug && d.originalMessage) lines.push(`    originalMessage: ${d.originalMessage}`);
 		}
 	}
 	return lines.join("\n");
@@ -171,19 +175,19 @@ function renderStatusHuman(status: AutoRAGRefreshStatus, debug: boolean): string
 		);
 	}
 	if (status.progress) {
-		lines.push(`  progress: phase=${status.progress.phase}`);
+		lines.push(`  progress: phase=${status.progress.phase === "minsync" ? "local" : status.progress.phase}`);
 		if (status.progress.indexing)
 			lines.push(`  local index: ${status.progress.indexing.phase} (${status.progress.indexing.state})`);
 		if (status.progress.sourceFiles) {
 			lines.push(`    sourceFiles: total=${status.progress.sourceFiles.total}`);
 		}
 		if (status.progress.minsync?.synced !== undefined) {
-			lines.push(`    minsync: synced=${status.progress.minsync.synced}`);
+			lines.push(`    local index: synced=${status.progress.minsync.synced}`);
 		}
 	}
 	const comps = status.components;
 	const compParts: string[] = [];
-	if (comps.minsync) compParts.push(`minsync=${comps.minsync}`);
+	if (comps.minsync) compParts.push(`localIndex=${comps.minsync}`);
 	if (comps.jikji) compParts.push(`jikji=${comps.jikji}`);
 	if (comps.datasources) compParts.push(`datasources=${comps.datasources}`);
 	if (comps.everything) compParts.push(`everything=${comps.everything}`);
@@ -191,7 +195,7 @@ function renderStatusHuman(status: AutoRAGRefreshStatus, debug: boolean): string
 	if (compParts.length > 0) lines.push(`  components: ${compParts.join(" ")}`);
 	if (status.lastError) lines.push(`  lastError: ${status.lastError}`);
 	if (debug || status.diagnostics.length > 0) {
-		for (const d of status.diagnostics) {
+		for (const d of status.diagnostics.map(diagnosticProjection)) {
 			lines.push(`  diagnostic: [${d.severity}] ${d.code}: ${d.message}`);
 		}
 	}
@@ -200,7 +204,25 @@ function renderStatusHuman(status: AutoRAGRefreshStatus, debug: boolean): string
 
 export function renderStatus(status: AutoRAGRefreshStatus, opts: RenderOptions): string {
 	if (opts.json) {
-		return JSON.stringify(status, null, 2);
+		const { minsync: localIndex, ...components } = status.components;
+		const progress = status.progress;
+		const { minsync: localProgress, ...restProgress } = progress ?? {};
+		return JSON.stringify(
+			{
+				...status,
+				diagnostics: status.diagnostics.map(diagnosticProjection),
+				components: { ...components, ...(localIndex === undefined ? {} : { localIndex }) },
+				progress: progress
+					? {
+							...restProgress,
+							phase: progress.phase === "minsync" ? "local" : progress.phase,
+							...(localProgress === undefined ? {} : { localIndex: localProgress }),
+						}
+					: undefined,
+			},
+			null,
+			2,
+		);
 	}
 	return renderStatusHuman(status, opts.debug ?? false);
 }
@@ -325,7 +347,7 @@ export interface IndexCommandResult {
 
 function indexEnvelope(result: IndexCommandResult) {
 	const envelope: Record<string, unknown> = {
-		ok: true,
+		ok: result.rebuilt ? refreshOk(result.rebuilt) : true,
 		action: result.action,
 	};
 	if (result.removed !== undefined) {

@@ -61,7 +61,7 @@ export function buildSystemPrompt(config: SystemPromptConfig): string {
 			"instant macOS/Linux file/folder name search (fsearch-cli/FSearch) across the configured search folders, with a slow filesystem-walk fallback",
 		),
 		toolLine(config, "search_all_documents", "fan out across every configured retrieval method and merge results"),
-		toolLine(config, "semantic_search_local_docs", "semantic MinSync search over parsed document mirrors"),
+		toolLine(config, "semantic_search_local_docs", "AutoRAG semantic search over parsed document mirrors"),
 		toolLine(
 			config,
 			"read_local_evidence",
@@ -237,7 +237,7 @@ ${toolLines.join("\n")}
 ${noSearchTools}
 ## Search Strategy
 
-- For generic, stable questions answer directly from knowledge or memory without searching. For source-dependent questions, the first question of a conversation gets baseline MinSync and Jikji retrieval that starts before the model's search decision and supplies up to 100 candidates per method; inspect it first and treat it as unverified evidence. Later questions get no baseline: search by tool call.
+- For generic, stable questions answer directly from knowledge or memory without searching. For source-dependent questions, the first question of a conversation gets baseline AutoRAG semantic and Jikji retrieval that starts before the model's search decision and supplies up to 100 candidates per method; inspect it first and treat it as unverified evidence. Later questions get no baseline: search by tool call.
 - Start with the most specific exact term, identifier, filename glob, or regex that preserves the query intent.
 - Use \`search_all_documents\` when multiple configured retrieval methods can help.
 - Use local BM25 for exact terminology, local vector search for semantic similarity, and \`search_all_documents\` when hybrid ranking over the same AutoRAG chunks can help.

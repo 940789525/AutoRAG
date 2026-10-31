@@ -54,7 +54,7 @@ export function createSearchAllDocumentsTool(
 		name: SEARCH_ALL_DOCUMENTS_TOOL_NAME,
 		label: "Search All Documents",
 		description:
-			"Search across all configured retrieval methods (posix, MinSync, datasources) and return every distinct chunk they found, with only pure duplicates removed. This is the exhaustive retrieval surface: one call can return many candidates, including several passages of the same document, so judge the evidence yourself rather than assuming it was pre-filtered. Authority is server-configured; tool arguments can only provide query, topK, and an optional narrowing scope.",
+			"Search across all configured retrieval methods (local keyword/vector indexes, datasources) and return every distinct chunk they found, with only pure duplicates removed. This is the exhaustive retrieval surface: one call can return many candidates, including several passages of the same document, so judge the evidence yourself rather than assuming it was pre-filtered. Authority is server-configured; tool arguments can only provide query, topK, and an optional narrowing scope.",
 		parameters: searchAllSchema,
 		async execute(_toolCallId, params, signal): Promise<AgentToolResult<SearchAllDocumentsDetails>> {
 			const query = params.query.trim();

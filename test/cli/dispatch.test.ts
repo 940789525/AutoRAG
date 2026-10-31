@@ -24,6 +24,7 @@ describe("lite refresh forwarding", () => {
 			},
 		);
 		const output: string[] = [];
+		const progress: string[] = [];
 		const context: CommandContext = {
 			positionals: [],
 			flags: { config: join(root, "config.json"), method: "minsync,jikji,datasources", full: true },
@@ -31,14 +32,19 @@ describe("lite refresh forwarding", () => {
 			debug: false,
 			cwd: root,
 			stdout: (line) => output.push(line),
-			stderr: (line) => output.push(line),
+			stderr: (line) => progress.push(line),
 		};
 
 		expect(await runLiteRefresh(context)).toBe(0);
 		expect(received).toEqual({
 			force: true,
-			options: { methods: ["minsync", "datasources", "jikji"] },
+			options: {
+				methods: ["minsync", "datasources", "jikji"],
+				onProgress: expect.any(Function),
+				onIndexEvent: expect.any(Function),
+			},
 		});
+		expect(progress.join("\n")).toContain("正在启动索引");
 		expect(JSON.parse(output[0] ?? "{}").ok).toBe(true);
 		rmSync(root, { recursive: true, force: true });
 	});

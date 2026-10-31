@@ -14,6 +14,7 @@ import { createLexicalAnalyzer } from "../../src/indexing/lexical.ts";
 import { LocalDocumentIndex } from "../../src/indexing/pipeline.ts";
 import type {
 	IndexDocument,
+	IndexEvent,
 	IndexHit,
 	IndexRow,
 	IndexStore,
@@ -146,6 +147,21 @@ describe("native structure-aware chunking", () => {
 });
 
 describe("AutoRAG-owned indexing pipeline", () => {
+	it("reports cumulative successful embeddings without changing batch size", async () => {
+		const events: IndexEvent[] = [];
+		const { root, index, calls } = fixture(undefined, undefined, undefined, {
+			onEvent: (event) => events.push(event),
+			batchSize: 2,
+		});
+		const docs = [document(root, "first.md", "First document."), document(root, "second.md", "Second document.")];
+		const report = await index.sync(input(docs));
+		const completed = events.filter((event) => event.phase === "embed" && event.state === "end");
+		assert.equal(calls.length, 1);
+		assert.equal(calls[0].length, 2);
+		assert.equal(completed[0].progress?.embedded, 2);
+		assert.equal(events.at(-1)?.progress?.embedded, report.embedded);
+		assert.equal(events.at(-1)?.progress?.chunks, report.chunks);
+	});
 	it("deduplicates embeddings across sources, then skips unchanged indexing and maintenance", async () => {
 		let tokenizerPreparations = 0;
 		const f = fixture(undefined, undefined, undefined, {

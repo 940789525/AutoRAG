@@ -76,6 +76,7 @@ export type SearchDocumentDiagnosticCode =
 	| "embedding-unavailable";
 
 export interface SearchDocumentDiagnostic {
+	readonly originalMessage?: string;
 	readonly code: SearchDocumentDiagnosticCode;
 	readonly severity: SearchDocumentDiagnosticSeverity;
 	readonly message: string;

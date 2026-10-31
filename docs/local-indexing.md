@@ -2,10 +2,10 @@
 
 AutoRAG owns parsing, chunking, lexical analysis, embedding batches, vector reuse,
 LanceDB writes, and index maintenance. The default embedding model remains local
-Qwen3-Embedding-0.6B through the shared MinSync daemon or optional native addon.
+Qwen3-Embedding-0.6B through the local FastEmbed HTTP service.
 Local-file indexing and retrieval do not execute `minsync init`, `sync`, `check`,
-or `query`. The exported legacy MinSync client remains available to callers that
-use it explicitly.
+or `query`. Legacy method/configuration aliases remain accepted; no MinSync
+executable, daemon or native addon is used.
 
 ## Inspect a run
 
@@ -16,10 +16,31 @@ autorag refresh --method local --debug
 autorag index inspect /docs/refund-policy.txt --json
 ```
 
-`local` is an alias of the existing `minsync` method selection. The existing
-`minsync` JSON property and retrieval method names `minsync` / `hybrid` remain
-compatible. `minsync.backend` and `minsync.report.backend` identify the new
-implementation as `autorag`.
+`local` selects the AutoRAG index. The old `--method minsync` input remains
+accepted. CLI refresh/rebuild JSON now uses `localIndex` in place of `minsync`,
+reset/rebuild `removed` uses `local`, and status uses `components.localIndex`,
+`progress.localIndex` and phase `local`. Update scripts reading the old CLI keys.
+The TypeScript API and persisted compatibility method names are unchanged.
+`localIndex.backend` and `localIndex.report.backend` identify the implementation
+as `autorag`.
+
+### 实时进度与中文提示
+
+`refresh`、`lite refresh` 和 `index rebuild` 默认向 **stderr** 输出中文进度，
+包括当前文件、阶段、累计分块数、完成向量化数和复用数。最终结果（包括
+`--json`）只写入 **stdout**，无需开启 `--debug`，正常批处理大小保持不变。
+连续 10 秒没有新输出时显示最近进度和等待提示；该提示只表示任务尚未返回，
+不保证底层请求正在取得进展。TUI `/index` 同样显示计数和等待时长。
+解析和向量化可以重叠，分块总数也会继续增加，因此不显示推测的完成百分比。
+
+已知 PDF 隐藏文本、页眉页脚和图片缺少文字的警告使用中文 `message`，
+准确原文保留在 `originalMessage` 中，未知警告原样返回。普通终端显示中文，
+JSON 和调试输出保留原文以供排查；翻译不调用任何远程服务。
+
+```sh
+# 进度仍显示在终端；最终 JSON 保存到文件
+autorag index rebuild --method local --yes --json > rebuild-result.json
+```
 
 Refresh reports stage durations in milliseconds:
 

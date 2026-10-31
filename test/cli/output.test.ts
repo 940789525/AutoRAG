@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { AutoRAGRefreshResult } from "../../src/agent/agent.ts";
+import type { AutoRAGRefreshResult, AutoRAGRefreshStatus } from "../../src/agent/agent.ts";
 import type { HealthReportV1 } from "../../src/cli/commands/health.ts";
-import { renderHealth, renderRefresh } from "../../src/cli/output.ts";
+import { renderHealth, renderIndex, renderRefresh, renderStatus } from "../../src/cli/output.ts";
 
 const report: HealthReportV1 = {
 	healthSchemaVersion: 1,
@@ -24,6 +24,53 @@ const report: HealthReportV1 = {
 };
 
 describe("renderRefresh", () => {
+	it("uses local names in status JSON without altering the library's compatibility snapshot", () => {
+		const status: AutoRAGRefreshStatus = {
+			state: "indexing",
+			inFlight: true,
+			stale: false,
+			diagnostics: [],
+			components: { minsync: "ready" },
+			progress: { phase: "minsync", minsync: { synced: 3 } },
+		};
+		const text = renderStatus(status, { json: true });
+		const result = JSON.parse(text);
+		expect(result.components).toEqual({ localIndex: "ready" });
+		expect(result.progress).toEqual({ phase: "local", localIndex: { synced: 3 } });
+		expect(text).not.toMatch(/minsync/i);
+		expect(renderStatus(status, {})).not.toMatch(/minsync/i);
+		expect(status.progress?.phase).toBe("minsync");
+	});
+
+	it("retains original diagnostics alongside Chinese and reports failed rebuilds honestly", () => {
+		const result: AutoRAGRefreshResult = {
+			indexPath: "/tmp/fixture",
+			scanned: 1,
+			written: 1,
+			deleted: 0,
+			skipped: 0,
+			diagnostics: [
+				{
+					code: "parser-warning",
+					severity: "warning",
+					source: "/docs/a.pdf",
+					message: "已过滤 82 个隐藏文本元素",
+					originalMessage: "HIDDEN_TEXT_FILTERED: 82개 숨겨진 텍스트 요소 필터링됨",
+				},
+			],
+			minsync: { ok: false, synced: 0 },
+		};
+		const json = JSON.parse(renderIndex({ action: "rebuild", removed: ["local"], rebuilt: result }, { json: true }));
+		expect(json.ok).toBe(false);
+		expect(json.rebuilt.localIndex.ok).toBe(false);
+		expect(json.rebuilt.minsync).toBeUndefined();
+		expect(json.rebuilt.diagnostics[0].originalMessage).toContain("82개");
+		const human = renderRefresh(result, {});
+		expect(human).toContain("已过滤 82 个");
+		expect(human).not.toContain("82개");
+		expect(renderRefresh(result, { debug: true })).toContain("82개");
+	});
+
 	it("carries the MinSync staging-exclusion count in the JSON envelope", () => {
 		// A file name with no canonical source-id form is excluded from the
 		// MinSync index; the count must be visible where the reporter looks.
@@ -37,9 +84,9 @@ describe("renderRefresh", () => {
 			minsync: { ok: true, synced: 2, stagingExcludedCount: 1 },
 		};
 		const envelope = JSON.parse(renderRefresh(result, { json: true, debug: false })) as {
-			minsync?: { stagingExcludedCount?: number };
+			localIndex?: { stagingExcludedCount?: number };
 		};
-		expect(envelope.minsync?.stagingExcludedCount).toBe(1);
+		expect(envelope.localIndex?.stagingExcludedCount).toBe(1);
 	});
 
 	it("fails the refresh envelope when Windows Everything indexing failed and shows why", () => {
@@ -96,12 +143,12 @@ describe("renderRefresh", () => {
 		const parsed = JSON.parse(jsonStr);
 		expect(parsed.ok).toBe(true);
 		expect(parsed.counts).toEqual({ scanned: 3, written: 2, deleted: 0, skipped: 1 });
-		expect(parsed.minsync).toEqual({ ok: true, synced: 2 });
+		expect(parsed.localIndex).toEqual({ ok: true, synced: 2 });
 		expect(jsonStr).not.toContain("/secret/path");
 
 		const humanStr = renderRefresh(result, { json: false });
 		expect(humanStr).toContain("refresh: ok");
-		expect(humanStr).toContain("minsync: ok=true synced=2");
+		expect(humanStr).toContain("local index (AutoRAG): ok=true synced=2");
 	});
 
 	it("reports ok: false and surfaces minsync error diagnostic when minsync fails", () => {
@@ -139,16 +186,16 @@ describe("renderRefresh", () => {
 		const jsonStr = renderRefresh(result, { json: true });
 		const parsed = JSON.parse(jsonStr);
 		expect(parsed.ok).toBe(false);
-		expect(parsed.minsync.ok).toBe(false);
-		expect(parsed.minsync.synced).toBe(0);
-		expect(parsed.minsync.reason).toBe("check-failed: embedder unavailable");
-		expect(parsed.minsync.diagnostics).toHaveLength(1);
+		expect(parsed.localIndex.ok).toBe(false);
+		expect(parsed.localIndex.synced).toBe(0);
+		expect(parsed.localIndex.reason).toBe("check-failed: embedder unavailable");
+		expect(parsed.localIndex.diagnostics).toHaveLength(1);
 		expect(parsed.diagnostics[0].code).toBe("embedder-unavailable");
 		expect(jsonStr).not.toContain("/secret/");
 
 		const humanStr = renderRefresh(result, { json: false });
 		expect(humanStr).toContain("refresh: failed");
-		expect(humanStr).toContain("minsync: ok=false synced=0");
+		expect(humanStr).toContain("local index (AutoRAG): ok=false synced=0");
 		expect(humanStr).toContain("diagnostic: [error] embedder-unavailable");
 		expect(humanStr).not.toContain("/secret/");
 	});

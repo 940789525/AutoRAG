@@ -16,11 +16,11 @@ Subcommands:
                        (--search-paths PATHS  --exclude PATH  --workspace DIR  --memory-path FILE  --force)
                        --exclude may be repeated; relative paths use the current directory
   autorag lite refresh Run an incremental index refresh (no model required)
-                       (--full  --force  --method minsync,parsed,datasources,jikji,everything,fsearch,all)
+                       (--full  --force  --method local,parsed,datasources,jikji,everything,fsearch,all)
   autorag lite watch  Watch configured roots (or --once for one refresh tick)
                        (--once  --immediate  --debounce-ms N  --force)
   autorag lite status  Show path-opaque corpus freshness and index health
-  autorag lite index   Reset or rebuild parsed/MinSync indexes
+  autorag lite index   Reset or rebuild parsed/AutoRAG indexes
                        (reset|rebuild  --yes  --method)
   autorag lite duplicates
                        Scan duplicate document families without deleting files

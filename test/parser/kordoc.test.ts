@@ -127,6 +127,29 @@ describe("KordocParser failure transparency", () => {
 		);
 	});
 
+	it("translates known PDF warnings and retains exact original text; unknown warnings pass through", async () => {
+		const messages = [
+			{ code: "HIDDEN_TEXT_FILTERED", message: "82개 숨겨진 텍스트 요소 필터링됨" },
+			{ code: "HIDDEN_TEXT_FILTERED", message: "41개 머리글/바닥글 요소 제거됨" },
+			{
+				code: "SKIPPED_IMAGE",
+				message:
+					"1개 이미지 영역에 추출 가능한 텍스트 없음 (그림/차트/도장 내용 누락 가능 — 그림 속 글은 ocr: true / CLI --ocr 로 읽습니다)",
+			},
+			{ code: "HIDDEN_TEXT_FILTERED", message: "unknown future warning /real/file.pdf" },
+		];
+		const parser = new KordocParser({ parse: async () => ({ success: true, markdown: "body", warnings: messages }) });
+		const parsed = await parser.parse({ virtualPath: "/docs/test.pdf", bytes: new Uint8Array([1]) });
+		const diagnostics = parsed.diagnostics!;
+		expect(diagnostics[0].message).toContain("已过滤 82 个");
+		expect(diagnostics[1].message).toContain("41 个页眉、页脚");
+		expect(diagnostics[2].message).toContain("请启用 OCR");
+		for (let i = 0; i < 3; i++)
+			expect(diagnostics[i].originalMessage).toBe(`${messages[i].code}: ${messages[i].message}`);
+		expect(diagnostics[3].message).toBe("HIDDEN_TEXT_FILTERED: unknown future warning /real/file.pdf");
+		expect(diagnostics[3].originalMessage).toBeUndefined();
+	});
+
 	it("maps kordoc warnings to parser-warning diagnostics verbatim", async () => {
 		const parser = new KordocParser({
 			parse: async () => ({

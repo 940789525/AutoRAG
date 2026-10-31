@@ -1,0 +1,72 @@
+{
+  "date": "2026-10-31T12:30:18.511Z",
+  "container": "autorag-xsy-dev-dev-1",
+  "checks": {
+    "check": "PASS",
+    "lint": "PASS",
+    "typecheck": "PASS",
+    "relevantTests": "290 PASS / 19 files",
+    "build": "PASS",
+    "additionalStatusOutputTest": "PASS (11 output tests, including one additional status compatibility test)"
+  },
+  "hostedApiCalls": 0,
+  "modelDownloads": 0,
+  "qaRootRemoved": true,
+  "unchangedDailyState": {
+    "before": {
+      "/dev-home/.autorag/config.json": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+      "/dev-home/.autorag/config.fastembed.json": "0b4b17290b6cf48928091ef66ec6a21e53374e3535b8f8ad1e4be9d64b7e276b",
+      "/data/workspace/.autorag/local-index/ready.json": "3bdfffece1cf32790f64c973e8a3d65b8a17a38b3d13dfbdbc37709908776a61"
+    },
+    "after": {
+      "/dev-home/.autorag/config.json": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+      "/dev-home/.autorag/config.fastembed.json": "0b4b17290b6cf48928091ef66ec6a21e53374e3535b8f8ad1e4be9d64b7e276b",
+      "/data/workspace/.autorag/local-index/ready.json": "3bdfffece1cf32790f64c973e8a3d65b8a17a38b3d13dfbdbc37709908776a61"
+    }
+  },
+  "runs": [
+    {
+      "command": "index rebuild --method local --yes --json",
+      "ok": true,
+      "firstProgressMs": 2332.204356,
+      "durationMs": 3514.7266950000003,
+      "documents": 1,
+      "chunks": 2,
+      "embedded": 2,
+      "unchanged": 0,
+      "progressSample": [
+        "[索引 0秒] 向量化：进行中 · 本批 2 项 · 已处理文档 1，分块 2，已向量化 0，复用 0，未变更 0 · 文件解析 1/1",
+        "[索引 1秒] 向量化：完成 · 本批 2 项 · 已处理文档 1，分块 2，已向量化 2，复用 0，未变更 0 · 本阶段 0.3 秒 · 文件解析 1/1",
+        "[索引 1秒] 写入索引：进行中 · 本批 2 项 · 已处理文档 1，分块 2，已向量化 2，复用 0，未变更 0 · 文件解析 1/1",
+        "[索引 1秒] 整理索引：进行中 · 已处理文档 1，分块 2，已向量化 2，复用 0，未变更 0 · 文件解析 1/1",
+        "[索引 1秒] 索引结束：完成 · 已处理文档 1，分块 2，已向量化 2，复用 0，未变更 0 · 文件解析 1/1"
+      ]
+    },
+    {
+      "command": "refresh --method local --json",
+      "ok": true,
+      "firstProgressMs": 1824.8173259999999,
+      "durationMs": 2568.8633320000004,
+      "documents": 1,
+      "chunks": 0,
+      "embedded": 0,
+      "unchanged": 1,
+      "progressSample": [
+        "[索引 0秒] 解析文档 0/1 · /docs/synthetic.md",
+        "[索引 0秒] 解析文档 1/1",
+        "[索引 0秒] 解析文档：完成 · /docs/synthetic.md · 已处理文档 1，分块 0，已向量化 0，复用 0，未变更 0 · 本阶段 0.0 秒 · 文件解析 1/1",
+        "[索引 0秒] 准备索引：进行中 · tokenizer · 已处理文档 1，分块 0，已向量化 0，复用 0，未变更 0 · 文件解析 1/1",
+        "[索引 0秒] 索引结束：完成 · 已处理文档 1，分块 0，已向量化 0，复用 0，未变更 1 · 文件解析 1/1"
+      ]
+    }
+  ],
+  "hostConfigHashes": {
+    "before": "ABSENT",
+    "after": "ABSENT"
+  },
+  "limitations": [
+    "Only a temporary synthetic corpus was rebuilt; the daily corpus was not rebuilt.",
+    "No graphical Cursor/F5 manual run or full repository suite for this output-only change.",
+    "Upstream main synchronization was attempted and aborted because it conflicts extensively with the existing MinSync removal; current feature branch preserved."
+  ]
+}

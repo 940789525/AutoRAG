@@ -3115,14 +3115,9 @@ export class AutoRAGAgent {
 								)
 								.catch(() => undefined),
 					this.searchProgress
-						.track(
-							"minsync",
-							"MinSync semantic search",
-							this.minSyncMethod.retrieve(searchQuery, retrieveOptions),
-							{
-								count: (found) => found.length,
-							},
-						)
+						.track("minsync", "本地语义检索", this.minSyncMethod.retrieve(searchQuery, retrieveOptions), {
+							count: (found) => found.length,
+						})
 						.catch((error: unknown) => {
 							// MinSync is required: its absence fails the run, anything else is one empty source.
 							if (error instanceof MinSyncRequiredError) throw error;
@@ -4799,7 +4794,7 @@ function stagingExcludedDiagnostics(excluded: readonly string[] | undefined): Se
 	return (excluded ?? []).map((source) => ({
 		code: "minsync-staging-excluded",
 		severity: "warning",
-		message: "Excluded from the MinSync index: this file name cannot be represented as a canonical source id.",
+		message: "Excluded from the AutoRAG local index: this file name cannot be represented as a canonical source id.",
 		source,
 	}));
 }
@@ -4809,13 +4804,14 @@ function fileSkippedDiagnostics(failed: readonly MinSyncFileFailure[] | undefine
 	return (failed ?? []).map((failure) => ({
 		code: "minsync-file-skipped",
 		severity: "warning",
-		message: `MinSync skipped this file at the ${failure.stage} stage and will retry it on the next sync: ${sanitizeDiagnosticMessage(failure.error)}`,
+		message: `AutoRAG skipped this file at the ${failure.stage} stage and will retry it on the next sync: ${sanitizeDiagnosticMessage(failure.error)}`,
 		source: failure.path,
 	}));
 }
 
 function toSearchDiagnostic(diagnostic: ParsedMirrorDiagnostic): SearchDocumentDiagnostic {
 	return {
+		...(diagnostic.originalMessage === undefined ? {} : { originalMessage: diagnostic.originalMessage }),
 		code: diagnostic.code,
 		severity: diagnostic.severity,
 		message: diagnostic.message,
@@ -4896,7 +4892,7 @@ function minSyncRefreshDiagnostics(minsync: MinSyncSyncResult | undefined): Sear
 		diagnostics.push({
 			code: "lexical-tokenizer-unavailable",
 			severity: "warning",
-			message: `The "${minsync.lexicalFallback.requested}" BM25 tokenizer needs the Kiwi native library and model, which were not found, so MinSync tokenizes on whitespace and a Korean word with a particle (인증서를) does not match its stem (인증서). Install Kiwi (set KIWI_LIBRARY_PATH and KIWI_MODEL_PATH, or install it under ~/.local/kiwi), then refresh again.`,
+			message: `The "${minsync.lexicalFallback.requested}" BM25 tokenizer needs the Kiwi native library and model, which were not found, so the index tokenizes on whitespace and a Korean word with a particle (인증서를) does not match its stem (인증서). Install Kiwi (set KIWI_LIBRARY_PATH and KIWI_MODEL_PATH, or install it under ~/.local/kiwi), then refresh again.`,
 			source: "minsync",
 		});
 	}
@@ -4924,7 +4920,7 @@ function toMinSyncReasonDiagnostic(reason: string): SearchDocumentDiagnostic {
 	return {
 		code: "minsync-sync-failed",
 		severity: "error",
-		message: `MinSync sync failed: ${sanitizeDiagnosticMessage(reason)}`,
+		message: `AutoRAG local index sync failed: ${sanitizeDiagnosticMessage(reason)}`,
 		source: "minsync",
 	};
 }

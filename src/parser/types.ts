@@ -13,6 +13,8 @@ export interface ParseOutput {
 export type ParseDiagnosticCode = "pdf-extract-thin" | "parser-warning";
 
 export interface ParseDiagnostic {
+	/** Original upstream text retained when message has a Chinese translation. */
+	readonly originalMessage?: string;
 	readonly code: ParseDiagnosticCode;
 	readonly severity: "warning";
 	readonly message: string;

@@ -269,7 +269,12 @@ export class LocalDocumentIndex {
 		let fatal: unknown;
 		let failed = false;
 		const event = (value: Omit<IndexEvent, "runId" | "elapsedMs">): void => {
-			const entry = { runId, elapsedMs: performance.now() - started, ...value };
+			const entry: IndexEvent = {
+				runId,
+				elapsedMs: performance.now() - started,
+				progress: { documents: processed, unchanged, chunks: chunkCount, embedded, reused, deleted },
+				...value,
+			};
 			events.push(entry);
 			try {
 				this.options.onEvent?.(entry);
@@ -389,6 +394,7 @@ export class LocalDocumentIndex {
 											throw new Error(
 												`embedding returned invalid vectors (expected ${batch.length} x ${context.dimension}, finite and nonzero)`,
 											);
+										embedded += batch.length;
 										return result;
 									} catch (error) {
 										options.signal?.throwIfAborted();
@@ -414,7 +420,6 @@ export class LocalDocumentIndex {
 						batch.forEach((row, index) => {
 							vectors.set(row.embedding_key, result[index]);
 						});
-						embedded += batch.length;
 						consecutiveFailures = 0;
 					} catch (error) {
 						options.signal?.throwIfAborted();

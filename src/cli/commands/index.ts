@@ -8,13 +8,14 @@ import { loadIndexTokenizer } from "../../indexing/tokenizer.ts";
 import { loadMirrorIndex, type ParsedMirrorEntry, saveMirrorIndex } from "../../mirror/index-store.ts";
 import { PARSED_MIRROR_SUBDIR, refreshReadinessPath } from "../../mirror/paths.ts";
 import { buildAgentOptions, type CliConfig, readRawConfigObject, resolveConfig, writeConfigObject } from "../config.ts";
+import { createIndexProgress } from "../index-progress.ts";
 import { renderError, renderIndex } from "../output.ts";
 import { parseMethodFlag } from "./refresh.ts";
 import type { CommandContext } from "./types.ts";
 
 const LOCAL_INDEX_SUBDIR = ".autorag/local-index";
 const ALL_RESET_TARGETS = [PARSED_MIRROR_SUBDIR, LOCAL_INDEX_SUBDIR] as const;
-const ALL_RESET_TARGET_NAMES = ["parsed", "minsync"] as const;
+const ALL_RESET_TARGET_NAMES = ["parsed", "local"] as const;
 
 /**
  * Run the `autorag index` command.
@@ -156,12 +157,19 @@ export async function runIndex(ctx: CommandContext): Promise<number> {
 
 	// rebuild: re-run a forced refresh with a model-free agent, scoped to methods.
 	let rebuilt: AutoRAGRefreshResult;
+	const progress = createIndexProgress(ctx);
 	try {
 		const agent = new AutoRAGAgent(buildAgentOptions(config));
-		rebuilt = await agent.refresh(true, refreshMethods ? { methods: refreshMethods } : undefined);
+		rebuilt = await agent.refresh(true, {
+			onProgress: progress.onProgress,
+			onIndexEvent: progress.onIndexEvent,
+			...(refreshMethods ? { methods: refreshMethods } : {}),
+		});
 	} catch (error) {
 		ctx.stderr(renderError(error, { json: ctx.json }));
 		return 1;
+	} finally {
+		progress.close();
 	}
 
 	ctx.stdout(renderIndex({ action: "rebuild", removed: [...targetNames], rebuilt }, { json: ctx.json }));
@@ -204,7 +212,7 @@ function resolveResetScope(methods: readonly RefreshMethod[] | undefined): {
 		if (m === "parsed") {
 			addTarget("parsed", PARSED_MIRROR_SUBDIR);
 		} else if (m === "minsync") {
-			addTarget("minsync", LOCAL_INDEX_SUBDIR);
+			addTarget("local", LOCAL_INDEX_SUBDIR);
 		}
 		// datasources/jikji have no reset dir but are valid refresh methods.
 	}

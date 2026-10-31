@@ -1,6 +1,6 @@
 import { createAutoRAGLite } from "../../core.ts";
-import type { IndexEvent } from "../../indexing/types.ts";
 import { ConfigError } from "../config.ts";
+import { createIndexProgress } from "../index-progress.ts";
 import { renderError } from "../output.ts";
 import { parseMethodFlag } from "./refresh.ts";
 import type { CommandContext } from "./types.ts";
@@ -14,12 +14,15 @@ import type { CommandContext } from "./types.ts";
  * Exit codes: 0 on success, 2 on config error, 1 on runtime error.
  */
 export async function runLiteRefresh(ctx: CommandContext): Promise<number> {
+	let progress: ReturnType<typeof createIndexProgress> | undefined;
 	try {
 		const lite = createAutoRAGLite({ flags: { ...ctx.flags, ...(ctx.debug ? { debug: true } : {}) }, cwd: ctx.cwd });
 		const methods = parseMethodFlag(ctx.flags.method);
 		const force = ctx.flags.force === true || ctx.flags.full === true;
+		progress = createIndexProgress(ctx);
 		const options = {
-			...(ctx.debug ? { onIndexEvent: (event: IndexEvent) => ctx.stderr(JSON.stringify(event)) } : {}),
+			onIndexEvent: progress.onIndexEvent,
+			onProgress: progress.onProgress,
 			...(methods ? { methods } : {}),
 			...(ctx.flags["retry-failed"] === true ? { retrySkipped: true } : {}),
 		};
@@ -30,5 +33,7 @@ export async function runLiteRefresh(ctx: CommandContext): Promise<number> {
 	} catch (error) {
 		ctx.stderr(renderError(error, { json: ctx.json, debug: ctx.debug }));
 		return error instanceof ConfigError ? 2 : 1;
+	} finally {
+		progress?.close();
 	}
 }

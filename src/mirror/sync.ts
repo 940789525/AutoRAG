@@ -159,6 +159,7 @@ export type ParsedMirrorDiagnosticCode =
  * `message` keeps the underlying error text, which may include a filesystem path.
  */
 export interface ParsedMirrorDiagnostic {
+	readonly originalMessage?: string;
 	readonly code: ParsedMirrorDiagnosticCode;
 	readonly severity: "info" | "warning";
 	readonly message: string;
@@ -574,6 +575,7 @@ async function syncWithRegistry(
 			}
 			for (const diagnostic of parsed.diagnostics ?? []) {
 				diagnostics.push({
+					...(diagnostic.originalMessage === undefined ? {} : { originalMessage: diagnostic.originalMessage }),
 					code: diagnostic.code,
 					severity: diagnostic.severity,
 					message: diagnostic.message,

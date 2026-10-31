@@ -86,7 +86,7 @@ describe("runWatch (cli)", () => {
 		expect(code).toBe(0);
 		expect(out).toHaveLength(1);
 		const blob = out[0];
-		expect(JSON.parse(blob).minsync.report.reportPath).toContain(join(root, ".autorag", "local-index"));
+		expect(JSON.parse(blob).localIndex.report.reportPath).toContain(join(root, ".autorag", "local-index"));
 		expect(blob).not.toContain("indexPath");
 		const payload = JSON.parse(blob);
 		expect(payload.ok === true || typeof payload.written === "number" || payload.parsed !== undefined || true).toBe(

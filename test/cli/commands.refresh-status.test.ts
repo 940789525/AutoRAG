@@ -119,7 +119,7 @@ describe("runRefresh + runStatus (cli)", () => {
 		const refreshBlob = refreshOut[0];
 		// Path opacity: no absolute index path, no temp root, no bm25 subdir literal.
 		expect(refreshBlob).not.toContain("indexPath");
-		expect(JSON.parse(refreshBlob).minsync.report.reportPath).toContain(join(root, ".autorag", "local-index"));
+		expect(JSON.parse(refreshBlob).localIndex.report.reportPath).toContain(join(root, ".autorag", "local-index"));
 		expect(refreshBlob).not.toContain(join(".autorag", "bm25"));
 
 		const statusOut: string[] = [];
@@ -151,7 +151,7 @@ describe("runRefresh + runStatus (cli)", () => {
 		process.env.PATH = pathWithoutMinsync(previousPath);
 		const out: string[] = [];
 		expect(await runRefresh(makeCtx({ flags: { method: "local" }, stdout: (line) => out.push(line) }))).toBe(0);
-		expect(JSON.parse(out[0]).minsync.report.backend).toBe("autorag");
+		expect(JSON.parse(out[0]).localIndex.report.backend).toBe("autorag");
 	});
 
 	it("skips unknown datasource entries and reports a non-fatal diagnostic", async () => {
@@ -246,11 +246,11 @@ describe("runRefresh + runStatus (cli)", () => {
 		expect(out).toHaveLength(1);
 		const blob = out[0];
 		expect(blob).not.toContain("indexPath");
-		expect(JSON.parse(blob).minsync.report.backend).toBe("autorag");
+		expect(JSON.parse(blob).localIndex.report.backend).toBe("autorag");
 		const parsed = JSON.parse(blob);
 		expect(parsed.counts).toBeDefined();
-		expect(parsed.minsync).toBeDefined();
-		expect(typeof parsed.minsync.ok).toBe("boolean");
+		expect(parsed.localIndex).toBeDefined();
+		expect(typeof parsed.localIndex.ok).toBe("boolean");
 	});
 
 	it("returns nonzero and the underlying embedding failure in the refresh JSON", async () => {
@@ -261,9 +261,9 @@ describe("runRefresh + runStatus (cli)", () => {
 		const out: string[] = [];
 		expect(await runRefresh(makeCtx({ flags: { method: "local" }, stdout: (line) => out.push(line) }))).toBe(1);
 		const result = JSON.parse(out[0]);
-		expect(result.minsync.ok).toBe(false);
-		expect(result.minsync.reason).toContain(`provider failed at ${root}`);
-		expect(result.minsync.report.failures.length).toBeGreaterThan(0);
+		expect(result.localIndex.ok).toBe(false);
+		expect(result.localIndex.reason).toContain(`provider failed at ${root}`);
+		expect(result.localIndex.report.failures.length).toBeGreaterThan(0);
 	});
 
 	it("refreshes with all methods when --method all is given", async () => {
