@@ -4,9 +4,12 @@ import { Type } from "typebox";
 import type { IndexJob, IndexJobRequest, IndexJobs } from "../indexing/jobs.ts";
 import { formatIndexEvent } from "../indexing/progress.ts";
 
+import { classifyIndexInput } from "./index-intent.ts";
+
 export const INDEX_TOOL_NAME = "manage_local_index";
 export interface IndexOperations {
 	jobs: IndexJobs;
+	onCommand?(): void;
 	start(request: IndexJobRequest): IndexJob;
 	activeIndex?(): { embeddingProfile: string; ready: boolean };
 	profiles(): readonly { id: string; kind: string; model: string }[];
@@ -29,7 +32,7 @@ export function createIndexTool(operations: IndexOperations): AgentTool<typeof p
 		name: INDEX_TOOL_NAME,
 		label: "Local Index Tasks",
 		description:
-			"Only when the user explicitly requests indexing: build configured local document roots, refresh the active index, inspect progress or cancel this session's task. Select only a configured embeddingProfile. Switching profiles requires build. Never change configuration or authorize remote sending. Returns jobId immediately; work continues in this TUI. Use status to inspect it, not repeated builds. No filesystem path or credential arguments. Status also lists configured profiles.",
+			"Inspect local index task status and configured embedding profiles. Use operation status. Interactive build, refresh and cancel requests are validated and dispatched by the TUI input router, not by conversation tool calls. Never change configuration or authorize remote sending. No filesystem path or credential arguments.",
 		parameters,
 		async execute(_id, input) {
 			if (input.operation !== "status" && !operations.canWriteFromModel(input.operation))
@@ -57,28 +60,19 @@ export function createIndexTool(operations: IndexOperations): AgentTool<typeof p
 	};
 }
 
-/** Conservative intent routing; ordinary retrieval never creates an index. */
+/** Compatibility classification only; never use keyword matches as write permission. */
 export function indexWriteOperations(text: string): ReadonlySet<"build" | "refresh" | "cancel"> {
 	const allowed = new Set<"build" | "refresh" | "cancel">();
-	if (/^(?:如何|怎么|怎样|how\b|explain\b)/iu.test(text.trim())) return allowed;
-	if (
-		/(?:建立|创建|构建|重建).{0,24}(?:索引|向量化)|(?:请|帮我|使用|用).{0,30}向量化|^(?:build|create|index)\b/iu.test(
-			text,
-		)
-	)
-		allowed.add("build");
-	if (/(?:更新|刷新).{0,24}(?:索引|向量化)|^refresh\b/iu.test(text)) allowed.add("refresh");
-	if (/(?:取消|停止).{0,24}(?:索引|向量化)|(?:索引|向量化).{0,12}(?:取消|停止)|^cancel\b/iu.test(text))
-		allowed.add("cancel");
+	const gate = classifyIndexInput(text);
+	if (gate.kind === "operation") {
+		if (["ensure_index", "rebuild"].includes(gate.request.intent)) allowed.add("build");
+		if (gate.request.intent === "refresh") allowed.add("refresh");
+		if (gate.request.intent === "cancel_job") allowed.add("cancel");
+	}
 	return allowed;
 }
 export function isIndexOperationInput(text: string): boolean {
-	return (
-		indexWriteOperations(text).size > 0 ||
-		/(?:查看|显示|检查).{0,18}(?:索引|向量化)|(?:索引|向量化).{0,12}(?:进度|状态)|^(?:show|check)\b.{0,40}(?:index|progress|status)/iu.test(
-			text,
-		)
-	);
+	return classifyIndexInput(text).kind !== "ordinary";
 }
 
 export function parseIndexCommand(args: string): {
@@ -156,6 +150,7 @@ export function createIndexControls(operations: IndexOperations): ExtensionFacto
 			description: "Local indexing: /index build --embedding PROFILE | refresh | status | cancel",
 			handler: async (args, ctx) => {
 				try {
+					operations.onCommand?.();
 					const input = parseIndexCommand(args);
 					const job =
 						input.operation === "status"

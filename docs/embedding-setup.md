@@ -44,7 +44,9 @@ With configured document roots, no conversation model is needed for:
 
 `build` explicitly prepares/starts the local service when needed; queries, setup and status never start it or download models. CLI refresh/watch need an already running service. `/embedding off` can stop only the process started by this agent; an existing external service remains externally managed. Exiting the owning TUI cancels its task and closes its owned service. It is not a detached job queue. Tasks are persisted under `<workspace>/.autorag/index-jobs`; a dead owner is reported as interrupted, not successful. Linux owner detection also checks the process start tick to avoid PID reuse.
 
-A signed-in conversation model can process requests such as “使用本地 Qwen 为已配置目录建立索引” and “查看索引进度”. A native `manage_local_index` tool uses the same task controller. Explicit `/index` remains the deterministic entry. Natural-language indexing requires a matching explicit user intent; retrieved document text cannot grant write or network authorization.
+Natural-language index control uses a lightweight gate before retrieval. Whole commands such as “请重建当前索引”, “更新当前索引” and “查看索引进度” are parsed locally without a conversation-model call. Ambiguous indexing requests use the configured conversation model once to distinguish operations, questions and missing parameters. Jev is not required. If that model is unavailable, use `/index`.
+
+Questions, negation and quoted instructions do not grant index writes. Unknown profiles, partial/unconfigured roots and conflicting restrictions require clarification; only all configured local roots are supported. “建索引” ensures an index (incremental refresh when compatible); explicit “重建” and `/index build` retain candidate-build semantics. Profile switching requires build. Ordinary questions follow the existing query route, while candidate questions may incur one extra interpretation call. The native `manage_local_index` tool remains read-only for model turns; validated interactive requests dispatch directly to the shared task controller. Remote extension messages cannot grant local index writes.
 
 ## Profile configuration
 

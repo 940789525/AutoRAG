@@ -47,7 +47,7 @@ function operations() {
 describe("TUI indexing commands and native tool", () => {
 	it("works without a conversation model and subscribes again after session replacement", async () => {
 		vi.useFakeTimers();
-		const ops = operations();
+		const ops = { ...operations(), onCommand: vi.fn() };
 		const handlers = new Map<string, (event: unknown, ctx: ExtensionContext) => unknown>();
 		let command!: (text: string, ctx: ExtensionContext) => Promise<void>;
 		const notes = vi.fn();
@@ -70,6 +70,7 @@ describe("TUI indexing commands and native tool", () => {
 			expect(vi.getTimerCount()).toBe(0);
 		}
 		expect(ops.start).toHaveBeenCalledTimes(2);
+		expect(ops.onCommand).toHaveBeenCalledTimes(2);
 		vi.useRealTimers();
 	});
 	it("cannot grant writes through tool parameters or a status-only user request", async () => {

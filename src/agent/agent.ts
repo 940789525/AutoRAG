@@ -151,13 +151,8 @@ import { EvidenceLedger } from "./evidence-ledger.ts";
 import { EvidenceOriginIndex } from "./evidence-origins.ts";
 import { createEvidencePersistence } from "./evidence-persistence.ts";
 import { createFSearchSearchTool, FSEARCH_SEARCH_TOOL_NAME } from "./fsearch-search-tool.ts";
-import {
-	createIndexControls,
-	createIndexTool,
-	INDEX_TOOL_NAME,
-	indexWriteOperations,
-	isIndexOperationInput,
-} from "./index-controls.ts";
+import { createIndexControls, createIndexTool, INDEX_TOOL_NAME } from "./index-controls.ts";
+import { IndexIntentRouter } from "./index-intent.ts";
 import { intentOfMessage } from "./intent-tracing.ts";
 import {
 	createJevExtension,
@@ -946,7 +941,8 @@ export class AutoRAGAgent {
 	private readonly localIndexOptions: LocalIndexOptions;
 	private readonly localIndexRevision?: string;
 	readonly indexJobs: IndexJobs;
-	private nativeIndexIntent: ReadonlySet<"build" | "refresh" | "cancel"> = new Set();
+	private indexIntentRouter?: IndexIntentRouter;
+	private localIndexJobId?: string;
 	private readonly minSyncEmbedderConfig: MinSyncEmbedderConfig | undefined;
 	private readonly jikjiClient: JikjiClient | undefined;
 	private readonly everythingClient: EverythingClient | undefined;
@@ -1829,11 +1825,6 @@ export class AutoRAGAgent {
 			extensionFactories: [
 				this.permissionGate,
 				createIndexControls(this.indexOperations()),
-				(pi) => {
-					pi.on("agent_end", () => {
-						this.nativeIndexIntent = new Set();
-					});
-				},
 				...(options.extensionFactories ?? []),
 				createUserRequestPersistence(this.userRequests),
 				createEvidencePersistence(this.evidenceLedger, this.citationNumbers, this.conversationQueries),
@@ -1865,6 +1856,9 @@ export class AutoRAGAgent {
 		return {
 			...runtime,
 			dispose: async () => {
+				this.indexIntentRouter?.reset();
+				this.indexIntentRouter = undefined;
+				this.localIndexJobId = undefined;
 				await this.indexJobs.close();
 				await this.embedder.close();
 				if (this.boundPiRuntime === runtime.runtime) {
@@ -2006,46 +2000,121 @@ export class AutoRAGAgent {
 	 * user is correcting a search that is going wrong) and Alt+Enter queues a
 	 * follow-up question that runs once this search answers.
 	 */
-	private routeInteractiveInput(input: AutoRAGInteractiveInput, pi: ExtensionAPI): AutoRAGInputDisposition {
-		const state = this.interactive;
-		if (state.run === undefined && isIndexOperationInput(input.text)) {
-			if (!this.boundPiRuntime?.session.model) {
+	private routeInteractiveInput(
+		input: AutoRAGInteractiveInput,
+		pi: ExtensionAPI,
+	): AutoRAGInputDisposition | Promise<AutoRAGInputDisposition> {
+		if (input.source === "extension") return this.routeOrdinaryInput(input, pi);
+		this.indexIntentRouter ??= new IndexIntentRouter({
+			observe: (data) =>
+				this.routingDiagnostics.push({
+					code: "index-intent",
+					severity: "info",
+					source: "agent",
+					message: JSON.stringify(data),
+				}),
+			snapshot: () => {
+				const manager = this.embedder instanceof ProfileEmbedder ? this.embedder : undefined;
+				return {
+					profiles: manager
+						? Object.entries(manager.config.profiles).map(([id, p]) => ({ id, kind: p.kind, model: p.model }))
+						: [{ id: "injected", kind: "local-http", model: "injected" }],
+					activeProfile: manager?.profileId ?? "injected",
+					defaultProfile: manager?.config.defaultProfile ?? "injected",
+					ready: this.minSyncMethod.index.isReady(),
+					localJobId: this.localIndexJobId,
+				};
+			},
+			complete: async (prompt, signal) => {
+				if (!this.boundPiRuntime?.session.model)
+					throw new Error("Natural-language indexing needs a conversation model");
+				const resolved = await this.resolveSessionModel();
+				signal.throwIfAborted();
+				return createModelDecompositionCompleter(resolved, signal, 512, (message) => {
+					this.routingDiagnostics.push({
+						code: "index-intent",
+						severity: "info",
+						source: "agent",
+						message: JSON.stringify({
+							model: message.model,
+							inputTokens: message.usage?.input ?? null,
+							outputTokens: message.usage?.output ?? null,
+							cost: message.usage?.cost?.total ?? null,
+						}),
+					});
+				})(prompt);
+			},
+			notify: (text) =>
+				pi.sendMessage(
+					{ customType: "autorag.index", content: [{ type: "text", text }], display: true },
+					{ triggerTurn: false },
+				),
+			execute: (plan, requestId) => {
+				const ops = this.indexOperations();
+				const job =
+					plan.operation === "status"
+						? ops.jobs.status(plan.jobId)
+						: plan.operation === "cancel"
+							? ops.jobs.cancel(plan.jobId ?? "")
+							: ops.start({
+									mode: plan.operation,
+									embeddingProfile: "embeddingProfile" in plan ? plan.embeddingProfile : undefined,
+									requestId,
+								});
 				pi.sendMessage(
 					{
 						customType: "autorag.index",
 						content: [
 							{
 								type: "text",
-								text: "Natural-language indexing needs a conversation model. Use /index build --embedding local-qwen3, /index refresh, /index status or /index cancel.",
+								text: JSON.stringify({
+									operation: plan.operation,
+									scope: "全部已配置本地目录",
+									job: job ?? null,
+									activeIndex: ops.activeIndex(),
+								}),
 							},
 						],
 						display: true,
 					},
 					{ triggerTurn: false },
 				);
-				return { kind: "handled" };
-			}
-			this.nativeIndexIntent = indexWriteOperations(input.text);
-			this.userRequests.record(input.text);
-			return { kind: "native" };
+			},
+		});
+		const router = this.indexIntentRouter;
+		const gate = router.gate(input.text);
+		if (gate.kind === "ordinary") {
+			router.reset();
+			return this.routeOrdinaryInput(input, pi);
 		}
-		this.nativeIndexIntent = new Set();
+		this.userRequests.record(input.text);
+		return router
+			.handle(input.text, gate)
+			.then((handled) => (handled ? { kind: "handled" } : this.routeOrdinaryInput(input, pi, true)));
+	}
+
+	private routeOrdinaryInput(
+		input: AutoRAGInteractiveInput,
+		pi: ExtensionAPI,
+		recorded = false,
+	): AutoRAGInputDisposition {
+		const state = this.interactive;
 		const followUp = input.streamingBehavior === "followUp" || state.nextSubmitIsFollowUp;
 		state.nextSubmitIsFollowUp = false;
 		if (state.run === undefined) {
-			this.userRequests.record(input.text);
+			if (!recorded) this.userRequests.record(input.text);
 			this.startInteractiveQuery(input.text, pi);
 			return { kind: "handled" };
 		}
 		if (followUp) {
-			this.userRequests.record(input.text);
+			if (!recorded) this.userRequests.record(input.text);
 			state.followUps.push(input.text);
 			return { kind: "handled" };
 		}
 		if (input.streamingBehavior === "steer") {
 			// A turn is streaming: pi queues the user's text as steering for that turn.
 			state.steers.push(input.text);
-			this.userRequests.record(input.text, "steer");
+			if (!recorded) this.userRequests.record(input.text, "steer");
 			state.steerTexts.add(input.text);
 			this.conversationQueries.add(input.text);
 			// Cut any in-flight retrieval short so the steer reaches the model promptly.
@@ -2056,7 +2125,7 @@ export class AutoRAGAgent {
 		// steer on the search instead: the next phase's model request takes it. A
 		// search past its last request (or between queued queries) answers it next.
 		if (!this.steer(input.text, input.images)) {
-			this.userRequests.record(input.text);
+			if (!recorded) this.userRequests.record(input.text);
 			state.followUps.push(input.text);
 		}
 		return { kind: "handled" };
@@ -2068,6 +2137,10 @@ export class AutoRAGAgent {
 	 * Alt+Enter like Enter, so AutoRAG acts on them there.
 	 */
 	private handleInteractiveKey(key: AutoRAGInteractiveKey): boolean {
+		if (key === "interrupt" && this.indexIntentRouter?.recognizing) {
+			this.indexIntentRouter.reset();
+			return true;
+		}
 		const state = this.interactive;
 		if (state.run === undefined || this.boundPiRuntime?.session.isStreaming === true) return false;
 		if (key === "followUp") {
@@ -3500,16 +3573,21 @@ export class AutoRAGAgent {
 	private indexOperations() {
 		return {
 			jobs: this.indexJobs,
+			onCommand: () => this.indexIntentRouter?.reset(),
 			activeIndex: () => ({
 				embeddingProfile: this.embedder instanceof ProfileEmbedder ? this.embedder.profileId : "injected",
 				ready: this.minSyncMethod.index.isReady(),
 			}),
-			start: (request: IndexJobRequest) => this.startIndexJob(request),
+			start: (request: IndexJobRequest) => {
+				const job = this.startIndexJob(request);
+				this.localIndexJobId = job.jobId;
+				return job;
+			},
 			profiles: () =>
 				this.embedder instanceof ProfileEmbedder
 					? Object.entries(this.embedder.config.profiles).map(([id, p]) => ({ id, kind: p.kind, model: p.model }))
 					: [],
-			canWriteFromModel: (operation: "build" | "refresh" | "cancel") => this.nativeIndexIntent.has(operation),
+			canWriteFromModel: () => false,
 		};
 	}
 

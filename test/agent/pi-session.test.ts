@@ -1489,7 +1489,7 @@ describe("AutoRAG pi coding-agent host", () => {
 				const waiting = widgets.lines().join("\n");
 				expect(waiting).toMatch(/✓ Routing the question — local/u);
 				expect(waiting).toMatch(/Datasource kakao · \d+s/u);
-				expect(waiting).toContain("MinSync");
+				expect(waiting).toContain("本地语义检索");
 
 				datasource.release();
 				await tui.agent.waitForIdle();
@@ -1545,5 +1545,32 @@ describe("AutoRAG pi coding-agent host", () => {
 				await tui.dispose();
 			}
 		});
+	});
+});
+
+describe("1102 index input routing", () => {
+	it("handles a status request before any search or model turn", async () => {
+		const tui = await tuiAgent([]);
+		try {
+			await tui.session.prompt("查看当前索引进度", { source: "interactive" });
+			expect(tui.session.messages.some((m) => m.role === "custom" && m.customType === "autorag.index")).toBe(true);
+			expect(tui.session.messages.some((m) => m.role === "assistant")).toBe(false);
+		} finally {
+			await tui.dispose();
+		}
+	});
+	it("uses the configured model for one candidate interpretation and skips retrieval", async () => {
+		const tui = await tuiAgent([
+			fauxAssistantMessage(JSON.stringify({ kind: "operation", request: { intent: "status", constraints: [] } }), {
+				stopReason: "stop",
+			}),
+		]);
+		try {
+			await tui.session.prompt("帮我看看索引现在怎么样了", { source: "interactive" });
+			expect(tui.session.messages.some((m) => m.role === "custom" && m.customType === "autorag.index")).toBe(true);
+			expect(tui.session.messages.some((m) => m.role === "assistant")).toBe(false);
+		} finally {
+			await tui.dispose();
+		}
 	});
 });

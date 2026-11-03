@@ -119,6 +119,7 @@ export type AutoRAGInputDisposition =
 	| { readonly kind: "native" };
 
 export interface AutoRAGInteractiveInput {
+	readonly source?: "interactive" | "extension";
 	readonly text: string;
 	readonly images: readonly ImageContent[] | undefined;
 	/** pi's delivery for input typed while a turn streams; undefined when no turn streams. */
@@ -136,7 +137,10 @@ export interface AutoRAGPiInteractiveRuntimeOptions extends Omit<AutoRAGPiSessio
 	 * or a follow-up queued behind it. Must not wait for a search to finish:
 	 * pi's TUI reads the next input only after this returns.
 	 */
-	readonly onInput: (input: AutoRAGInteractiveInput, pi: ExtensionAPI) => AutoRAGInputDisposition;
+	readonly onInput: (
+		input: AutoRAGInteractiveInput,
+		pi: ExtensionAPI,
+	) => AutoRAGInputDisposition | Promise<AutoRAGInputDisposition>;
 	/** Whether a search is running: while it is, every interactive input belongs to it. */
 	readonly isSearchRunning?: () => boolean;
 	/**
@@ -459,7 +463,7 @@ function createAutoRAGInteractiveExtension(
 				});
 			});
 		}
-		pi.on("input", (event) => {
+		pi.on("input", async (event) => {
 			const text = userInputText(event);
 			if (text === undefined || text.length === 0) return undefined;
 			// A "/" line is pi's (commands, skills, templates), except during a search:
@@ -469,7 +473,15 @@ function createAutoRAGInteractiveExtension(
 			if (text.startsWith("/") && isSearchRunning?.() !== true) return undefined;
 			let disposition: AutoRAGInputDisposition;
 			try {
-				disposition = onInput({ text, images: event.images, streamingBehavior: event.streamingBehavior }, pi);
+				disposition = await onInput(
+					{
+						text,
+						source: event.source === "interactive" ? "interactive" : "extension",
+						images: event.images,
+						streamingBehavior: event.streamingBehavior,
+					},
+					pi,
+				);
 			} catch (error) {
 				// Display-only: while a turn streams, pi's default delivery steers a
 				// custom message into it as a user message, and the model would

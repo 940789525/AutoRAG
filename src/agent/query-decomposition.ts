@@ -92,6 +92,8 @@ export async function decomposeQuery(complete: DecompositionCompleter, query: st
 export function createModelDecompositionCompleter(
 	target: DecompositionModel,
 	signal?: AbortSignal,
+	maxTokens = 2048,
+	onResult?: (message: AssistantMessage) => void,
 ): DecompositionCompleter {
 	return async (prompt) => {
 		const result: AssistantMessage = await completeSimple(
@@ -101,9 +103,10 @@ export function createModelDecompositionCompleter(
 				...(target.apiKey !== undefined ? { apiKey: target.apiKey } : {}),
 				...(signal !== undefined ? { signal } : {}),
 				reasoning: "minimal",
-				maxTokens: 2048,
+				maxTokens,
 			},
 		);
+		onResult?.(result);
 		if (result.stopReason === "error" || result.stopReason === "aborted") {
 			throw new Error(result.errorMessage ?? `query decomposition ${result.stopReason}`);
 		}
