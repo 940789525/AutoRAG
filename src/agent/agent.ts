@@ -151,6 +151,7 @@ import { EvidenceLedger } from "./evidence-ledger.ts";
 import { EvidenceOriginIndex } from "./evidence-origins.ts";
 import { createEvidencePersistence } from "./evidence-persistence.ts";
 import { createFSearchSearchTool, FSEARCH_SEARCH_TOOL_NAME } from "./fsearch-search-tool.ts";
+import { createGitHubMcpEvidence } from "./github-mcp-evidence.ts";
 import { createIndexControls, createIndexTool, INDEX_TOOL_NAME } from "./index-controls.ts";
 import { IndexIntentRouter } from "./index-intent.ts";
 import { intentOfMessage } from "./intent-tracing.ts";
@@ -1639,7 +1640,11 @@ export class AutoRAGAgent {
 			// The model sees each steer framed as a correction of the running search.
 			contextTransform: (messages, info) => this.transformRequestContext(messages, info),
 			...this.contextRequestLifecycle(),
-			extensionFactories: [this.permissionGate, ...(this.jevExtension !== undefined ? [this.jevExtension] : [])],
+			extensionFactories: [
+				this.permissionGate,
+				createGitHubMcpEvidence(this.evidenceLedger),
+				...(this.jevExtension !== undefined ? [this.jevExtension] : []),
+			],
 			extensionToolNames: this.jevExtension !== undefined ? [JEV_TOOL_NAME] : [],
 		});
 		const agent = piSession.session.agent;
@@ -1827,6 +1832,7 @@ export class AutoRAGAgent {
 				createIndexControls(this.indexOperations()),
 				...(options.extensionFactories ?? []),
 				createUserRequestPersistence(this.userRequests),
+				createGitHubMcpEvidence(this.evidenceLedger),
 				createEvidencePersistence(this.evidenceLedger, this.citationNumbers, this.conversationQueries),
 				createCitationLinks(this.evidenceLedger),
 				createSearchProgressExtension(this.searchProgress, () => keyText("app.interrupt")),

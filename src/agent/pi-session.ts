@@ -531,6 +531,7 @@ export async function createAutoRAGPiSession(options: AutoRAGPiSessionOptions): 
 		cwd: options.cwd,
 		agentDir,
 		settingsManager,
+		additionalSkillPaths: [...(mcp?.skillPaths ?? [])],
 		extensionFactories: [
 			...(mcp?.extensionFactories ?? []),
 			createAutoRAGExtension(
@@ -627,6 +628,7 @@ export async function createAutoRAGPiInteractiveRuntime(
 				? {}
 				: { extensionFlagValues: new Map(Object.entries(options.extensionFlags)) }),
 			resourceLoaderOptions: {
+				additionalSkillPaths: [...(mcp?.skillPaths ?? [])],
 				...(options.extensionPaths === undefined ? {} : { additionalExtensionPaths: [...options.extensionPaths] }),
 				extensionFactories: [
 					...(mcp?.extensionFactories ?? []),
