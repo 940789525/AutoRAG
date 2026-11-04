@@ -36,8 +36,22 @@ const BUSINESS_KEYS = new Set([
 ]);
 
 /** QA-only observer. Actual nested execution events, not script parsing, count MCP requests. */
-export function githubQaTrace(runId: string, calls: GitHubQaCall[]): ExtensionFactory {
+export function githubQaTrace(
+	runId: string,
+	calls: GitHubQaCall[],
+	record?: (event: Record<string, unknown>) => void,
+): ExtensionFactory {
 	return (pi) => {
+		if (record) {
+			pi.on("before_provider_request", () => { record({ event: "model_request" }); });
+			pi.on("message_end", ({ message }) => {
+				if (message.role === "assistant") record({ event: "model_end", stopReason: message.stopReason });
+			});
+		}
+		const checkpoint = (call: GitHubQaCall) => record?.({
+			event: "tool", tool: call.tool, toolCallId: call.toolCallId, parentToolCallId: call.parentToolCallId,
+			method: call.parameters.method, status: call.status, durationMs: call.durationMs, responseBytes: call.responseBytes,
+		});
 		const pending = new Map<string, { call: GitHubQaCall; started: number }>();
 		pi.on("tool_execution_start", (event, ctx) => {
 			const args = event.args as Record<string, unknown>;
@@ -58,6 +72,7 @@ export function githubQaTrace(runId: string, calls: GitHubQaCall[]): ExtensionFa
 				status: "running",
 			};
 			calls.push(call);
+			checkpoint(call);
 			pending.set(event.toolCallId, { call, started: performance.now() });
 		});
 		pi.on("tool_execution_end", (event) => {
@@ -71,12 +86,14 @@ export function githubQaTrace(runId: string, calls: GitHubQaCall[]): ExtensionFa
 				item.call.result = event.result;
 				item.call.responseBytes = Buffer.byteLength(JSON.stringify(event.result));
 			}
+			checkpoint(item.call);
 		});
 		pi.on("agent_end", () => {
 			for (const { call, started } of pending.values()) {
 				call.status = "cancelled";
 				call.finishedAt = new Date().toISOString();
 				call.durationMs = performance.now() - started;
+				checkpoint(call);
 			}
 			pending.clear();
 		});

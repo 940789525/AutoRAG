@@ -2,7 +2,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 /**
- * Intent tracing: every tool the model can call also takes a short `i` argument, one line saying
+ * Intent tracing: JSON-schema tools also take a short `i` argument, one line saying
  * what that call is for. The text is shown while the model works (pi's `Working` loader in the TUI,
  * `progress` events of `searchDocumentsStream` for the CLI and the desktop app), so a long search
  * says what it is doing without the model writing separate progress notes.
@@ -95,15 +95,17 @@ function declareIntent(message: AgentMessage): AgentMessage {
 	if (message.role !== "system" || message.toolsAdded === undefined || message.toolsAdded.length === 0) return message;
 	return {
 		...message,
-		toolsAdded: message.toolsAdded.map((tool) => ({
-			...tool,
-			parameters: withIntentField(tool.parameters) as typeof tool.parameters,
-		})),
+		toolsAdded: message.toolsAdded.map((tool) =>
+			// Grammar tools encode one string input; adding metadata would invalidate that contract.
+			tool.constrainedSampling && tool.constrainedSampling.type === "grammar"
+				? tool
+				: { ...tool, parameters: withIntentField(tool.parameters) as typeof tool.parameters },
+		),
 	};
 }
 
 /**
- * Wires intent tracing into a pi session: declares `i` on every tool, takes it off the arguments
+ * Wires intent tracing into a pi session: declares `i` on JSON-schema tools, takes it off the arguments
  * before the tool runs, and, when the session has a terminal UI, shows the newest intent as the
  * working message. Register it in every session whose model calls AutoRAG's tools.
  */

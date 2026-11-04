@@ -1,0 +1,77 @@
+{
+  "schemaVersion": 1,
+  "recordType": "template",
+  "status": "NOT_RUN",
+  "runId": null,
+  "startedAt": null,
+  "completedAt": null,
+  "code": {
+    "commit": null,
+    "dirty": null,
+    "piVersion": null,
+    "skillRevision": null
+  },
+  "model": {
+    "provider": null,
+    "id": null,
+    "thinking": null,
+    "credentialReference": null
+  },
+  "mcp": {
+    "connectionName": "github",
+    "endpoint": "https://api.githubcopilot.com/mcp/",
+    "exposure": null,
+    "serverInfo": null,
+    "negotiatedProtocolVersion": null,
+    "toolCatalogDigest": null,
+    "readOnlyVerified": null,
+    "toolCatalog": []
+  },
+  "verificationLayers": {
+    "L1": "NOT_RUN",
+    "L2": "NOT_RUN",
+    "L3": "NOT_RUN",
+    "L4": "NOT_RUN"
+  },
+  "dataset": {
+    "revision": null,
+    "cases": []
+  },
+  "modelRequests": [],
+  "discoveryRecords": [],
+  "codemodeExecutions": [],
+  "mcpCalls": [],
+  "evidence": [],
+  "metrics": {
+    "totalCases": null,
+    "executedCases": null,
+    "skippedCases": null,
+    "passedCases": null,
+    "taskCompletionRate": null,
+    "citationValidityRate": null,
+    "unsupportedClaimCount": null,
+    "mcpBusinessCallCount": null,
+    "discoveryCount": null,
+    "codemodeExecutionCount": null,
+    "modelRequestCount": null,
+    "inputTokens": null,
+    "outputTokens": null,
+    "cacheReadTokens": null,
+    "cacheWriteTokens": null,
+    "endToEndDurationMs": null,
+    "remoteWriteRequestCount": null,
+    "remoteStateChangeCount": null
+  },
+  "checks": [],
+  "errors": [],
+  "skips": [],
+  "isolation": {
+    "qaRoot": null,
+    "dailyConfigBefore": [],
+    "dailyConfigAfter": [],
+    "dailyConfigsUnchanged": null,
+    "ownedStateCleanup": "NOT_RUN",
+    "ownedProcessCleanup": "NOT_RUN"
+  },
+  "limitations": []
+}

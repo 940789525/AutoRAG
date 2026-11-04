@@ -1,16 +1,27 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { inertUi } from "../../test/helpers/inert-ui.ts";
+import {
+	boundedGitHubSearch,
+	probeGitHub,
+	summarizeGitHubComparison,
+	validateGitHubCase,
+	waitForGitHubTools,
+} from "./github-mcp-acceptance.ts";
 import { type GitHubQaCall, githubQaTrace } from "./github-mcp-trace.ts";
 
 const { values } = parseArgs({
 	options: {
 		checks: { type: "boolean", default: false },
+		"probe-only": { type: "boolean", default: false },
+		review: { type: "string" },
+		reviews: { type: "string" },
 		manifest: { type: "string" },
 		model: { type: "string" },
 		compare: { type: "boolean", default: false },
@@ -18,6 +29,57 @@ const { values } = parseArgs({
 		output: { type: "string", default: ".omo/evidence/github-pr-analysis.json" },
 	},
 });
+if (values.review) {
+	assert(values.reviews, "--review <report> requires --reviews <human-review-file>");
+	const saved = JSON.parse(readFileSync(resolve(values.review), "utf8"));
+	const reviews = JSON.parse(readFileSync(resolve(values.reviews), "utf8"));
+	assert.equal(reviews.runId, saved.runId, "Human reviews must name this report's runId");
+	for (const row of saved.cases) {
+		const review = reviews.cases?.[row.caseId];
+		if (!review) continue;
+		assert(["PASS", "FAIL"].includes(review.businessReview));
+		assert(["PASS", "FAIL", "NOT_APPLICABLE"].includes(review.ciReview));
+		assert(
+			!(row.ciReview === "NOT_RUN" && review.ciReview === "NOT_APPLICABLE"),
+			"A required CI case cannot be waived",
+		);
+		assert(
+			Number.isSafeInteger(review.citationsChecked) && review.citationsChecked > 0,
+			"Record the number of citations actually reviewed",
+		);
+		assert(
+			Number.isSafeInteger(review.citationsValid) &&
+				review.citationsValid >= 0 &&
+				review.citationsValid <= review.citationsChecked,
+		);
+		assert(Number.isSafeInteger(review.unsupportedClaimCount) && review.unsupportedClaimCount >= 0);
+		row.businessReview = review.businessReview;
+		row.ciReview = review.ciReview;
+		row.citationsChecked = review.citationsChecked;
+		row.citationsValid = review.citationsValid;
+		row.unsupportedClaimCount = review.unsupportedClaimCount;
+		row.comparable = review.comparable === true;
+		row.status =
+			row.automaticChecks !== "PASS" ||
+			review.businessReview === "FAIL" ||
+			review.ciReview === "FAIL" ||
+			review.citationsValid !== review.citationsChecked ||
+			review.unsupportedClaimCount > 0
+				? "FAIL"
+				: "PASS";
+	}
+	saved.L4 = {
+		status: saved.cases.some((row: any) => row.status === "FAIL")
+			? "FAIL"
+			: saved.cases.length && saved.cases.every((row: any) => row.status === "PASS")
+				? "PASS"
+				: "NOT_RUN",
+	};
+	saved.comparison = summarizeGitHubComparison(saved.cases);
+	writeFileSync(resolve(values.review), `${JSON.stringify(saved, null, 2)}\n`);
+	console.log(JSON.stringify({ L4: saved.L4.status, comparison: saved.comparison }));
+	process.exit(saved.L4.status === "FAIL" ? 1 : 0);
+}
 const repoRoot = fileURLToPath(new URL("../../", import.meta.url));
 const output = resolve(values.output!);
 const root = mkdtempSync(join(tmpdir(), "autorag-github-qa-"));
@@ -41,28 +103,34 @@ const implementationFiles = [
 	"src/agent/agent.ts",
 	"src/agent/mcp-client.ts",
 	"src/agent/pi-session.ts",
+	"src/agent/intent-tracing.ts",
 	"src/agent/github-mcp-evidence.ts",
 	"skills/github-pr-analysis/SKILL.md",
 	"scripts/manual-qa/github-mcp-trace.ts",
+	"scripts/manual-qa/github-mcp-acceptance.ts",
 	"scripts/manual-qa/run-qa-github-mcp.mts",
 	"test/agent/github-mcp-evidence.test.ts",
 	"test/agent/github-mcp-workflow.test.ts",
+	"test/agent/intent-tracing.test.ts",
 	"test/helpers/github-mcp-server.ts",
 	"test/manual-qa/github-mcp-qa.test.ts",
+	"test/manual-qa/github-mcp-acceptance.test.ts",
 ];
-const report: Record<string, any> = {
-	version: 1,
-	runId: randomUUID(),
-	date: new Date().toISOString(),
-	code: spawnSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8" }).stdout.trim(),
-	implementationSha256: Object.fromEntries(
+const implementationSnapshot = () =>
+	Object.fromEntries(
 		implementationFiles.map((path) => [
 			path,
 			createHash("sha256")
 				.update(readFileSync(join(repoRoot, path)))
 				.digest("hex"),
 		]),
-	),
+	);
+const report: Record<string, any> = {
+	version: 1,
+	runId: randomUUID(),
+	date: new Date().toISOString(),
+	code: spawnSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, encoding: "utf8" }).stdout.trim(),
+	implementationSha256: implementationSnapshot(),
 	checks: [],
 	L3: { status: "NOT_RUN" },
 	L4: { status: "NOT_RUN" },
@@ -90,6 +158,7 @@ try {
 		const tests = [
 			"github-mcp-evidence",
 			"github-mcp-workflow",
+			"intent-tracing",
 			"mcp-client",
 			"answer-citations",
 			"citation-links",
@@ -102,12 +171,24 @@ try {
 			["bun", "run", "check"],
 			["bun", "run", "lint"],
 			["bun", "run", "typecheck"],
-			[process.execPath, "node_modules/vitest/vitest.mjs", "run", ...tests, "test/manual-qa/github-mcp-qa.test.ts"],
+			[
+				process.execPath,
+				"node_modules/vitest/vitest.mjs",
+				"run",
+				...tests,
+				"test/manual-qa/github-mcp-qa.test.ts",
+				"test/manual-qa/github-mcp-acceptance.test.ts",
+			],
 			["bun", "run", "build"],
 		];
 		for (const [command, ...args] of commands) {
 			const started = performance.now();
-			const result = spawnSync(command, args, { cwd: repoRoot, encoding: "utf8", maxBuffer: 32 * 1024 * 1024 });
+			const result = spawnSync(command, args, {
+				cwd: repoRoot,
+				encoding: "utf8",
+				maxBuffer: 32 * 1024 * 1024,
+				timeout: 60_000,
+			});
 			const log = `${result.stdout ?? ""}${result.stderr ?? ""}${result.error ? `\n${result.error.message}` : ""}`;
 			const logPath = `${output}.${report.checks.length}.log`;
 			mkdirSync(dirname(logPath), { recursive: true });
@@ -129,7 +210,7 @@ try {
 	const missing = [
 		!process.env.GITHUB_MCP_TOKEN && "GITHUB_MCP_TOKEN",
 		!values.manifest && "--manifest",
-		!values.model && "--model",
+		!values.model && !values["probe-only"] && "--model",
 	].filter(Boolean);
 	if (missing.length) {
 		const skip = { status: "SKIP", reason: `Missing ${missing.join(", ")}; no real GitHub/model requests made.` };
@@ -137,183 +218,204 @@ try {
 		report.L4 = skip;
 		report.comparison = skip;
 	} else {
-		const [{ AutoRAGAgent }, configApi, { GITHUB_READ_TOOLS }] = await Promise.all([
-			import("../../src/agent/agent.ts"),
-			import("../../src/cli/config.ts"),
-			import("../../src/agent/github-mcp-evidence.ts"),
-		]);
 		const manifest = JSON.parse(readFileSync(resolve(values.manifest!), "utf8"));
 		assert(
 			Array.isArray(manifest.samples) && manifest.samples.length > 0,
 			"Manifest must contain frozen public samples",
 		);
-		const modelConfig = JSON.parse(readFileSync(resolve(values.model!), "utf8"));
-		assert.deepEqual(
-			Object.keys(modelConfig),
-			["model"],
-			"Supply a model-only reference config, never a copy of daily configuration",
-		);
-		const repeats = Number(values.repeats);
-		assert(Number.isSafeInteger(repeats) && repeats > 0, "--repeats must be a positive integer");
-		for (let repetition = 0; repetition < repeats; repetition++)
-			for (const sample of manifest.samples) {
-				assert(sample.public === true, "Each fixture must be explicitly confirmed public by the operator");
-				assert(
+		assert.equal(manifest.version, 1, "Unsupported sample manifest version");
+		for (const sample of manifest.samples) {
+			assert(
+				sample.public === true &&
 					/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[1-9][0-9]*$/u.test(sample.url),
-					"Only explicit public github.com PR samples are supported",
-				);
-				assert(
-					typeof sample.headSha === "string" && sample.headSha.length > 0,
-					"Freeze the expected headSha before running",
-				);
-				const groups = values.compare
-					? repetition % 2
-						? ["codemode", "direct"]
-						: ["direct", "codemode"]
-					: ["codemode"];
-				for (const exposure of groups) {
-					const caseRoot = mkdtempSync(join(root, "case-"));
-					const agentDir = join(caseRoot, "pi");
-					mkdirSync(agentDir);
-					const configPath = join(caseRoot, "config.json");
-					assert(configPath.startsWith(root), "Config target must be inside this run's temp root");
-					writeFileSync(
-						configPath,
-						JSON.stringify({
-							...modelConfig,
-							searchPaths: [join(root, "docs")],
-							workspacePath: caseRoot,
-							memoryPath: join(caseRoot, "memory.json"),
-							rerank: false,
-							queryDecomposition: false,
-							jikji: false,
-						}),
+				"Only explicitly public github.com PRs are allowed",
+			);
+			assert(/^[a-f0-9]{40}$/iu.test(sample.headSha), "Freeze a full PR head SHA");
+			assert(
+				Array.isArray(sample.expectedText) &&
+					sample.expectedText.length > 0 &&
+					sample.expectedText.every((fact: unknown) => typeof fact === "string" && fact.trim()),
+				"Freeze nonempty expected facts",
+			);
+		}
+		report.fixture = manifest;
+		report.L3 = await probeGitHub(process.env.GITHUB_MCP_TOKEN!, manifest.samples);
+		if (values["probe-only"]) {
+			report.L4 = { status: "SKIP", reason: "L3-only run; no model invoked" };
+			report.comparison = { status: "SKIP", reason: "L3-only run; no model invoked" };
+		} else {
+			const [{ AutoRAGAgent }, configApi] = await Promise.all([
+				import("../../src/agent/agent.ts"),
+				import("../../src/cli/config.ts"),
+			]);
+			const modelConfig = JSON.parse(readFileSync(resolve(values.model!), "utf8"));
+			report.model = {
+				provider: modelConfig.model?.provider,
+				id: modelConfig.model?.id,
+				apiKeyEnv: modelConfig.model?.apiKeyEnv,
+			};
+			assert.deepEqual(
+				Object.keys(modelConfig),
+				["model"],
+				"Supply a model-only reference config, never a copy of daily configuration",
+			);
+			const repeats = Number(values.repeats);
+			assert(Number.isSafeInteger(repeats) && repeats > 0, "--repeats must be a positive integer");
+			for (let repetition = 0; repetition < repeats; repetition++)
+				for (const sample of manifest.samples) {
+					assert(sample.public === true, "Each fixture must be explicitly confirmed public by the operator");
+					assert(
+						/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[1-9][0-9]*$/u.test(sample.url),
+						"Only explicit public github.com PR samples are supported",
 					);
-					const template = JSON.parse(
-						readFileSync(join(repoRoot, "docs", "examples", `github-mcp.${exposure}.json`), "utf8"),
+					assert(
+						typeof sample.headSha === "string" && sample.headSha.length > 0,
+						"Freeze the expected headSha before running",
 					);
-					writeFileSync(join(agentDir, "mcp.json"), JSON.stringify(template));
-					const config = configApi.resolveConfigReadOnly({ flags: { config: configPath }, cwd: caseRoot });
-					const model = await configApi.resolveAgentModel(config, { agentDir });
-					const agent = new AutoRAGAgent({
-						...configApi.buildAgentOptions(config, agentDir),
-						...model,
-						piAgentDir: agentDir,
-						piSessionDir: join(caseRoot, "sessions"),
-						persistPiSessions: true,
-					});
-					const calls: GitHubQaCall[] = [];
-					let hosted: Awaited<ReturnType<typeof agent.createPiInteractiveRuntime>> | undefined;
-					try {
-						hosted = await agent.createPiInteractiveRuntime({
-							extensionFactories: [githubQaTrace(report.runId, calls)],
-						});
-						const session = hosted.runtime.session;
-						await session.bindExtensions({});
-						const tools = session.getAllTools().filter((tool) => tool.name.startsWith("mcp__github__"));
-						const names = tools.map((tool) => tool.name);
-						assert(
-							names.length === GITHUB_READ_TOOLS.length &&
-								names.every((name) => GITHUB_READ_TOOLS.some((tool) => name === `mcp__github__${tool}`)),
-							"GitHub tool directory is incomplete or exposes unselected tools",
+					const groups = values.compare
+						? repetition % 2
+							? ["codemode", "direct"]
+							: ["direct", "codemode"]
+						: ["codemode"];
+					for (const exposure of groups) {
+						const caseRoot = mkdtempSync(join(root, "case-"));
+						const agentDir = join(caseRoot, "pi");
+						mkdirSync(agentDir);
+						const configPath = join(caseRoot, "config.json");
+						assert(configPath.startsWith(root), "Config target must be inside this run's temp root");
+						writeFileSync(
+							configPath,
+							JSON.stringify({
+								...modelConfig,
+								searchPaths: [join(root, "docs")],
+								workspacePath: caseRoot,
+								memoryPath: join(caseRoot, "memory.json"),
+								rerank: false,
+								queryDecomposition: false,
+								jikji: false,
+							}),
 						);
-						report.L3 = {
-							status: "PASS",
-							tools,
-							serverInfo: null,
-							negotiatedProtocol: null,
-							note: "Actual Pi tool directory; server version/protocol are not exposed by this observer and still require operator recording.",
-						};
-						if (exposure === "direct")
-							session.setActiveToolsByName(session.getActiveToolNames().filter((name) => name !== "codemode"));
-						for (const phase of ["cold", "warm"]) {
-							const firstCall = calls.length;
-							const started = performance.now();
-							const query =
-								phase === "cold" && sample.debug === true
-									? `请先通过 codemode 发现 GitHub PR 读取工具并输出发现结果，再分析 ${sample.url} 的问题、变更、讨论和当前提交 CI。给出真实证据引用；失败时保留原错误。`
-									: `请分析 ${sample.url} 解决的问题、主要修改、讨论中的未决事项和当前提交 CI。读取可用的失败日志，给出来源及不能确认的内容。`;
-							assert(
-								!(exposure === "direct" && sample.debug === true),
-								"Use separate non-debug samples for direct/codemode comparisons",
-							);
-							const response = await agent.searchDocuments(query);
-							const trace = calls.slice(firstCall);
-							const mcp = trace.filter((call) => call.tool.startsWith("mcp__github__"));
-							const scripts = trace.filter((call) => call.tool === "codemode");
-							const substituted = trace.some(
-								(call) =>
-									!call.tool.startsWith("mcp__github__") &&
-									!["codemode", "read", "tool_search"].includes(call.tool),
-							);
-							const protocolValid =
-								mcp.length > 0 &&
-								!substituted &&
-								(exposure === "direct"
-									? scripts.length === 0 && mcp.every((call) => !call.parentToolCallId)
-									: mcp.some((call) => !!call.parentToolCallId));
-							const entries = session.sessionManager
-								.getEntries()
-								.filter((entry) => entry.type === "custom" && entry.customType === "autorag.evidence");
-							const facts = (sample.expectedText ?? []).map((text: string) => ({
-								text,
-								present: response.answer.includes(text),
-							}));
-							const row = {
-								sample: sample.id,
-								url: sample.url,
-								expectedHeadSha: sample.headSha,
-								repetition,
-								exposure,
-								phase,
-								debug: sample.debug === true,
-								query,
-								status: protocolValid && response.results.length > 0 ? "PASS" : "FAIL",
-								businessReview: "NOT_RUN",
-								ciReview: "NOT_RUN",
-								durationMs: performance.now() - started,
-								response,
-								trace,
-								evidence: entries,
-								expectedFacts: facts,
-								mcpCalls: mcp.length,
-								scripts: scripts.length,
-							};
-							report.cases.push(row);
-							if (row.status === "FAIL") process.exitCode = 1;
-						}
-						const logPath = join(caseRoot, "logs", "runs.jsonl");
-						if (existsSync(logPath))
-							report.cases[report.cases.length - 1].runLog = readFileSync(logPath, "utf8")
-								.trim()
-								.split("\n")
-								.map((line) => JSON.parse(line));
-					} catch (error) {
-						report.cases.push({
-							sample: sample.id,
-							exposure,
-							repetition,
-							status: "FAIL",
-							error: error instanceof Error ? error.stack : String(error),
-							trace: calls,
+						const template = JSON.parse(
+							readFileSync(join(repoRoot, "docs", "examples", `github-mcp.${exposure}.json`), "utf8"),
+						);
+						writeFileSync(join(agentDir, "mcp.json"), JSON.stringify(template));
+						const config = configApi.resolveConfigReadOnly({ flags: { config: configPath }, cwd: caseRoot });
+						const model = await configApi.resolveAgentModel(config, { agentDir });
+						const agent = new AutoRAGAgent({
+							...configApi.buildAgentOptions(config, agentDir),
+							...model,
+							piAgentDir: agentDir,
+							piSessionDir: join(caseRoot, "sessions"),
+							persistPiSessions: true,
 						});
-						process.exitCode = 1;
-					} finally {
-						if (hosted) await hosted.dispose();
-						else await agent.indexJobs.close();
+						const calls: GitHubQaCall[] = [];
+						let phaseName = "setup";
+						const journal = `${output}.${report.runId}.events.jsonl`;
+						report.journal = journal;
+						mkdirSync(dirname(output), { recursive: true });
+						const record = (event: Record<string, unknown>) => appendFileSync(journal, JSON.stringify({
+							at: new Date().toISOString(), sample: sample.id, repetition, exposure, phase: phaseName, ...event,
+						}) + "\n", { mode: 0o600 });
+						record({ event: "setup" });
+						let hosted: Awaited<ReturnType<typeof agent.createPiInteractiveRuntime>> | undefined;
+						try {
+							hosted = await agent.createPiInteractiveRuntime({
+								extensionFactories: [githubQaTrace(report.runId, calls, record)],
+							});
+							const session = hosted.runtime.session;
+							const notices: string[] = [];
+							await session.bindExtensions({ uiContext: inertUi(notices) });
+							await waitForGitHubTools(session, notices);
+							if (exposure === "direct")
+								session.setActiveToolsByName(
+									session.getActiveToolNames().filter((name) => name !== "codemode"),
+								);
+							for (const phase of ["cold", "warm"]) {
+								phaseName = phase;
+								record({ event: "search_start" });
+								const firstCall = calls.length;
+								const logPath = join(caseRoot, "logs", "runs.jsonl");
+								const firstLog = existsSync(logPath) ? readFileSync(logPath, "utf8").length : 0;
+								const started = performance.now();
+								const query =
+									phase === "cold" && sample.debug === true
+										? `请先通过 codemode 发现 GitHub PR 读取工具并输出发现结果，再分析 ${sample.url} 的问题、变更、讨论和当前提交 CI。给出真实证据引用；失败时保留原错误。`
+										: `请分析 ${sample.url} 解决的问题、主要修改、讨论中的未决事项和当前提交 CI。读取可用的失败日志，给出来源及不能确认的内容。`;
+								assert(
+									!(exposure === "direct" && sample.debug === true),
+									"Use separate non-debug samples for direct/codemode comparisons",
+								);
+								const response = await boundedGitHubSearch(agent, query, 60_000, () => record({ event: "deadline" }));
+								const trace = calls.slice(firstCall);
+								const mcp = trace.filter((call) => call.tool.startsWith("mcp__github__"));
+								const scripts = trace.filter((call) => call.tool === "codemode");
+								const entries = session.sessionManager
+									.getEntries()
+									.filter((entry) => entry.type === "custom" && entry.customType === "autorag.evidence");
+								const validation = validateGitHubCase(
+									sample,
+									exposure,
+									trace,
+									response.answer,
+									response.results.map(result => result.source),
+								);
+								const runLog = existsSync(logPath)
+									? readFileSync(logPath, "utf8")
+											.slice(firstLog)
+											.trim()
+											.split("\n")
+											.filter(Boolean)
+											.map((line) => JSON.parse(line))
+									: [];
+								const row = {
+									...validation,
+									caseId: `${sample.id}/${repetition}/${exposure}/${phase}`,
+									sample: sample.id,
+									url: sample.url,
+									expectedHeadSha: sample.headSha,
+									repetition,
+									exposure,
+									phase,
+									debug: sample.debug === true,
+									query,
+									durationMs: performance.now() - started,
+									response,
+									trace,
+									evidence: entries,
+									runLog,
+									modelUsage: runLog.filter((event: any) => event.event === "model_usage"),
+									mcpCalls: mcp.length,
+									scripts: scripts.length,
+								};
+								report.cases.push(row);
+								record({ event: "search_end", status: row.status, durationMs: row.durationMs, results: response.results.length });
+								if (row.status === "FAIL") process.exitCode = 1;
+							}
+						} catch (error) {
+							report.cases.push({
+								sample: sample.id,
+								exposure,
+								repetition,
+								status: "FAIL",
+								error: error instanceof Error ? error.stack : String(error),
+								trace: calls,
+							});
+							process.exitCode = 1;
+						} finally {
+							record({ event: "cleanup_start" });
+							try { await hosted?.dispose(); } finally { await agent.indexJobs.close(); }
+							record({ event: "cleanup_end" });
+						}
 					}
 				}
-			}
-		report.L4 = {
-			status: report.cases.some((row: any) => row.status === "FAIL") ? "FAIL" : "NOT_RUN",
-			note: "Raw real-model runs recorded; manually verify SHA/run/job alignment, claims, citations and CI before declaring business acceptance PASS.",
-		};
-		report.comparison = {
-			status: values.compare ? "NOT_RUN" : "SKIP",
-			reason:
-				"Paired raw rows retained; review mutable GitHub data and expected facts before comparing. No performance improvement is presumed.",
-			totalTokenCost: null,
-		};
+			report.L4 = {
+				status: report.cases.some((row: any) => row.status === "FAIL") ? "FAIL" : "NOT_RUN",
+				note: "Raw real-model runs recorded; manually verify SHA/run/job alignment, claims, citations and CI before declaring business acceptance PASS.",
+			};
+			report.comparison = values.compare
+				? summarizeGitHubComparison(report.cases)
+				: { status: "SKIP", reason: "--compare not requested" };
+		}
 	}
 } catch (error) {
 	report.error = error instanceof Error ? error.stack : String(error);
@@ -321,6 +423,8 @@ try {
 	report.L4 = { status: "FAIL", error: report.error };
 	process.exitCode = 1;
 } finally {
+	// `check --write` can format files before the tests; fingerprint the verified files.
+	report.implementationSha256 = implementationSnapshot();
 	report.realConfigAfter = snapshot();
 	report.realConfigUnchanged = JSON.stringify(before) === JSON.stringify(report.realConfigAfter);
 	if (!report.realConfigUnchanged) process.exitCode = 1;

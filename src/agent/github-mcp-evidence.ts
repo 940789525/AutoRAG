@@ -29,7 +29,7 @@ function browserSource(value: unknown, repo: string): string | undefined {
 		if (url.origin !== "https://github.com" || url.username || url.password) return undefined;
 		const prefix = `/${repo}/`;
 		return url.pathname.toLowerCase().startsWith(prefix.toLowerCase()) &&
-			/^(?:pull\/\d+|issues\/\d+|actions\/runs\/\d+)(?:\/|$)/u.test(url.pathname.slice(prefix.length))
+			/^(?:pull\/\d+|issues\/\d+|actions\/runs\/\d+|runs\/\d+)(?:\/|$)/u.test(url.pathname.slice(prefix.length))
 			? url.href
 			: undefined;
 	} catch {
@@ -84,14 +84,16 @@ export class GitHubEvidenceAdapter {
 		const pr = prNumber ? this.prs.get(`${repo}/${prNumber}`) : undefined;
 		const register = (source: string, content: string, context = ""): void => {
 			if (!content.trim()) return;
+			const page = event.input.page === undefined ? "" : `page ${event.input.page}; `;
 			for (let offset = 0; offset < content.length; offset += 1700) {
-				const location =
+				const range =
 					`${context} chars ${offset}-${Math.min(offset + 1700, content.length)}/${content.length}`.trim();
+				const location = `${page}${range}`;
 				const excerpt = content.slice(offset, offset + 1700);
 				const id = this.ledger.register({
 					method: event.toolName,
 					source,
-					content: `${location}\n${excerpt}`,
+					content: `${range}\n${excerpt}`,
 					evidenceLocation: location,
 				});
 				hints.push(`[${id}] ${source} (${location}) ${excerpt.slice(0, 100)}`);
@@ -104,6 +106,10 @@ export class GitHubEvidenceAdapter {
 			}
 			const item = object(value);
 			if (!item) return;
+			if (object(item.pageInfo)?.hasNextPage === true)
+				diagnostics.push(
+					"GitHub evidence: response reports unread pages (hasNextPage=true); only returned content is cited.",
+				);
 			if (item.error !== undefined) {
 				diagnostics.push(
 					`GitHub evidence: ${typeof item.error === "string" ? item.error : JSON.stringify(item.error)}`,
@@ -180,6 +186,7 @@ export class GitHubEvidenceAdapter {
 				"edges",
 				"node",
 				"reviewThreads",
+				"review_threads",
 				"threads",
 			]) {
 				if (item[key] !== undefined) visit(item[key]);

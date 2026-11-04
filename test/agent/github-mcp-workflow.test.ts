@@ -3,7 +3,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { type FauxResponseStep, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
+import {
+	type Context,
+	type FauxResponseStep,
+	fauxAssistantMessage,
+	fauxToolCall,
+	getCurrentTools,
+} from "@earendil-works/pi-ai";
+import { resolveGrammarConstrainedSampling } from "@earendil-works/pi-ai/api/constrained-sampling";
 import { registerFauxProvider } from "@earendil-works/pi-ai/compat";
 import { MockBackend } from "jev-use";
 import { describe, expect, it } from "vitest";
@@ -21,7 +28,8 @@ import {
 import { inertUi } from "../helpers/inert-ui.ts";
 
 const server = fileURLToPath(new URL("../helpers/github-mcp-server.ts", import.meta.url));
-const input = { owner: "example", repo: "project", pullNumber: 42, method: "get" };
+const repository = { owner: "example", repo: "project" };
+const input = { ...repository, pullNumber: 42, method: "get" };
 const call = (tool: string, args: Record<string, string | number>, exposure: string): FauxResponseStep =>
 	fauxAssistantMessage(
 		[
@@ -50,13 +58,22 @@ describe("GitHub evidence through the real Pi MCP pipeline (synthetic service/mo
 				const responses: FauxResponseStep[] = [
 					...(exposure === "codemode"
 						? [
-								fauxAssistantMessage(
-									[fauxToolCall("codemode", { code: 'return searchTools("github pull request");' })],
-									{ stopReason: "toolUse" },
-								),
+								(context: Context) => {
+									const tool = getCurrentTools(context.messages).find((entry) => entry.name === "codemode");
+									if (!tool) throw new Error("codemode was not declared");
+									// Use the provider's real validation: faux responses alone do not enforce grammar schemas.
+									expect(resolveGrammarConstrainedSampling(tool, true)).toMatchObject({
+										inputProperty: "code",
+									});
+									return fauxAssistantMessage(
+										[fauxToolCall("codemode", { code: 'return searchTools("github pull request");' })],
+										{ stopReason: "toolUse" },
+									);
+								},
 							]
 						: []),
 					call("pull_request_read", input, exposure),
+					call("issue_read", { ...repository, method: "get", issue_number: 41 }, exposure),
 					...(exposure === "codemode"
 						? [
 								fauxAssistantMessage(
@@ -72,16 +89,16 @@ describe("GitHub evidence through the real Pi MCP pipeline (synthetic service/mo
 								call("pull_request_read", { ...input, method: "get_diff" }, exposure),
 								call("pull_request_read", { ...input, method: "get_comments" }, exposure),
 							]),
-					call("actions_list", { ...input, method: "list_workflow_runs" }, exposure),
-					call("actions_get", { ...input, method: "list_workflow_jobs", run_id: 77 }, exposure),
-					call("get_job_logs", { ...input, job_id: 88 }, exposure),
+					call("actions_list", { ...repository, method: "list_workflow_runs" }, exposure),
+					call("actions_list", { ...repository, method: "list_workflow_jobs", resource_id: "77" }, exposure),
+					call("get_job_logs", { ...repository, job_id: 88 }, exposure),
 					(context) => {
 						const text = JSON.stringify(context.messages);
 						expect(text).toContain("403 Forbidden: comments unavailable /fixture/comments");
 						expect(text).toContain("FAIL search.test.ts");
 						expect(text).toContain("github-pr-analysis");
 						return fauxAssistantMessage(
-							"修复空搜索结果 [e1]。日志显示测试预期 2 条而实际为 0 [e5]。评论读取失败：403 Forbidden: comments unavailable /fixture/comments。",
+							"修复空搜索结果 [e1]，关联问题描述搜索无结果 [e2]。日志显示测试预期 2 条而实际为 0 [e6]。评论读取失败：403 Forbidden: comments unavailable /fixture/comments。",
 							{ stopReason: "stop" },
 						);
 					},
@@ -110,9 +127,16 @@ describe("GitHub evidence through the real Pi MCP pipeline (synthetic service/mo
 					},
 				});
 				const calls: GitHubQaCall[] = [];
+				const events: Record<string, unknown>[] = [];
 				const hosted =
 					mode === "tui"
-						? await agent.createPiInteractiveRuntime({ extensionFactories: [githubQaTrace("fixture", calls)] })
+						? await agent.createPiInteractiveRuntime({
+								extensionFactories: [
+									githubQaTrace("fixture", calls, (event) => {
+										events.push(event);
+									}),
+								],
+							})
 						: undefined;
 				try {
 					if (hosted) {
@@ -136,9 +160,14 @@ describe("GitHub evidence through the real Pi MCP pipeline (synthetic service/mo
 							new ConversationQueries(),
 							session.sessionManager,
 						);
-						expect(restored.lookup("e5", { allowLocalFiles: false })[0]?.source).toContain("/job/88");
+						expect(restored.lookup("e6", { allowLocalFiles: false })[0]?.source).toContain("/job/88");
 						const business = calls.filter((call) => call.tool.startsWith("mcp__github__"));
-						expect(business).toHaveLength(6);
+						expect(business).toHaveLength(7);
+						for (const call of business) {
+							expect(
+								events.filter((event) => event.toolCallId === call.toolCallId).map((event) => event.status),
+							).toEqual(["running", call.status]);
+						}
 						expect(business.every((call) => call.durationMs !== undefined)).toBe(true);
 						expect(business.some((call) => call.status === "error")).toBe(true);
 						expect(business.every((call) => !!call.parentToolCallId)).toBe(exposure === "codemode");

@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "frozenAt": "2026-11-04",
+  "samples": [
+    {
+      "id": "identity-ci-failure",
+      "public": true,
+      "url": "https://github.com/Marker-Inc-Korea/AutoRAG/pull/2034",
+      "headSha": "1832963d64d8ef2927eae62ca5c27aeb2c6a1339",
+      "expectedText": [
+        "IDENTITY.md",
+        "1930",
+        "lite-refresh-force"
+      ],
+      "ci": {
+        "runId": 40845231065,
+        "jobId": 123350970723,
+        "failureText": "lite-refresh-force.test.ts"
+      }
+    }
+  ]
+}

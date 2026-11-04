@@ -120,6 +120,48 @@ describe("GitHub MCP evidence contract", () => {
 		expect(ledger.takeUnsaved()).toEqual([]);
 	});
 
+	it("cites snake-case review threads and check-run URLs, retaining unread-page diagnostics", () => {
+		const ledger = new EvidenceLedger();
+		const adapter = new GitHubEvidenceAdapter(ledger);
+		const reviewUrl = `${url}#discussion_r123`;
+		const result = adapter.adapt(
+			event(
+				"pull_request_read",
+				{
+					review_threads: [{ comments: { nodes: [{ url: reviewUrl, body: "Please fix the edge case" }] } }],
+					pageInfo: { hasNextPage: true },
+				},
+				{ method: "get_review_comments", page: 2 },
+			),
+		);
+		expect(JSON.stringify(result)).toContain("unread pages");
+		adapter.adapt(
+			event(
+				"pull_request_read",
+				{
+					check_runs: [
+						{
+							id: 99,
+							status: "completed",
+							conclusion: "failure",
+							html_url: "https://github.com/example/project/runs/99",
+						},
+					],
+				},
+				{ method: "get_check_runs" },
+			),
+		);
+		const entries = ledger.takeUnsaved();
+		expect(entries.map((entry) => entry.source)).toEqual([reviewUrl, "https://github.com/example/project/runs/99"]);
+		expect(entries[0]?.evidenceLocation).toContain("page 2");
+		const answer = deriveResultsFromAnswer("评审提出边界问题 [e1]，检查失败 [e2]。", ledger, {
+			allowLocalFiles: false,
+			numbers: new CitationNumbers(),
+		});
+		expect(answer.diagnostics).toEqual([]);
+		expect(answer.details.results).toHaveLength(2);
+	});
+
 	it("does not turn errors, empty/unknown shapes, wrong identities or untrusted tools into evidence", () => {
 		const ledger = new EvidenceLedger();
 		const adapter = new GitHubEvidenceAdapter(ledger);

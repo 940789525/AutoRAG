@@ -90,21 +90,83 @@ node scripts/manual-qa/run-qa-github-mcp.mts \
 
 报告保留父子调用 ID、业务参数、脚本文本/输出、耗时、原错误、证据和原有运行日志。认证 headers/环境值不采集。实际 GitHub 请求按 MCP 执行事件计数，不能把发现函数或一个父脚本当作全部业务请求。model usage 原始记录保留；无法证明包含全部路由/规划成本时，总 token 成本保持 null。
 
-自动状态只检查调用路径和引用结果是否存在。真实业务验收还必须人工核对 PR/head SHA、CI run/job 关联、失败日志、事实和引用支持关系；`businessReview`/`ciReview` 默认 NOT_RUN。远程数据发生变化的配对不能用于性能结论，不能把单次演示或模拟模型写成真实模型完成率。
+自动检查核对调用路径、引用是否存在、预期事实、实际 PR/head SHA，以及读取日志前是否已取得同仓库且对应目标 SHA 的 run/job。自动通过只设置 `automaticChecks: PASS`，样例总体状态仍为 `NOT_RUN`，等待人工事实和引用复核；失败保持 `FAIL`。远程数据发生变化的配对不能用于性能结论，不能把单次演示或模拟模型写成真实模型完成率。
+
+## 2026-11-03 续开发与人工接续
+
+本轮补齐 `review_threads`、`/runs/<id>` 证据来源和分页未读提示；严格化本地接口夹具，纠正 `list_workflow_jobs` 的工具与参数归属。只读目录/schema/协议由已安装的 MCP SDK 做受控探测，Pi 会话工具目录等待后台连接就绪后再检查。探测请求与模型业务调用分开记录，均不包含认证 headers。
+
+仅验证真实服务、不调用模型时，在隔离 QA 容器内执行：
+
+```bash
+node scripts/manual-qa/run-qa-github-mcp.mts --probe-only \
+  --manifest /tmp/github-qa-public-samples.json \
+  --output /workspace/.omo/evidence/github-pr-probe.json
+```
+
+仍需安全注入 `GITHUB_MCP_TOKEN`。样本必须包含 `version: 1`、明确公开的 PR URL、完整 40 位 head SHA 和非空 `expectedText`。失败 CI 样本另加 `ci: { "runId": <真实数字>, "jobId": <真实数字>, "failureText": "<日志原文>" }`。真实值必须在运行前核验，旧报告中的 ID/SHA 不能默认仍有效。
+
+人工复核可在运行结束后离线登记，不需要重新执行模型或提供认证。复核文件只记录对应报告的真实 runId 和 caseId，例如：
+
+```json
+{
+  "runId": "<报告中的 runId>",
+  "cases": {
+    "<样本ID>/0/codemode/cold": {
+      "businessReview": "PASS",
+      "ciReview": "PASS",
+      "comparable": true,
+      "citationsChecked": 3,
+      "citationsValid": 3,
+      "unsupportedClaimCount": 0
+    }
+  }
+}
+```
+
+以上为格式示例，不能代替实际审查。没有要求失败 CI 的样本允许 `ciReview: NOT_APPLICABLE`；要求的 CI 样本不能这样豁免。复核不允许覆盖自动检查失败。`comparable` 需确认两组 PR/SHA、讨论和 CI 数据可比后填写。
+
+```bash
+node scripts/manual-qa/run-qa-github-mcp.mts \
+  --review /workspace/.omo/evidence/github-pr-comparison.json \
+  --reviews /tmp/github-human-reviews.json
+```
+
+只有两组均通过自动检查、人工业务/CI 复核且确认可比的配对才进入性能指标。报告按 cold/warm、direct/codemode 分开保存逐阶段 usage、缓存 token、调用数、延迟和引用有效率。原有路由/规划成本尚未完整测量，总 token 成本继续保持 null，不能据此宣称全流程节省。
+
+本地检查每个子命令最多等待 60 秒，服务探测每个请求超时 15 秒；这是 QA 的执行边界，不改变产品会话或模型轮次。没有凭据时直接 SKIP，不启动远程调用。最初一轮 141 项测试及检查记录见 [续开发验证报告](qa/github-pr-follow-up-2026-11-03.json)。原先在宿主环境失败的九项 MCP 测试，在独立无网络 Docker 中全部通过；不将宿主差异当作产品缺陷修补。
+
+Docker 恢复后，真实模型调用暴露了一个兼容缺陷：进度说明逻辑向 grammar 约束的 `codemode` 添加必填 `i` 字段，违反单字符串输入合同，导致模型请求发出前失败。现已在 `intent-tracing.ts` 保留 grammar 工具的原始声明，并让 headless/TUI 回归使用提供方实际的 grammar 校验函数。修复后 check、lint、typecheck、build 与 12 个文件的 149 项测试均通过。
+
+当前账号的 `openai-codex/gpt-6.1-sol` 已在独立容器中通过冷发现调试：加载分析 skill，经 codemode 发现并实际读取公开 PR #2023，标题、完整 head SHA 和最终 GitHub 来源引用核对一致，耗时约 23.5 秒。其中一次错误的发现调用由模型自行纠正，记录中保留失败。普通 PR #2034/CI 分析达到 75 秒总时限后停止，未保存完整答案或工具轨迹，不记为业务通过，也没有重复运行。日常认证与配置摘要前后一致，只清理本次创建的容器。详见 [真实调用与修复记录](qa/github-pr-codemode-live-2026-11-03.json)。
+
+## 2026-11-04 失败 CI 验收
+
+公开 PR #2034 的固定样本在 [样本清单](examples/github-pr-ci-public-sample.json)。使用前述隔离步骤并安全注入 GitHub 只读凭据后，可以单独验证 PR 的 head SHA、失败 run、该 run 中的失败 job 和日志尾部原文。任何一层身份不匹配都会终止后续探测。
+
+```bash
+node scripts/manual-qa/run-qa-github-mcp.mts --probe-only \
+  --manifest docs/examples/github-pr-ci-public-sample.json \
+  --output .omo/evidence/github-ci-probe.json
+```
+
+模型验收每次业务提问限时 60 秒，到期调用 `agent.abort()` 并将该案例记为失败。模型请求、工具开始和结束、超时以及清理事件逐条写入输出文件旁的 `<output>.<runId>.events.jsonl`。即使测试进程被外部终止，已经写出的事件也可以用于定位。CI 样本的最终答案必须有指向指定 job 的引用。
+
+本轮在当前代码回放了七类真实 MCP 返回，逐个核对了证据编号与来源。随后在隔离容器内用当前账号的 6.1 sol 完成了 PR #2034 的在线分析。GitHub 工具在 5.4 秒内就绪，含就绪时间共用 53.5 秒。AutoRAG 通过 codemode 成功读取 GitHub 11 次，将 PR 提交与失败 run、job 对应，并引用了目标 job 的真实测试日志。该案例的自动检查通过，业务与 CI 结论的正式人工复核尚未执行。完整回答和 10 条编号来源见 [P0–P3 验证记录](qa/github-pr-p0-p3-2026-11-04.json)。
 
 ## 阶段记录与限制
 
-实现基线按用户要求为 `codex/observable-local-index`，基线提交 `3d97c44e6b0f53aac4b1f5d675d528ea86c93902`，未改动其他未跟踪的开发材料。
+早期实现记录使用 `codex/observable-local-index` 的 `3d97c44e6b0f53aac4b1f5d675d528ea86c93902`。本轮继续当前分支 `codex/github-pr-analysis-local-index`，HEAD 为 `52da4df6e307f92eaefd72b2e8ddb72210dd6d0c`；修改尚未提交，没有切换或同步分支，未改动其他未跟踪的开发材料。
 
 | 阶段 | 本次实现 | 真实验收状态 |
 | --- | --- | --- |
-| P0 接入契约 | 保留官方远程只读配置，支持的结果形状有合同测试 | SKIP：环境没有 GITHUB_MCP_TOKEN，实际工具目录/协议/公开 PR 夹具尚未冻结 |
-| P1 最小场景 | TUI/headless 的 MCP 调用与 skill 加载已由 L2 验证 | 真实模型冷发现/业务提问 SKIP |
-| P2 证据引用 | JSON/结构化/diff/log、真实 ID、结果映射、交互会话恢复 | L1/L2 验证；真实服务 SKIP |
-| P3 PR/CI 流程 | skill 和真实 MCP 协议夹具覆盖顺序、并发部分失败与 CI 引用 | 真实失败日志案例 SKIP |
-| P4 调用证据 | QA 观察器、隔离运行报告、配置摘要和清理收据 | 夹具调用有实际父子事件；真实服务记录 SKIP |
-| P5 回归 | check、lint、typecheck、相关测试和 build | 不宣称全套测试或模型 live E2E 已执行 |
-| P6 对照 | 配对运行/分组检测/原始测量设施 | SKIP：没有实际模型/GitHub 样本测量，不宣称性能收益 |
+| P0 接入契约 | 只读配置、独立 SDK 探测与目录/schema/协议记录 | 官方服务与五个只读工具已验证，两个公开 PR/SHA 已核验；失败样本的 PR、run、job 和日志已逐层核验 |
+| P1 最小场景 | TUI/headless 装配、skill 加载与 grammar 参数兼容修复 | 真实 6.1 sol 冷发现与单 PR 读取通过；PR #2034 普通业务自动检查通过，实际终端演示待补 |
+| P2 证据引用 | JSON/结构化/diff/log、review_threads、CI /runs/ 来源、分页诊断和会话恢复 | L1/L2 通过；真实 PR 标题/SHA 到最终来源引用已验证，七类真实返回回放通过，完整回答的逐项人工复核待补 |
+| P3 PR/CI 流程 | skill、严格接口夹具，以及 SHA/run/job/事实验收检查 | PR #2034 完整分析与真实失败日志自动检查通过；业务与 CI 人工复核及其他场景待补 |
+| P4 调用证据 | QA 观察器、逐阶段 usage、隔离摘要与离线人工复核 | 最小真实调用和 PR #2034 成功运行都有父子事件，旧超时运行没有完整轨迹，全流程成本仍未知 |
+| P5 回归 | check、lint、typecheck、152 项相关测试和 build 通过 | 最小模型链路通过；不宣称全套测试或完整业务 E2E 已通过 |
+| P6 对照 | 配对运行、混组检测、人工复核门禁和指标汇总 | SKIP：没有 direct/codemode 的有效配对结果，不宣称性能收益 |
 | P7 交付 | 实现、测试、配置示例与本页操作说明 | 仍待补齐以上真实验收，不能标记整个方案完成 |
 
 既有 live-E2E 场景不启用 GitHub MCP；本次没有更改默认本地检索、embedding、数据源身份或公共答案 schema。相应回归仍需覆盖默认无 MCP 路径；GitHub 场景的端到端证据由本页专用 runner 生成。未运行模型冷/暖 live E2E，不沿用既有绿灯作为新功能证明。
