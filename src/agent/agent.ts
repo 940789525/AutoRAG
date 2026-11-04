@@ -89,7 +89,7 @@ import {
 	type ParsedMirrorSyncResult,
 	syncParsedMirrors,
 } from "../mirror/sync.ts";
-import { AutoRAGRunLogger } from "../observability/run-log.ts";
+import { AutoRAGRunLogger, assistantUsageEvent } from "../observability/run-log.ts";
 import { type DefaultParserRegistryOptions, resolveParserOptions } from "../parser/index.ts";
 import { RetrievalEngine } from "../retrieval/engine.ts";
 import { ParallelRetriever, ResultMerger } from "../retrieval/merger.ts";
@@ -1202,10 +1202,43 @@ export class AutoRAGAgent {
 		const convertFilesTool = this.fileeOptions === false ? undefined : createConvertFilesTool(this);
 		const listFileConversionsTool = this.fileeOptions === false ? undefined : createListFileConversionsTool(this);
 		const manageAutomationsTool = createManageAutomationsTool();
-		this.jevJudge =
+		const judge =
 			options.jev === undefined || options.jev === false
 				? undefined
 				: createJevJudge({ ...options.jev, agentDir: options.piAgentDir });
+		this.jevJudge =
+			judge === undefined
+				? undefined
+				: async (...args) => {
+						const sessionId = this.lastSessionId ?? "unbound";
+						const started = performance.now();
+						let result: Awaited<ReturnType<JevJudge>> | undefined;
+						try {
+							result = await judge(...args);
+							return result;
+						} finally {
+							const input = result?.usage?.inputTokens;
+							const output = result?.usage?.outputTokens;
+							const valid = (value: number | undefined): value is number =>
+								Number.isFinite(value) && value! >= 0;
+							this.runLogger.write({
+								event: "model_usage",
+								timestamp: new Date().toISOString(),
+								sessionId,
+								scope: "jev",
+								model: result?.model ?? "jev",
+								stopReason: result === undefined ? "error" : "stop",
+								usageReported: valid(input) && valid(output),
+								inputTokens: valid(input) ? input : null,
+								outputTokens: valid(output) ? output : null,
+								totalTokens: valid(input) && valid(output) ? input + output : null,
+								cacheReadTokens: null,
+								cacheWriteTokens: null,
+								cost: null,
+								latencyMs: performance.now() - started,
+							});
+						}
+					};
 		this.jevExtension = this.jevJudge === undefined ? undefined : createJevExtension(this.jevJudge);
 		this.selfConfig = this.jevJudge === undefined ? undefined : options.selfConfig;
 		this.permissions = options.permissionController ?? new PermissionController(options.permissionMode ?? "full");
@@ -1693,27 +1726,7 @@ export class AutoRAGAgent {
 			onContextSettled: (success) => this.contextSelection.settle(success),
 			onContextReset: (reason) => this.contextSelection.invalidate(reason),
 			onModelUsage: (message, scope, timing) => {
-				const usage = message.usage;
-				const usageReported = [usage?.input, usage?.output, usage?.cacheRead, usage?.cacheWrite].some(
-					(value) => Number.isFinite(value) && value > 0,
-				);
-				this.runLogger.write({
-					event: "model_usage",
-					timestamp: new Date().toISOString(),
-					sessionId: this.lastSessionId ?? "unbound",
-					scope,
-					model: message.model,
-					usageReported,
-					stopReason: message.stopReason,
-					inputTokens: usageReported && Number.isFinite(usage?.input) ? usage.input : null,
-					outputTokens: usageReported && Number.isFinite(usage?.output) ? usage.output : null,
-					cacheReadTokens: usageReported && Number.isFinite(usage?.cacheRead) ? usage.cacheRead : null,
-					cacheWriteTokens: usageReported && Number.isFinite(usage?.cacheWrite) ? usage.cacheWrite : null,
-					totalTokens: usageReported && Number.isFinite(usage?.totalTokens) ? usage.totalTokens : null,
-					cost: usageReported && Number.isFinite(usage?.cost?.total) ? usage.cost.total : null,
-					latencyMs: timing.latencyMs,
-					firstTokenMs: timing.firstTokenMs ?? null,
-				});
+				this.runLogger.write(assistantUsageEvent(message, scope, this.lastSessionId ?? "unbound", timing));
 			},
 		};
 	}
@@ -2036,7 +2049,13 @@ export class AutoRAGAgent {
 					throw new Error("Natural-language indexing needs a conversation model");
 				const resolved = await this.resolveSessionModel();
 				signal.throwIfAborted();
+				const started = performance.now();
+				const sessionId = this.lastSessionId ?? "unbound";
 				return createModelDecompositionCompleter(resolved, signal, 512, (message) => {
+					this.runLogger.write(
+						assistantUsageEvent(message, "index_intent", sessionId, { latencyMs: performance.now() - started }),
+					);
+					if (!message) return;
 					this.routingDiagnostics.push({
 						code: "index-intent",
 						severity: "info",
@@ -2426,6 +2445,7 @@ export class AutoRAGAgent {
 				sessionId,
 				queryLength: trimmedQuery.length,
 				model: resolved.model.id,
+				usageVersion: 1,
 			});
 			searchStarted = true;
 			session = await this.createSearchSession(
@@ -3058,11 +3078,23 @@ export class AutoRAGAgent {
 					? { apiKey: resolved.apiKey ?? resolved.providerApiKeys?.[resolved.model.provider] }
 					: {}),
 			};
+			const started = performance.now();
+			const sessionId = this.lastSessionId ?? "unbound";
 			try {
 				queries = await this.searchProgress.step(
 					"decompose",
 					"Splitting the question into search queries",
-					() => decomposeQuery(createModelDecompositionCompleter(target, signal), query),
+					() =>
+						decomposeQuery(
+							createModelDecompositionCompleter(target, signal, 2048, (message) => {
+								this.runLogger.write(
+									assistantUsageEvent(message, "query_decomposition", sessionId, {
+										latencyMs: performance.now() - started,
+									}),
+								);
+							}),
+							query,
+						),
 					(list) => `${list.length} ${list.length === 1 ? "query" : "queries"}`,
 				);
 			} catch (error) {

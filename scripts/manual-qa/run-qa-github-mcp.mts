@@ -11,15 +11,18 @@ import {
 	boundedGitHubSearch,
 	probeGitHub,
 	summarizeGitHubComparison,
+	summarizeGitHubUsage,
 	validateGitHubCase,
 	waitForGitHubTools,
 } from "./github-mcp-acceptance.ts";
 import { type GitHubQaCall, githubQaTrace } from "./github-mcp-trace.ts";
+import { prepareGitHubReview } from "./github-mcp-review.ts";
 
 const { values } = parseArgs({
 	options: {
 		checks: { type: "boolean", default: false },
 		"probe-only": { type: "boolean", default: false },
+		"prepare-review": { type: "string" },
 		review: { type: "string" },
 		reviews: { type: "string" },
 		manifest: { type: "string" },
@@ -30,11 +33,26 @@ const { values } = parseArgs({
 		output: { type: "string", default: ".omo/evidence/github-pr-analysis.json" },
 	},
 });
+if (values["prepare-review"]) {
+	const input = readFileSync(resolve(values["prepare-review"]), "utf8");
+	const packet = prepareGitHubReview(JSON.parse(input), createHash("sha256").update(input).digest("hex"));
+	const directory = resolve(values.output!);
+	mkdirSync(directory, { recursive: true });
+	for (const [name, content] of Object.entries({
+		"report.json": packet.reportText, "reviews.pending.json": `${JSON.stringify(packet.reviews, null, 2)}\n`, "review.html": packet.html,
+	})) writeFileSync(join(directory, name), content, { flag: "wx", mode: 0o600 });
+	console.log(JSON.stringify({ reviewPacket: directory, humanReview: "NOT_RUN" }));
+	process.exit(0);
+}
 if (values.review) {
 	assert(values.reviews, "--review <report> requires --reviews <human-review-file>");
-	const saved = JSON.parse(readFileSync(resolve(values.review), "utf8"));
+	const savedText = readFileSync(resolve(values.review), "utf8");
+	const saved = JSON.parse(savedText);
 	const reviews = JSON.parse(readFileSync(resolve(values.reviews), "utf8"));
 	assert.equal(reviews.runId, saved.runId, "Human reviews must name this report's runId");
+	assert(typeof reviews.reviewer === "string" && reviews.reviewer.trim(), "Name the human who reviewed the evidence");
+	assert(typeof reviews.reviewedAt === "string" && Number.isFinite(Date.parse(reviews.reviewedAt)), "Record the actual review time");
+	if (reviews.reportSha256) assert.equal(reviews.reportSha256, createHash("sha256").update(savedText).digest("hex"), "The reviewed report changed; prepare a fresh packet");
 	for (const row of saved.cases) {
 		const review = reviews.cases?.[row.caseId];
 		if (!review) continue;
@@ -77,6 +95,7 @@ if (values.review) {
 				: "NOT_RUN",
 	};
 	saved.comparison = summarizeGitHubComparison(saved.cases);
+	saved.humanReview = { reviewer: reviews.reviewer, reviewedAt: reviews.reviewedAt };
 	writeFileSync(resolve(values.review), `${JSON.stringify(saved, null, 2)}\n`);
 	console.log(JSON.stringify({ L4: saved.L4.status, comparison: saved.comparison }));
 	process.exit(saved.L4.status === "FAIL" ? 1 : 0);
@@ -159,6 +178,9 @@ try {
 		const tests = [
 			"github-mcp-evidence",
 			"github-mcp-workflow",
+			"github-mcp-lifecycle",
+			"jev-pipeline",
+			"query-decomposition",
 			"intent-tracing",
 			"mcp-client",
 			"answer-citations",
@@ -179,6 +201,7 @@ try {
 				...tests,
 				"test/manual-qa/github-mcp-qa.test.ts",
 				"test/manual-qa/github-mcp-acceptance.test.ts",
+				"test/observability/run-log.test.ts",
 			],
 			["bun", "run", "build"],
 		];
@@ -406,6 +429,7 @@ try {
 									evidence: entries,
 									runLog,
 									modelUsage: runLog.filter((event: any) => event.event === "model_usage"),
+									pipelineUsage: summarizeGitHubUsage(runLog),
 									mcpCalls: mcp.length,
 									scripts: scripts.length,
 								};

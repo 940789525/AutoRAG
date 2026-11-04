@@ -1,0 +1,168 @@
+{
+  "date": "2026-11-04",
+  "baselineCommit": "5176c2dfafee6ce42b3b91bba7f0f5be002e8050",
+  "branch": "codex/github-pr-analysis-local-index",
+  "implementationSha256": {
+    "src/agent/agent.ts": "d8d145c6dbcc5da06a78f4268cc7f9ab3214dfd44844735a0956b5c3eb8a63e5",
+    "src/agent/query-decomposition.ts": "81da96636fce34d1a185ff8ad9569be7cbc18c00745ffe9579efa0e1f4cf6d43",
+    "src/observability/run-log.ts": "d8698644e32dcdec21916fc155e153525618054318bdd47f52fe7d88d6a3bdac",
+    "scripts/manual-qa/github-mcp-acceptance.ts": "64498d0097262e36a1f31741e3fd6d2680053b01a60132cb1e89c2f89ddfa2d1",
+    "scripts/manual-qa/github-mcp-review.ts": "8fdf6f91d4ff807020d5b220451a12c4f8d6b14f24d15d659a658de498163d73",
+    "scripts/manual-qa/run-qa-github-mcp.mts": "3a671ad0459c2c6c57a9a79c2340f1bdf67dff3d80ac8f8fdf58af84509f7976",
+    "test/agent/github-mcp-lifecycle.test.ts": "3681eb3d0df3a14555e35d74db23f37e2b8acd68c5aa8b9fa91e512c5a25a22c",
+    "test/agent/jev-pipeline.test.ts": "4a4c4451ecd8ab7bcf4ada943b9b1b23fdd5286a59fff70dd6bbc6c2a62bc7ae",
+    "test/helpers/github-mcp-server.ts": "a445a24ef394038aff56c06d67fb7faf36ab95f23f3439660ce672824e9a74f5",
+    "test/manual-qa/github-mcp-acceptance.test.ts": "5943092f5de20f17b30c0971a5138434aed0c53bbba0c575096f4f88167e0f32",
+    "test/manual-qa/github-mcp-qa.test.ts": "6f74b2f0708c62d82a72984e1dd77cb7215d4722af0967c402909ce7a5065ca0",
+    "test/observability/run-log.test.ts": "9d74a5b8c76e88ebbb46beecf23b230f5cba258d9bed25cdda99f6b410133024"
+  },
+  "checks": [
+    {
+      "command": [
+        "bun",
+        "run",
+        "check"
+      ],
+      "exitCode": 0,
+      "status": "PASS",
+      "durationMs": 1869
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "lint"
+      ],
+      "exitCode": 0,
+      "status": "PASS",
+      "durationMs": 1267
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "typecheck"
+      ],
+      "exitCode": 0,
+      "status": "PASS",
+      "durationMs": 6242
+    },
+    {
+      "command": [
+        "node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "--configLoader",
+        "native",
+        "--no-cache",
+        "--fsModuleCachePath",
+        "/tmp/github-vitest-cache",
+        "--reporter=json",
+        "--outputFile=/evidence/tests.json",
+        "test/agent/github-mcp-evidence.test.ts",
+        "test/agent/github-mcp-workflow.test.ts",
+        "test/agent/github-mcp-lifecycle.test.ts",
+        "test/agent/intent-tracing.test.ts",
+        "test/agent/mcp-client.test.ts",
+        "test/agent/answer-citations.test.ts",
+        "test/agent/citation-links.test.ts",
+        "test/agent/citation-numbers.test.ts",
+        "test/agent/evidence-ledger.test.ts",
+        "test/agent/evidence-refs-e2e.test.ts",
+        "test/agent/pi-session.test.ts",
+        "test/agent/jev-pipeline.test.ts",
+        "test/agent/query-decomposition.test.ts",
+        "test/manual-qa/github-mcp-qa.test.ts",
+        "test/manual-qa/github-mcp-acceptance.test.ts",
+        "test/observability/run-log.test.ts"
+      ],
+      "exitCode": 0,
+      "status": "PASS",
+      "durationMs": 11591
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "build"
+      ],
+      "exitCode": 0,
+      "status": "PASS",
+      "durationMs": 2901
+    }
+  ],
+  "regression": {
+    "testFiles": 16,
+    "passed": 198,
+    "failed": 0,
+    "success": true,
+    "fullSuiteRun": false
+  },
+  "execution": {
+    "boundary": "owned ephemeral Docker container, source copy and read-only dependency bind",
+    "image": "autorag-qa-ob8tmejo:latest",
+    "network": "none",
+    "hostHomeMounted": false,
+    "existingServicesTouched": false,
+    "containerRemoved": true
+  },
+  "cancellationAndDisconnect": {
+    "status": "PASS",
+    "layer": "L2: actual Pi sessions, real stdio MCP transport, deterministic synthetic service and model",
+    "exposures": [
+      "direct",
+      "codemode"
+    ],
+    "checks": [
+      "server observed cancellation",
+      "no dependent issue request after abort",
+      "late response released during next turn",
+      "new Pi session retains no cancelled evidence",
+      "transport disconnect preserves earlier PR evidence and original error"
+    ]
+  },
+  "usageCollection": {
+    "implementation": "PASS",
+    "controlledIntegration": "PASS",
+    "scopes": [
+      "answer_session",
+      "pi_compaction",
+      "jev",
+      "query_decomposition",
+      "index_intent"
+    ],
+    "boundaryVersion": 1,
+    "liveNewVersion": "NOT_RUN",
+    "reason": "GITHUB_MCP_TOKEN and runner model credentials are unavailable in this session. Historical missing usage cannot be reconstructed.",
+    "historicalFullPipelineTokens": null,
+    "pricingNote": "Jev does not expose per-call price or cache split. Missing fields stay null; external/provider-internal retries are not separately metered."
+  },
+  "humanReview": {
+    "status": "NOT_RUN",
+    "officiallyReviewedPairs": 0,
+    "packets": [
+      {
+        "directory": ".omo/evidence/github-review-ready-2026-11-04/p6",
+        "reportSha256": "d85b82658255dbd2dce6f49497201959b48cc6301269e05a4c765ca5b1516a3c",
+        "humanTemplateSha256": "534084b2468631160ee7bcf25dbee29afd7792e4b57c684649691186ce05ff86",
+        "htmlSha256": "328e201010b3635dd5a2ae931025ce8c57b9dfaa41850d567fe2897c181e9d00"
+      },
+      {
+        "directory": ".omo/evidence/github-review-ready-2026-11-04/ci",
+        "reportSha256": "b38319e7d5c20215fcd532bae1a2fbaa6a954a0468c3b5d36e0384dcedf5aad0",
+        "humanTemplateSha256": "ae82312a226387a75b7442c4aafe1ee13d34217cf0986c24486f38fd432f375c",
+        "htmlSha256": "d87ecf4a10c9098661966f46f962d40bf3b48d22010510eb959a1b61fd63420f"
+      }
+    ],
+    "requiredAction": "Open prepared HTML, verify facts/citations/CI identity and pairing, then supply actual reviewer identity, time and decisions. No automatic approval was entered."
+  },
+  "liveE2EReview": {
+    "changed": false,
+    "reason": "No new tool, retrieval method, datasource identity, embedding backend or public answer schema. New behavior is diagnostic usage collection. Default no-MCP and Pi/citation paths covered by current regressions; historical live evidence not relabeled as current."
+  },
+  "supplyChain": {
+    "status": "NOT_APPLICABLE",
+    "reason": "No dependency, license allowlist or embedding changes."
+  },
+  "manualSteps": "docs/github-pr-manual-review.md"
+}

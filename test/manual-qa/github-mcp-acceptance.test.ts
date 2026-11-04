@@ -7,6 +7,7 @@ import {
 	githubPayloads,
 	probeGitHub,
 	summarizeGitHubComparison,
+	summarizeGitHubUsage,
 	validateGitHubCase,
 	waitForGitHubTools,
 } from "../../scripts/manual-qa/github-mcp-acceptance.ts";
@@ -57,6 +58,31 @@ function trace(): GitHubQaCall[] {
 }
 
 describe("GitHub QA acceptance gates", () => {
+	it("keeps historical, partial, failed and missing provider usage unknown", () => {
+		const start = { event: "search_started", usageVersion: 1, sessionId: "s" };
+		const usage = {
+			event: "model_usage",
+			sessionId: "s",
+			scope: "answer_session",
+			usageReported: true,
+			totalTokens: 30,
+			cost: 0.01,
+		};
+		const end = { event: "search_completed", sessionId: "s" };
+		expect(summarizeGitHubUsage([start, usage, end])).toMatchObject({
+			complete: true,
+			fullPipelineTokens: 30,
+			totalTokenCost: 0.01,
+		});
+		for (const events of [
+			[{ ...start, usageVersion: undefined }, usage, end],
+			[start, usage],
+			[start, usage, { ...end, degraded: true }],
+			[start, usage, { ...usage, scope: "jev", usageReported: false, totalTokens: null }, end],
+			[start, usage, { ...usage, sessionId: "previous" }, end],
+		])
+			expect(summarizeGitHubUsage(events).fullPipelineTokens).toBeNull();
+	});
 	it("probes the selected SDK tool catalog and PR identity without a model", async () => {
 		const catalog = GITHUB_READ_TOOLS.map((name) => ({
 			name,

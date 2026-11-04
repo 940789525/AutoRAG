@@ -270,6 +270,29 @@ export function validateGitHubCase(
 }
 
 /** Raw measurements stay separate from human-reviewed, comparable business results. */
+export function summarizeGitHubUsage(runLog: Record<string, any>[]) {
+	const started = runLog.filter(event => event.event === "search_started");
+	const ended = runLog.filter(event => event.event === "search_completed" && !event.degraded);
+	const usage = runLog.filter(event => event.event === "model_usage");
+	const bounded = started.length === 1 && started[0].usageVersion === 1 && ended.length === 1 &&
+		started[0].sessionId === ended[0].sessionId && usage.every(event => event.sessionId === started[0].sessionId) &&
+		!runLog.some(event => event.event === "search_failed");
+	const sum = (field: string) => bounded && usage.length > 0 && usage.every(event =>
+		event.usageReported === true && typeof event[field] === "number" && Number.isFinite(event[field]) && event[field] >= 0,
+	) ? usage.reduce((total, event) => total + event[field], 0) : null;
+	return {
+		complete: sum("totalTokens") !== null,
+		modelCalls: usage.length,
+		fullPipelineTokens: sum("totalTokens"),
+		totalTokenCost: sum("cost"),
+		inputTokens: sum("inputTokens"), outputTokens: sum("outputTokens"),
+		cacheReadTokens: sum("cacheReadTokens"), cacheWriteTokens: sum("cacheWriteTokens"),
+		scopes: [...new Set(usage.map(event => event.scope))],
+		unknownUsageCalls: usage.filter(event => event.usageReported !== true || event.totalTokens == null).length,
+		boundaryVerified: bounded,
+	};
+}
+
 export function summarizeGitHubComparison(rows: Record<string, any>[]) {
 	const pairs = new Map<string, Record<string, any>[]>();
 	for (const row of rows.filter((row) => !row.debug)) {
@@ -294,6 +317,10 @@ export function summarizeGitHubComparison(rows: Record<string, any>[]) {
 		const middle = Math.floor(values.length / 2);
 		return values.length ? (values.length % 2 ? values[middle] : (values[middle - 1] + values[middle]) / 2) : null;
 	};
+	const accepted = eligible.flatMap(([, pair]) => pair);
+	const pipelineTotal = (field: string) => accepted.length > 0 && accepted.every(row =>
+		row.pipelineUsage?.complete === true && typeof row.pipelineUsage[field] === "number",
+	) ? accepted.reduce((total, row) => total + row.pipelineUsage[field], 0) : null;
 	return {
 		status: rows.some((row) => row.status === "FAIL")
 			? "FAIL"
@@ -341,7 +368,8 @@ export function summarizeGitHubComparison(rows: Record<string, any>[]) {
 				};
 			}),
 		),
-		totalTokenCost: null,
-		usageScope: "Raw per-phase model usage retained; complete routing/planning cost is not measured.",
+		fullPipelineTokens: pipelineTotal("fullPipelineTokens"),
+		totalTokenCost: pipelineTotal("totalTokenCost"),
+		usageScope: "Application-owned answer/compaction, Jev judgments and query decomposition; only reviewed comparable pairs are aggregated. Missing provider usage/pricing and historical uninstrumented runs stay null. External tool/provider-internal retries are not separately metered.",
 	};
 }

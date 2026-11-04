@@ -1,13 +1,16 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ContextSelectionReport } from "../agent/context-selection-projector.ts";
+
+export type ModelUsageScope = "answer_session" | "pi_compaction" | "jev" | "query_decomposition" | "index_intent";
 
 export type AutoRAGRunEvent =
 	| {
 			event: "model_usage";
 			timestamp: string;
 			sessionId: string;
-			scope: "answer_session" | "pi_compaction";
+			scope: ModelUsageScope;
 			model: string;
 			usageReported?: boolean;
 			stopReason?: string;
@@ -27,6 +30,8 @@ export type AutoRAGRunEvent =
 			sessionId: string;
 			queryLength: number;
 			model: string;
+			/** All application-owned answer, judgment and decomposition calls are observed. */
+			usageVersion?: 1;
 	  }
 	| {
 			event: "search_completed";
@@ -49,6 +54,37 @@ export type AutoRAGRunEvent =
 			failureCount: number;
 			errorTypes: string[];
 	  };
+
+/** pi's all-zero fallback is not a provider usage report. Missing usage stays unknown. */
+export function assistantUsageEvent(
+	message: AssistantMessage | undefined,
+	scope: ModelUsageScope,
+	sessionId: string,
+	timing: { latencyMs: number; firstTokenMs?: number },
+): Extract<AutoRAGRunEvent, { event: "model_usage" }> {
+	const usage = message?.usage;
+	const reported = [usage?.input, usage?.output, usage?.cacheRead, usage?.cacheWrite].some(
+		(value) => Number.isFinite(value) && value! > 0,
+	);
+	const count = (value: number | undefined) => (reported && Number.isFinite(value) && value! >= 0 ? value! : null);
+	return {
+		event: "model_usage",
+		timestamp: new Date().toISOString(),
+		sessionId,
+		scope,
+		model: message?.model ?? "unknown",
+		usageReported: reported,
+		stopReason: message?.stopReason ?? "error",
+		inputTokens: count(usage?.input),
+		outputTokens: count(usage?.output),
+		cacheReadTokens: count(usage?.cacheRead),
+		cacheWriteTokens: count(usage?.cacheWrite),
+		totalTokens: count(usage?.totalTokens),
+		cost: count(usage?.cost?.total),
+		latencyMs: timing.latencyMs,
+		firstTokenMs: timing.firstTokenMs ?? null,
+	};
+}
 
 export class AutoRAGRunLogger {
 	private readonly path: string;

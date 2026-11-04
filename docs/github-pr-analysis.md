@@ -1,5 +1,7 @@
 # GitHub PR 问题与变更分析
 
+2026-11-04 收尾新增取消/断连的真实 Pi→MCP 集成测试，以及回答、压缩、Jev、拆解的分阶段用量采集。正式人工复核和新版本真实用量仍需操作者接续；材料已准备，操作见[剩余人工步骤](github-pr-manual-review.md)。以下日期记录保留当时的结果与限制，不作为本轮的新验收。
+
 本功能基于 Pi 已有的 MCP 客户端和 codemode，通过用户配置的 `github` 只读连接读取 PR、明确关联的 Issue、diff、评论以及当前提交的 CI/日志。入口是明确的 `https://github.com/OWNER/REPO/pull/NUMBER`。不会因 commit/push 自动触发，不提供合并、评论、重跑 CI 或修改代码功能。
 
 ## 实现与职责
@@ -111,6 +113,8 @@ node scripts/manual-qa/run-qa-github-mcp.mts --probe-only \
 ```json
 {
   "runId": "<报告中的 runId>",
+  "reviewer": "<实际人工复核者>",
+  "reviewedAt": "<实际复核时间的 ISO 字符串>",
   "cases": {
     "<样本ID>/0/codemode/cold": {
       "businessReview": "PASS",

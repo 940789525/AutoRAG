@@ -1,10 +1,16 @@
 /** Synthetic GitHub-shaped service. stdout is reserved for the real MCP protocol. */
+import { appendFileSync, existsSync } from "node:fs";
+import { setTimeout as sleep } from "node:timers/promises";
 import { McpServer } from "@modelcontextprotocol/server";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { z } from "zod";
 
 const server = new McpServer({ name: "github-fixture", version: "1.0.0" });
 const base = "https://github.com/example/project";
+const record = (event: string, input: unknown) => {
+	if (process.env.GITHUB_FIXTURE_EVENTS)
+		appendFileSync(process.env.GITHUB_FIXTURE_EVENTS, `${JSON.stringify({ event, input })}\n`);
+};
 const expiredJob = {
 	id: 89,
 	run_id: 77,
@@ -43,8 +49,21 @@ server.registerTool(
 			})
 			.strict(),
 	},
-	async (args) => {
-		if (![42, 43].includes(args.pullNumber))
+	async (args, ctx) => {
+		record("request", args);
+		if (args.pullNumber === 44) {
+			ctx.mcpReq.signal.addEventListener("abort", () => record("cancelled", args), { once: true });
+			// Deliberately finish after cancellation to exercise late transport responses.
+			const release = process.env.GITHUB_FIXTURE_RELEASE;
+			if (release) {
+				while (!existsSync(release)) await sleep(10);
+			} else await sleep(500);
+			record("late-response", args);
+		}
+		if (args.pullNumber === 45) {
+			process.exit(23);
+		}
+		if (![42, 43, 44].includes(args.pullNumber))
 			return { isError: true, content: [{ type: "text", text: "404 Not Found: pull request does not exist" }] };
 		if (args.pullNumber === 43 && args.method === "get_comments")
 			return json({
@@ -90,7 +109,10 @@ server.registerTool(
 			})
 			.strict(),
 	},
-	async () => json({ number: 41, html_url: `${base}/issues/41`, body: "Search returns no results" }),
+	async (args) => {
+		record("request", args);
+		return json({ number: 41, html_url: `${base}/issues/41`, body: "Search returns no results" });
+	},
 );
 server.registerTool(
 	"actions_list",
