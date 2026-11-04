@@ -162,6 +162,23 @@ describe("GitHub MCP evidence contract", () => {
 		expect(answer.details.results).toHaveLength(2);
 	});
 
+	it("retains verified PR evidence when the next PR is missing and a job log has expired", () => {
+		const ledger = new EvidenceLedger();
+		const adapter = new GitHubEvidenceAdapter(ledger);
+		adapter.adapt(event());
+		const missing = event("pull_request_read", null, { pullNumber: 404 });
+		const expired = event("get_job_logs", null, { job_id: 89 });
+		for (const [input, message] of [
+			[missing, "404 Not Found"],
+			[expired, "410 Gone"],
+		] as const) {
+			input.structuredContent = { isError: true, content: [{ type: "text", text: message }] };
+			expect(adapter.adapt(input)).toBeUndefined();
+			expect(input.structuredContent.content).toEqual([{ type: "text", text: message }]);
+		}
+		expect(ledger.takeUnsaved().map((entry) => entry.source)).toEqual([url]);
+	});
+
 	it("does not turn errors, empty/unknown shapes, wrong identities or untrusted tools into evidence", () => {
 		const ledger = new EvidenceLedger();
 		const adapter = new GitHubEvidenceAdapter(ledger);

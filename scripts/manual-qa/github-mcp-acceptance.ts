@@ -12,6 +12,7 @@ export interface GitHubSample {
 	headSha: string;
 	public: boolean;
 	expectedText: string[];
+	question?: string;
 	debug?: boolean;
 	ci?: { runId: number; jobId: number; failureText: string };
 }

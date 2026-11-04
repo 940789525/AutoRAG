@@ -1,0 +1,110 @@
+{
+  "scope": "Frozen public sample audits by Codex; independent human review has not been recorded.",
+  "ownPr": {
+    "observedAt": "2026-11-04T03:01:14.634279+00:00",
+    "scope": "PR #2 linked issue and head CI in the real terminal UI",
+    "status": "PASS",
+    "model": "gpt-6.1-sol",
+    "headSha": "b7b2369c60678f209e43fc5ea85b4d8ea57ca080",
+    "changedFiles": [
+      "src/agent/pi-session.ts",
+      "test/agent/pi-session.test.ts"
+    ],
+    "durationSecondsIncludingStartupAndCleanup": 37.98,
+    "mcpReads": [
+      [
+        "mcp__github__pull_request_read",
+        "get"
+      ],
+      [
+        "mcp__github__pull_request_read",
+        "get_check_runs"
+      ],
+      [
+        "mcp__github__pull_request_read",
+        "get_status"
+      ],
+      [
+        "mcp__github__issue_read",
+        "get"
+      ]
+    ],
+    "independentGitHubVerification": {
+      "linkedIssue": 1,
+      "checks": [],
+      "actionsRuns": 0,
+      "combinedState": "pending",
+      "statuses": 0
+    },
+    "answer": "**PR #2 明确关联 Issue #1；最新提交未查到 CI 检查结果，不能判定为通过。**\n\n- 关联需求为 [Issue #1](https://github.com/940789525/AutoRAG/issues/1)：“PR 分析验收：把变更、关联 Issue 与当前提交的 CI 对应到证据”。这是 PR 正文明确链接的需求，不代表自动关闭关系。[e1][e2]\n- 最新 head 的完整 SHA：**b7b2369c60678f209e43fc5ea85b4d8ea57ca080**。[e1]\n- 该 SHA 的检查查询返回 **0 个 check runs**；提交状态汇总为 **pending**，但 **statuses 为空**。因此不能据此认定 CI 正在运行或已经通过。可核对 [PR Checks](https://github.com/940789525/AutoRAG/pull/2/checks) 和[该提交](https://github.com/940789525/AutoRAG/commit/b7b2369c60678f209e43fc5ea85b4d8ea57ca080)。\n\n当前没有可用的 CI 检查记录，无法确认实际测试结果。",
+    "regression": {
+      "beforeFix": "FAIL: OAuth resolution",
+      "afterFixTestsPassed": 86,
+      "check": "PASS",
+      "lint": "PASS",
+      "typecheck": "PASS",
+      "build": "PASS"
+    },
+    "dailyStateUnchanged": true,
+    "testContainerRemoved": true
+  },
+  "publicFailure": {
+    "modelAnswerRecord": "github-pr-p0-p3-2026-11-04.json",
+    "verifiedHead": "1832963d64d8ef2927eae62ca5c27aeb2c6a1339",
+    "reviewType": "Codex compared numbered sources with recorded MCP payloads, PR/diff, discussions, Actions metadata and logs.",
+    "humanReview": "NOT_RUN",
+    "sources": [
+      {
+        "number": 1,
+        "url": "https://github.com/Marker-Inc-Korea/AutoRAG/pull/2034",
+        "supports": "PR 正文说明 IDENTITY.md、草稿及负责人尚待确认的事项。"
+      },
+      {
+        "number": 2,
+        "url": "https://github.com/Marker-Inc-Korea/AutoRAG/actions/runs/40845231065/job/123350970723",
+        "supports": "该 job 的元数据和返回的 150 行日志确认 Test 失败、文件行号和多出的 --progress jsonl。"
+      },
+      {
+        "number": 3,
+        "url": "https://github.com/Marker-Inc-Korea/AutoRAG/issues/1930",
+        "supports": "Issue #1930 为 open，接口返回了指向 #2034 的关联。"
+      },
+      {
+        "number": 4,
+        "url": "https://github.com/Marker-Inc-Korea/AutoRAG/pull/2034/files",
+        "supports": "九个文件的 diff 涵盖读取器、Agent 提示词、CLI、文档及测试。"
+      },
+      {
+        "number": 5,
+        "url": "https://github.com/Marker-Inc-Korea/AutoRAG/issues/1930#issuecomment-6268512360",
+        "supports": "维护者评论选择自由格式身份文件并列出不在本次范围的功能。"
+      },
+      {
+        "number": 6,
+        "url": "https://github.com/Marker-Inc-Korea/AutoRAG/issues/1930#issuecomment-6470738900",
+        "supports": "实现者评论接受该方案并说明已保存会话的行为。"
+      },
+      {
+        "number": 7,
+        "url": "https://github.com/Marker-Inc-Korea/AutoRAG/actions/runs/40845231065",
+        "supports": "CI #1650 的运行身份、提交和结论与目标 PR 对应。"
+      },
+      {
+        "number": 8,
+        "url": "https://github.com/Marker-Inc-Korea/AutoRAG/actions/runs/40845231065/job/123350972834",
+        "supports": "compatibility 检查为 skipped。"
+      },
+      {
+        "number": 9,
+        "url": "https://github.com/Marker-Inc-Korea/AutoRAG/pull/2034#issuecomment-6471303746",
+        "supports": "旧提交评论中的 3156 < 3000 断言属于此前一次运行。"
+      },
+      {
+        "number": 10,
+        "url": "https://github.com/Marker-Inc-Korea/AutoRAG/pull/2034#issuecomment-6492284654",
+        "supports": "作者报告合入 #2037 并称 179/179 项本地测试通过；评论中运行中的 CI 后来有了最终结果。"
+      }
+    ],
+    "limitation": "The log establishes the assertion failure; it does not establish that this PR introduced it. Local 179/179 is attributed to its author."
+  }
+}

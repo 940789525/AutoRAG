@@ -25,6 +25,7 @@ const { values } = parseArgs({
 		manifest: { type: "string" },
 		model: { type: "string" },
 		compare: { type: "boolean", default: false },
+		"stop-on-error": { type: "boolean", default: false },
 		repeats: { type: "string", default: "1" },
 		output: { type: "string", default: ".omo/evidence/github-pr-analysis.json" },
 	},
@@ -231,6 +232,7 @@ try {
 				"Only explicitly public github.com PRs are allowed",
 			);
 			assert(/^[a-f0-9]{40}$/iu.test(sample.headSha), "Freeze a full PR head SHA");
+			assert(sample.question === undefined || (typeof sample.question === "string" && sample.question.trim()), "A custom question must be nonempty");
 			assert(
 				Array.isArray(sample.expectedText) &&
 					sample.expectedText.length > 0 &&
@@ -249,10 +251,21 @@ try {
 				import("../../src/cli/config.ts"),
 			]);
 			const modelConfig = JSON.parse(readFileSync(resolve(values.model!), "utf8"));
+			const access = process.env.AUTORAG_QA_CODEX_ACCESS;
+			delete process.env.AUTORAG_QA_CODEX_ACCESS;
+			let piCredentials;
+			if (modelConfig.model?.provider === "openai-codex" && access) {
+				const { InMemoryCredentialStore } = await import("@earendil-works/pi-ai");
+				const expires = JSON.parse(Buffer.from(access.split(".")[1], "base64url").toString()).exp * 1000;
+				assert(expires > Date.now() + 300_000, "A current Codex OAuth session is required");
+				piCredentials = new InMemoryCredentialStore();
+				await piCredentials.modify("openai-codex", async () => ({ type: "oauth", access, refresh: "", expires }));
+			}
 			report.model = {
 				provider: modelConfig.model?.provider,
 				id: modelConfig.model?.id,
 				apiKeyEnv: modelConfig.model?.apiKeyEnv,
+				thinking: { fast: "low", final: "low" },
 			};
 			assert.deepEqual(
 				Object.keys(modelConfig),
@@ -262,7 +275,7 @@ try {
 			const repeats = Number(values.repeats);
 			assert(Number.isSafeInteger(repeats) && repeats > 0, "--repeats must be a positive integer");
 			for (let repetition = 0; repetition < repeats; repetition++)
-				for (const sample of manifest.samples) {
+				for (const [sampleIndex, sample] of manifest.samples.entries()) {
 					assert(sample.public === true, "Each fixture must be explicitly confirmed public by the operator");
 					assert(
 						/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/pull\/[1-9][0-9]*$/u.test(sample.url),
@@ -273,7 +286,7 @@ try {
 						"Freeze the expected headSha before running",
 					);
 					const groups = values.compare
-						? repetition % 2
+						? (repetition + sampleIndex) % 2
 							? ["codemode", "direct"]
 							: ["direct", "codemode"]
 						: ["codemode"];
@@ -304,6 +317,8 @@ try {
 						const agent = new AutoRAGAgent({
 							...configApi.buildAgentOptions(config, agentDir),
 							...model,
+							piCredentials,
+							thinking: report.model.thinking,
 							piAgentDir: agentDir,
 							piSessionDir: join(caseRoot, "sessions"),
 							persistPiSessions: true,
@@ -326,10 +341,15 @@ try {
 							const notices: string[] = [];
 							await session.bindExtensions({ uiContext: inertUi(notices) });
 							await waitForGitHubTools(session, notices);
-							if (exposure === "direct")
+							if (values.compare) {
+								// tool_search can promote a deferred MCP tool to a top-level call in either group.
 								session.setActiveToolsByName(
-									session.getActiveToolNames().filter((name) => name !== "codemode"),
+									session.getActiveToolNames().filter((name) =>
+										name !== "tool_search" &&
+										(exposure === "direct" ? name !== "codemode" : !name.startsWith("mcp__github__")),
+									),
 								);
+							}
 							for (const phase of ["cold", "warm"]) {
 								phaseName = phase;
 								record({ event: "search_start" });
@@ -340,6 +360,8 @@ try {
 								const query =
 									phase === "cold" && sample.debug === true
 										? `请先通过 codemode 发现 GitHub PR 读取工具并输出发现结果，再分析 ${sample.url} 的问题、变更、讨论和当前提交 CI。给出真实证据引用；失败时保留原错误。`
+									: sample.question
+										? `${sample.url}\n${sample.question}`
 										: `请分析 ${sample.url} 解决的问题、主要修改、讨论中的未决事项和当前提交 CI。读取可用的失败日志，给出来源及不能确认的内容。`;
 								assert(
 									!(exposure === "direct" && sample.debug === true),
@@ -396,11 +418,13 @@ try {
 								sample: sample.id,
 								exposure,
 								repetition,
+								phase: phaseName,
 								status: "FAIL",
 								error: error instanceof Error ? error.stack : String(error),
 								trace: calls,
 							});
 							process.exitCode = 1;
+							if (values["stop-on-error"]) throw error;
 						} finally {
 							record({ event: "cleanup_start" });
 							try { await hosted?.dispose(); } finally { await agent.indexJobs.close(); }

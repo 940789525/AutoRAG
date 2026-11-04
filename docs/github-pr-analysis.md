@@ -154,7 +154,25 @@ node scripts/manual-qa/run-qa-github-mcp.mts --probe-only \
 
 本轮在当前代码回放了七类真实 MCP 返回，逐个核对了证据编号与来源。随后在隔离容器内用当前账号的 6.1 sol 完成了 PR #2034 的在线分析。GitHub 工具在 5.4 秒内就绪，含就绪时间共用 53.5 秒。AutoRAG 通过 codemode 成功读取 GitHub 11 次，将 PR 提交与失败 run、job 对应，并引用了目标 job 的真实测试日志。该案例的自动检查通过，业务与 CI 结论的正式人工复核尚未执行。完整回答和 10 条编号来源见 [P0–P3 验证记录](qa/github-pr-p0-p3-2026-11-04.json)。
 
-## 阶段记录与限制
+## 2026-11-04 对照、边界和交付
+
+本轮在产品提交 `b7b2369c` 上使用当前账号的 `openai-codex/gpt-6.1-sol`，推理档位均为 low。官方 GitHub MCP 的五个只读工具对两组相同。对照程序在双方停用可把工具提升到顶层的 `tool_search`，仅在 direct 组停用 codemode，按实际父子事件验明每个 GitHub 调用。首轮两次 codemode 混用顶层工具，两对样本排除。正式采集的两份 PR 各有冷、热两个配对。[冻结清单](examples/github-pr-p6-samples.json)
+
+在按上文准备的隔离 Docker 中，使用仅含 `{"model":{"provider":"openai-codex","id":"gpt-6.1-sol"}}` 的模型配置。此 QA runner 支持通过 `AUTORAG_QA_CODEX_ACCESS` 注入现有 OAuth 会话的短期 access token，加载到内存后从环境删除。测试容器无需挂载日常认证目录。只读 GitHub 凭据由 `GITHUB_MCP_TOKEN` 提供。
+
+```bash
+node scripts/manual-qa/run-qa-github-mcp.mts \
+  --manifest docs/examples/github-pr-p6-samples.json --model /tmp/github-qa-model.json \
+  --compare --repeats 1 --stop-on-error --output /workspace/.omo/evidence/github-pr-comparison.json
+```
+
+向 PR #2 推送新提交会改变 head。再次运行时应先核对新的提交和 CI，并另存一份新清单。原清单保留历史快照，runner 会拒绝不匹配的 SHA。
+
+每次提问最多 60 秒，`--stop-on-error` 在超时等运行异常时保留轨迹、清理并终止本批。复核前报告的正式配对数为 0。完整的 8 份回答、各次耗时和 token、74 个编号来源、故障夹具原始错误以及本轮回归保存在[对照报告](qa/github-pr-p6-2026-11-04.json)。失败 CI 案例的 10 条来源另见[证据核对](qa/github-pr-case-reviews-2026-11-04.json)。本轮 154 项相关测试、check、lint、typecheck 与 build 通过。全仓测试未运行。
+
+源码和日期对应的先前结果保留在下表。最新阶段结论、演示提问和 E01–E12 的实际覆盖层次见[交付记录](../myself_dev/项目问题与变更分析助手/06-交付记录与简历.md)。
+
+## 早期阶段记录与限制
 
 早期实现记录使用 `codex/observable-local-index` 的 `3d97c44e6b0f53aac4b1f5d675d528ea86c93902`。本轮继续当前分支 `codex/github-pr-analysis-local-index`，HEAD 为 `52da4df6e307f92eaefd72b2e8ddb72210dd6d0c`；修改尚未提交，没有切换或同步分支，未改动其他未跟踪的开发材料。
 

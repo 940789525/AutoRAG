@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "samples": [
+    {
+      "id": "own-pr-2-issue-ci",
+      "public": true,
+      "url": "https://github.com/940789525/AutoRAG/pull/2",
+      "headSha": "b7b2369c60678f209e43fc5ea85b4d8ea57ca080",
+      "question": "请从 GitHub 重新读取这个 PR 的当前信息，核实它明确关联的 Issue、当前提交 SHA 和 CI 检查结论，附上可核对的来源。用中文简短回答。",
+      "expectedText": [
+        "#1",
+        "b7b2369c60678f209e43fc5ea85b4d8ea57ca080"
+      ]
+    },
+    {
+      "id": "public-2083-empty-discussion",
+      "public": true,
+      "url": "https://github.com/Marker-Inc-Korea/AutoRAG/pull/2083",
+      "headSha": "db0a301672ec48768e61c4fe782815ff0fcf8002",
+      "question": "请从 GitHub 重新读取此 PR，说明主要变更、明确关联的 Issue、是否有评论或评审，以及当前提交的 CI 结果。给出完整 SHA 和来源；没有证据的地方说明范围。用中文简短回答。",
+      "expectedText": [
+        "webSearch",
+        "db0a301672ec48768e61c4fe782815ff0fcf8002"
+      ]
+    }
+  ]
+}
