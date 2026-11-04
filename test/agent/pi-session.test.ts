@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { type FauxResponseStep, fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
-import { registerFauxProvider } from "@earendil-works/pi-ai/compat";
+import { getModel, registerFauxProvider } from "@earendil-works/pi-ai/compat";
 import type { ExtensionFactory, ExtensionUIContext } from "@earendil-works/pi-coding-agent";
 import { type JevBackend, MockBackend } from "jev-use";
 import { Type } from "typebox";
@@ -971,6 +971,35 @@ describe("AutoRAG pi coding-agent host", () => {
 			session.session.dispose();
 		} finally {
 			registration.unregister();
+		}
+	});
+
+	it("preserves a stored Codex OAuth login when the CLI forwards its resolved access token", async () => {
+		const agentDir = join(root, "agent");
+		mkdirSync(agentDir);
+		const access = "test-codex-access";
+		writeFileSync(
+			join(agentDir, "auth.json"),
+			JSON.stringify({ "openai-codex": { type: "oauth", access, refresh: "", expires: Number.MAX_SAFE_INTEGER } }),
+		);
+		const model = getModel("openai-codex", "gpt-6.1-sol");
+		const hosted = await createAutoRAGPiInteractiveRuntime({
+			cwd: root,
+			agentDir,
+			sessionDir: join(root, "sessions"),
+			model,
+			apiKey: access,
+			providerApiKeys: { "openai-codex": access },
+			getSystemPrompt: () => "prompt",
+			customTools: [],
+			onInput: () => ({ kind: "handled" }),
+		});
+		try {
+			const auth = await hosted.runtime.session.modelRuntime.getAuth(model);
+			expect(auth?.source).toBe("OAuth");
+			expect(auth?.auth.apiKey).toBe(access);
+		} finally {
+			await hosted.dispose();
 		}
 	});
 

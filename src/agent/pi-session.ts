@@ -233,11 +233,13 @@ async function configureModelRuntime(
 	const keys = new Map<string, string>();
 	if (model !== undefined && apiKey !== undefined) keys.set(model.provider, apiKey);
 	for (const [provider, key] of Object.entries(providerApiKeys ?? {})) keys.set(provider, key);
-	// Dazzi Models is OAuth-only: its token is the stored `/login` credential, and Pi resolves it from
-	// auth.json. A runtime API key would replace that credential with an api_key one the provider has
-	// no auth for, so every request then fails with "No API key found for dazzi".
 	keys.delete(DAZZI_PROVIDER_ID);
-	for (const [provider, key] of keys) await modelRuntime.setRuntimeApiKey(provider, key);
+	for (const [provider, key] of keys) {
+		// Reapplying a resolved OAuth token as a runtime API key hides the stored login.
+		const auth = modelRuntime.getProvider(provider)?.auth;
+		if (auth?.oauth && !auth.apiKey) continue;
+		await modelRuntime.setRuntimeApiKey(provider, key);
+	}
 }
 
 /**
