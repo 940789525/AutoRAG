@@ -1,0 +1,729 @@
+{
+  "implementationCommit": "d44bde3b0d42cd02280a8e2c64f51e329b199f33",
+  "method": {
+    "ui": "Real autorag tui in a Linux PTY, installed from the npm tarball; one user message issued for each conditional request, no slash command or confirmation during that request.",
+    "chatModel": "openai/gpt-6.1-sol",
+    "embedding": "local-qwen3, isolated loopback FastEmbed service, pinned Qwen3-Embedding-0.6B (1024 dimensions)",
+    "artifactSha256": "5fa1249b2572b432cf8ab4bf5eac836eb79a89ed84507bf733bc59d045c36c6c",
+    "fixture": "Five synthetic registered text files. Only after the assistant listed all five, the driver wrote a synthetic PDF; the verbatim scenario also created a Zone.Identifier entry. The user’s original PDF was never read.",
+    "membership": "Read the active ready.json profile and execute SELECT id FROM sources ORDER BY id against its journal.sqlite opened mode=ro.",
+    "taskCount": "Set difference of per-job JSON records across the user request, excluding latest.json and request aliases.",
+    "trace": "Chronological Pi JSONL user, tool call/result and final assistant events; timestamps in UTC. Reasoning blocks are omitted."
+  },
+  "verbatim": {
+    "sessionFile": "2026-11-06T11-15-17-353Z_01a1b091-f2e9-70c3-b106-34d61a065b1d.jsonl",
+    "priorCleanInventory": {
+      "input": "当前本地资料库有哪些文件？请列出各自的索引登记状态。",
+      "coverage": {
+        "files": [
+          {
+            "id": "/documents/会议记录.txt",
+            "status": "registered"
+          },
+          {
+            "id": "/documents/值班手册.txt",
+            "status": "registered"
+          },
+          {
+            "id": "/documents/退款规则.txt",
+            "status": "registered"
+          },
+          {
+            "id": "/documents/部署说明.txt",
+            "status": "registered"
+          },
+          {
+            "id": "/documents/项目计划.txt",
+            "status": "registered"
+          }
+        ],
+        "total": 5,
+        "registered": 5,
+        "complete": true,
+        "diagnostics": []
+      },
+      "newJobs": []
+    },
+    "conditionRequest": {
+      "input": "我新增了一个本地文件，先帮我确认下是否有成功新增了文件，如果有，帮我对新增文件建立索引。",
+      "submittedUTC": "2026-11-06T11:15:32.647441+00:00",
+      "sessionFile": [
+        "2026-11-06T11-15-17-353Z_01a1b091-f2e9-70c3-b106-34d61a065b1d.jsonl"
+      ],
+      "filesOnDisk": [
+        "会议记录.txt",
+        "值班手册.txt",
+        "研究生成绩单.pdf",
+        "研究生成绩单.pdf:Zone.Identifier",
+        "退款规则.txt",
+        "部署说明.txt",
+        "项目计划.txt"
+      ],
+      "journalBefore": [
+        "/documents/会议记录.txt",
+        "/documents/值班手册.txt",
+        "/documents/退款规则.txt",
+        "/documents/部署说明.txt",
+        "/documents/项目计划.txt"
+      ],
+      "journalAfter": [
+        "/documents/会议记录.txt",
+        "/documents/值班手册.txt",
+        "/documents/研究生成绩单.pdf",
+        "/documents/退款规则.txt",
+        "/documents/部署说明.txt",
+        "/documents/项目计划.txt"
+      ],
+      "jobsBefore": [
+        "2847bfe6-02e6-4df5-89ab-55b57a21d114"
+      ],
+      "newJobs": [
+        {
+          "jobId": "9697c74f-0340-497a-8856-d6289e68fee7",
+          "requestId": "6f4aac09-06dd-454f-ba2b-bc5150b7d82e",
+          "mode": "refresh",
+          "state": "succeeded",
+          "embeddingProfile": "local-qwen3",
+          "startedAt": "2026-11-06T11:15:49.969Z",
+          "updatedAt": "2026-11-06T11:15:51.376Z",
+          "error": null,
+          "report": {
+            "documents": 6,
+            "embedded": 1,
+            "reused": 0,
+            "failures": []
+          }
+        }
+      ],
+      "runId": [
+        "95a166da-bfee-430e-a929-94041b2a19ca"
+      ],
+      "trace": [
+        {
+          "lineId": "802ec7bc",
+          "at": "2026-11-06T11:15:32.773Z",
+          "type": "user",
+          "text": "我新增了一个本地文件，先帮我确认下是否有成功新增了文件，如果有，帮我对新增文件建立索引。"
+        },
+        {
+          "lineId": "47b2e8c8",
+          "at": "2026-11-06T11:15:38.933Z",
+          "type": "toolCall",
+          "tool": "read",
+          "callId": "call_PBQF7j4VzpZvac5M8ToJdM9X|fc_030749f77b868a8c016aedb6dab59087d0a92a207dbedcefeb",
+          "args": {
+            "i": "读取索引维护规范，以便先核对新增文件，再按规范建立索引。",
+            "path": "/tmp/autorag-same-turn.sEI7K9kz/installed/package/skills/autorag-index/SKILL.md",
+            "offset": null,
+            "limit": null
+          }
+        },
+        {
+          "lineId": "ea9f185e",
+          "at": "2026-11-06T11:15:38.937Z",
+          "type": "toolResult",
+          "tool": "read",
+          "callId": "call_PBQF7j4VzpZvac5M8ToJdM9X|fc_030749f77b868a8c016aedb6dab59087d0a92a207dbedcefeb",
+          "error": false
+        },
+        {
+          "lineId": "94285d3c",
+          "at": "2026-11-06T11:15:44.537Z",
+          "type": "toolCall",
+          "tool": "manage_local_index",
+          "callId": "call_aE3JfQZdHOIvE03jneXDGZSh|fc_030749f77b868a8c016aedb6e16c3887d08a46be1de0d0ba75",
+          "args": {
+            "i": "将当前文件清单与此前的 5 个文件对比，确认新增文件及其索引登记状态。",
+            "operation": "status",
+            "includeFiles": true
+          }
+        },
+        {
+          "lineId": "716e90af",
+          "at": "2026-11-06T11:15:44.543Z",
+          "type": "toolResult",
+          "tool": "manage_local_index",
+          "callId": "call_aE3JfQZdHOIvE03jneXDGZSh|fc_030749f77b868a8c016aedb6e16c3887d08a46be1de0d0ba75",
+          "error": false,
+          "coverage": {
+            "files": [
+              {
+                "id": "/documents/会议记录.txt",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/值班手册.txt",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/研究生成绩单.pdf",
+                "status": "unregistered"
+              },
+              {
+                "id": "/documents/研究生成绩单.pdf:Zone.Identifier",
+                "status": "unregistered"
+              },
+              {
+                "id": "/documents/退款规则.txt",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/部署说明.txt",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/项目计划.txt",
+                "status": "registered"
+              }
+            ],
+            "total": 7,
+            "registered": 5,
+            "complete": true,
+            "diagnostics": []
+          },
+          "job": {
+            "jobId": "2847bfe6-02e6-4df5-89ab-55b57a21d114",
+            "mode": "build",
+            "state": "succeeded"
+          }
+        },
+        {
+          "lineId": "6b778343",
+          "at": "2026-11-06T11:15:49.955Z",
+          "type": "toolCall",
+          "tool": "manage_local_index",
+          "callId": "call_NfpbJgqLP01hGAcBtTkPIM4x|fc_030749f77b868a8c016aedb6e7542c87d0a099a9478c3c5c44",
+          "args": {
+            "i": "已确认新增成绩单及同名附属文件，使用现有本地配置增量建立索引。",
+            "operation": "refresh",
+            "embeddingProfile": "local-qwen3",
+            "localOnly": true
+          }
+        },
+        {
+          "lineId": "bf9e219c",
+          "at": "2026-11-06T11:15:49.986Z",
+          "type": "toolResult",
+          "tool": "manage_local_index",
+          "callId": "call_NfpbJgqLP01hGAcBtTkPIM4x|fc_030749f77b868a8c016aedb6e7542c87d0a099a9478c3c5c44",
+          "error": false,
+          "job": {
+            "jobId": "9697c74f-0340-497a-8856-d6289e68fee7",
+            "requestId": "6f4aac09-06dd-454f-ba2b-bc5150b7d82e",
+            "mode": "refresh",
+            "embeddingProfile": "local-qwen3",
+            "state": "queued"
+          }
+        },
+        {
+          "lineId": "1e2c24e9",
+          "at": "2026-11-06T11:15:54.443Z",
+          "type": "toolCall",
+          "tool": "manage_local_index",
+          "callId": "call_kW1CmYuEmJCie1NTWLkEsJHy|fc_030749f77b868a8c016aedb6ec582887d0a3794a146e264a60",
+          "args": {
+            "i": "检查新增文件的索引任务是否已完成。",
+            "operation": "status",
+            "jobId": "9697c74f-0340-497a-8856-d6289e68fee7"
+          }
+        },
+        {
+          "lineId": "8524a09c",
+          "at": "2026-11-06T11:15:54.445Z",
+          "type": "toolResult",
+          "tool": "manage_local_index",
+          "callId": "call_kW1CmYuEmJCie1NTWLkEsJHy|fc_030749f77b868a8c016aedb6ec582887d0a3794a146e264a60",
+          "error": false,
+          "job": {
+            "jobId": "9697c74f-0340-497a-8856-d6289e68fee7",
+            "requestId": "6f4aac09-06dd-454f-ba2b-bc5150b7d82e",
+            "mode": "refresh",
+            "embeddingProfile": "local-qwen3",
+            "state": "succeeded"
+          }
+        },
+        {
+          "lineId": "566781c0",
+          "at": "2026-11-06T11:16:03.672Z",
+          "type": "toolCall",
+          "tool": "manage_local_index",
+          "callId": "call_i1UQDX91iSvSwgiMwj6ntRQV|fc_030749f77b868a8c016aedb6f31c4887d086ffda30cd542b54",
+          "args": {
+            "i": "索引任务已成功，复核新增成绩单的最终登记状态。",
+            "operation": "status",
+            "includeFiles": true
+          }
+        },
+        {
+          "lineId": "2bf90546",
+          "at": "2026-11-06T11:16:03.677Z",
+          "type": "toolResult",
+          "tool": "manage_local_index",
+          "callId": "call_i1UQDX91iSvSwgiMwj6ntRQV|fc_030749f77b868a8c016aedb6f31c4887d086ffda30cd542b54",
+          "error": false,
+          "coverage": {
+            "files": [
+              {
+                "id": "/documents/会议记录.txt",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/值班手册.txt",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/研究生成绩单.pdf",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/研究生成绩单.pdf:Zone.Identifier",
+                "status": "unregistered"
+              },
+              {
+                "id": "/documents/退款规则.txt",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/部署说明.txt",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/项目计划.txt",
+                "status": "registered"
+              }
+            ],
+            "total": 7,
+            "registered": 6,
+            "complete": true,
+            "diagnostics": []
+          },
+          "job": {
+            "jobId": "9697c74f-0340-497a-8856-d6289e68fee7",
+            "mode": "refresh",
+            "state": "succeeded"
+          }
+        },
+        {
+          "lineId": "5b44acc5",
+          "at": "2026-11-06T11:16:09.831Z",
+          "type": "answer",
+          "model": "gpt-6.1-sol",
+          "text": "**已确认新增了《研究生成绩单.pdf》，并已成功为其建立索引。**\n\n- 与上次清单相比，新增了 **研究生成绩单.pdf**；索引完成后已复核，状态为 **已登记**。\n- 同时新增了 **研究生成绩单.pdf:Zone.Identifier**，目前 **未登记**；这类文件通常是 Windows 的下载来源标记，并非成绩单正文。\n- 本次增量索引任务状态为 **成功（succeeded）**，原有 **5 个文件**保持不变，目前共 **6 个文件已登记**。\n- 任务 ID：`9697c74f-0340-497a-8856-d6289e68fee7`。"
+        }
+      ]
+    }
+  },
+  "shortRequest": {
+    "sessionFile": "2026-11-06T11-16-16-105Z_01a1b092-d868-77e4-b11a-0bad1f03f851.jsonl",
+    "priorCleanInventory": {
+      "input": "当前本地资料库有哪些文件？请列出各自的索引登记状态。",
+      "coverage": {
+        "files": [
+          {
+            "id": "/documents/会议记录.txt",
+            "status": "registered"
+          },
+          {
+            "id": "/documents/值班手册.txt",
+            "status": "registered"
+          },
+          {
+            "id": "/documents/退款规则.txt",
+            "status": "registered"
+          },
+          {
+            "id": "/documents/部署说明.txt",
+            "status": "registered"
+          },
+          {
+            "id": "/documents/项目计划.txt",
+            "status": "registered"
+          }
+        ],
+        "total": 5,
+        "registered": 5,
+        "complete": true,
+        "diagnostics": []
+      },
+      "newJobs": []
+    },
+    "conditionRequest": {
+      "input": "先确认有没有新增文件，如果有就建索引",
+      "submittedUTC": "2026-11-06T11:16:33.860858+00:00",
+      "sessionFile": [
+        "2026-11-06T11-16-16-105Z_01a1b092-d868-77e4-b11a-0bad1f03f851.jsonl"
+      ],
+      "filesOnDisk": [
+        "会议记录.txt",
+        "值班手册.txt",
+        "研究生成绩单.pdf",
+        "退款规则.txt",
+        "部署说明.txt",
+        "项目计划.txt"
+      ],
+      "journalBefore": [
+        "/documents/会议记录.txt",
+        "/documents/值班手册.txt",
+        "/documents/退款规则.txt",
+        "/documents/部署说明.txt",
+        "/documents/项目计划.txt"
+      ],
+      "journalAfter": [
+        "/documents/会议记录.txt",
+        "/documents/值班手册.txt",
+        "/documents/研究生成绩单.pdf",
+        "/documents/退款规则.txt",
+        "/documents/部署说明.txt",
+        "/documents/项目计划.txt"
+      ],
+      "jobsBefore": [
+        "3eda4613-31bd-405d-8d71-0b5e9e456250"
+      ],
+      "newJobs": [
+        {
+          "jobId": "8843d602-3a23-4aa8-8c7c-aef811383c78",
+          "requestId": "fbde91db-1dcc-482b-a761-5c908322f258",
+          "mode": "refresh",
+          "state": "succeeded",
+          "embeddingProfile": "local-qwen3",
+          "startedAt": "2026-11-06T11:16:48.577Z",
+          "updatedAt": "2026-11-06T11:16:49.487Z",
+          "error": null,
+          "report": {
+            "documents": 6,
+            "embedded": 1,
+            "reused": 0,
+            "failures": []
+          }
+        }
+      ],
+      "runId": [
+        "2ff67afa-2679-4a8a-a5cc-c533150a8780"
+      ],
+      "trace": [
+        {
+          "lineId": "e11f5681",
+          "at": "2026-11-06T11:16:33.986Z",
+          "type": "user",
+          "text": "先确认有没有新增文件，如果有就建索引"
+        },
+        {
+          "lineId": "dfbc7d30",
+          "at": "2026-11-06T11:16:37.910Z",
+          "type": "toolCall",
+          "tool": "read",
+          "callId": "call_W9SP7VtvXD6e1eQz99xw9zCv|fc_07e41c94082ea3ea016aedb714fccc87d08d9c32721d2780b4",
+          "args": {
+            "i": "读取索引维护流程，以检查新增文件并按需建立索引。",
+            "path": "/tmp/autorag-same-turn.sEI7K9kz/installed/package/skills/autorag-index/SKILL.md",
+            "offset": null,
+            "limit": null
+          }
+        },
+        {
+          "lineId": "707ecfe0",
+          "at": "2026-11-06T11:16:37.916Z",
+          "type": "toolResult",
+          "tool": "read",
+          "callId": "call_W9SP7VtvXD6e1eQz99xw9zCv|fc_07e41c94082ea3ea016aedb714fccc87d08d9c32721d2780b4",
+          "error": false
+        },
+        {
+          "lineId": "67ff9455",
+          "at": "2026-11-06T11:16:43.903Z",
+          "type": "toolCall",
+          "tool": "manage_local_index",
+          "callId": "call_iqmTZsJcowt5Tdums8CPo8TZ|fc_07e41c94082ea3ea016aedb71ae22c87d0b90bfa2fbe216402",
+          "args": {
+            "i": "将当前文件清单与上一轮的 5 个文件比较，确认是否有新增文件。",
+            "operation": "status",
+            "includeFiles": true
+          }
+        },
+        {
+          "lineId": "ce149b0f",
+          "at": "2026-11-06T11:16:43.910Z",
+          "type": "toolResult",
+          "tool": "manage_local_index",
+          "callId": "call_iqmTZsJcowt5Tdums8CPo8TZ|fc_07e41c94082ea3ea016aedb71ae22c87d0b90bfa2fbe216402",
+          "error": false,
+          "coverage": {
+            "files": [
+              {
+                "id": "/documents/会议记录.txt",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/值班手册.txt",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/研究生成绩单.pdf",
+                "status": "unregistered"
+              },
+              {
+                "id": "/documents/退款规则.txt",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/部署说明.txt",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/项目计划.txt",
+                "status": "registered"
+              }
+            ],
+            "total": 6,
+            "registered": 5,
+            "complete": true,
+            "diagnostics": []
+          },
+          "job": {
+            "jobId": "3eda4613-31bd-405d-8d71-0b5e9e456250",
+            "mode": "build",
+            "state": "succeeded"
+          }
+        },
+        {
+          "lineId": "171c0003",
+          "at": "2026-11-06T11:16:48.570Z",
+          "type": "toolCall",
+          "tool": "manage_local_index",
+          "callId": "call_PjDyf8OK2PyDm72RNUA8Q59B|fc_07e41c94082ea3ea016aedb720b8a887d0bb2fea14b3678fb3",
+          "args": {
+            "i": "发现新增的研究生成绩单.pdf 尚未登记，沿用当前配置执行增量索引。",
+            "operation": "refresh",
+            "embeddingProfile": "local-qwen3"
+          }
+        },
+        {
+          "lineId": "8bc5862c",
+          "at": "2026-11-06T11:16:48.588Z",
+          "type": "toolResult",
+          "tool": "manage_local_index",
+          "callId": "call_PjDyf8OK2PyDm72RNUA8Q59B|fc_07e41c94082ea3ea016aedb720b8a887d0bb2fea14b3678fb3",
+          "error": false,
+          "job": {
+            "jobId": "8843d602-3a23-4aa8-8c7c-aef811383c78",
+            "requestId": "fbde91db-1dcc-482b-a761-5c908322f258",
+            "mode": "refresh",
+            "embeddingProfile": "local-qwen3",
+            "state": "queued"
+          }
+        },
+        {
+          "lineId": "c2261e80",
+          "at": "2026-11-06T11:16:53.506Z",
+          "type": "toolCall",
+          "tool": "manage_local_index",
+          "callId": "call_3cmClKaMFrEtd7pHp8nLc9SX|fc_07e41c94082ea3ea016aedb726196c87d0bdc3c9a08ee9efa9",
+          "args": {
+            "i": "检查新增文件的增量索引任务是否已经完成。",
+            "operation": "status",
+            "jobId": "8843d602-3a23-4aa8-8c7c-aef811383c78"
+          }
+        },
+        {
+          "lineId": "9b5517f7",
+          "at": "2026-11-06T11:16:53.508Z",
+          "type": "toolResult",
+          "tool": "manage_local_index",
+          "callId": "call_3cmClKaMFrEtd7pHp8nLc9SX|fc_07e41c94082ea3ea016aedb726196c87d0bdc3c9a08ee9efa9",
+          "error": false,
+          "job": {
+            "jobId": "8843d602-3a23-4aa8-8c7c-aef811383c78",
+            "requestId": "fbde91db-1dcc-482b-a761-5c908322f258",
+            "mode": "refresh",
+            "embeddingProfile": "local-qwen3",
+            "state": "succeeded"
+          }
+        },
+        {
+          "lineId": "8039c0b0",
+          "at": "2026-11-06T11:16:57.911Z",
+          "type": "toolCall",
+          "tool": "manage_local_index",
+          "callId": "call_1toj90ACaFQw1VyzEWZkW90R|fc_07e41c94082ea3ea016aedb72bc61487d0b709b1251842f49f",
+          "args": {
+            "i": "核实索引完成后新增文件的登记状态及资料库总覆盖数。",
+            "operation": "status",
+            "includeFiles": true
+          }
+        },
+        {
+          "lineId": "fb624e2a",
+          "at": "2026-11-06T11:16:57.916Z",
+          "type": "toolResult",
+          "tool": "manage_local_index",
+          "callId": "call_1toj90ACaFQw1VyzEWZkW90R|fc_07e41c94082ea3ea016aedb72bc61487d0b709b1251842f49f",
+          "error": false,
+          "coverage": {
+            "files": [
+              {
+                "id": "/documents/会议记录.txt",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/值班手册.txt",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/研究生成绩单.pdf",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/退款规则.txt",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/部署说明.txt",
+                "status": "registered"
+              },
+              {
+                "id": "/documents/项目计划.txt",
+                "status": "registered"
+              }
+            ],
+            "total": 6,
+            "registered": 6,
+            "complete": true,
+            "diagnostics": []
+          },
+          "job": {
+            "jobId": "8843d602-3a23-4aa8-8c7c-aef811383c78",
+            "mode": "refresh",
+            "state": "succeeded"
+          }
+        },
+        {
+          "lineId": "819286c0",
+          "at": "2026-11-06T11:17:06.681Z",
+          "type": "answer",
+          "model": "gpt-6.1-sol",
+          "text": "**发现 1 个新增文件，已完成增量索引；当前 6 个文件全部已登记。**\n\n- 新增文件：**研究生成绩单.pdf**，状态已从未登记变为**已登记**。\n- 原有 **5 个文件**未发生变化，本次未重复处理。\n- 索引任务状态：**成功（succeeded）**；任务 ID：`8843d602-3a23-4aa8-8c7c-aef811383c78`。"
+        }
+      ]
+    }
+  },
+  "controls": {
+    "noFurtherAdditions": {
+      "input": "再看一下自刚才以来是否又有新增文件，有才建索引。",
+      "sessionFile": "2026-11-06T11-16-16-105Z_01a1b092-d868-77e4-b11a-0bad1f03f851.jsonl",
+      "newJobs": [],
+      "registeredBefore": 6,
+      "registeredAfter": 6,
+      "answer": "**自刚才以来没有新增文件，因此未启动索引任务。**\n\n当前资料库仍为 **6 个文件**，全部**已登记**，文件清单与上次一致。"
+    },
+    "readOnly": {
+      "input": "先确认有没有新增文件，只告诉我结果，不要建立索引。",
+      "sessionFile": "2026-11-06T11-17-25-630Z_01a1b093-e7fd-7139-989c-07f8c4e4927c.jsonl",
+      "newJobs": [],
+      "registeredBefore": 5,
+      "registeredAfter": 5,
+      "answer": "**发现 1 个新增文件：研究生成绩单.pdf，尚未登记到索引。本次未建立或更新索引。**"
+    },
+    "ambiguousNewSession": {
+      "input": "把刚才漏掉的资料补进去",
+      "sessionFile": "2026-11-06T11-15-05-213Z_01a1b091-c37c-745d-97d0-61a3c693136f.jsonl",
+      "newJobs": [],
+      "registeredBefore": 5,
+      "registeredAfter": 5,
+      "answer": "你指的是哪些遗漏的资料，要补到哪份文档、清单或搜索索引里？请告诉我资料名称和补充位置。"
+    },
+    "ambiguousFreshProcess": {
+      "input": "把刚才漏掉的资料补进去",
+      "sessionFile": "2026-11-06T11-14-39-818Z_01a1b091-6049-75ee-9f56-468c5d7ecf89.jsonl",
+      "newJobs": [],
+      "registeredBefore": 5,
+      "registeredAfter": 5,
+      "answer": "你是指把漏掉的资料补进**搜索索引**，还是补进刚才的**文档或清单**？请确认要补到哪里。"
+    },
+    "priorTurnMissingFile": {
+      "input": "把刚才漏掉的资料补进去",
+      "sessionFile": "2026-11-06T11-17-57-159Z_01a1b094-6325-7167-ba75-cb5b58215308.jsonl",
+      "newJobs": [
+        {
+          "jobId": "05b766b2-1004-47fb-a222-12ee0b2ab684",
+          "requestId": "3a6deba4-c0fb-40c8-a2a1-4f95670433a3",
+          "mode": "refresh",
+          "state": "succeeded",
+          "embeddingProfile": "local-qwen3",
+          "startedAt": "2026-11-06T11:18:23.917Z",
+          "updatedAt": "2026-11-06T11:18:24.938Z",
+          "error": null,
+          "report": {
+            "documents": 6,
+            "embedded": 1,
+            "reused": 0,
+            "failures": []
+          }
+        }
+      ],
+      "journalBefore": [
+        "/documents/会议记录.txt",
+        "/documents/值班手册.txt",
+        "/documents/退款规则.txt",
+        "/documents/部署说明.txt",
+        "/documents/项目计划.txt"
+      ],
+      "journalAfter": [
+        "/documents/会议记录.txt",
+        "/documents/值班手册.txt",
+        "/documents/研究生成绩单.pdf",
+        "/documents/退款规则.txt",
+        "/documents/部署说明.txt",
+        "/documents/项目计划.txt"
+      ]
+    }
+  },
+  "exploratoryTrial": {
+    "note": "Before the final Skill clarified ambiguous destinations, this trial incorrectly refreshed. It used the same TypeScript change, same model, and an earlier version of the bundled instructions. The controls above were rerun on the final package.",
+    "input": "把刚才漏掉的资料补进去",
+    "packageSha256": "4c4f5d84796c3c131518a6b9e7dd13d3d2f19af545b49921ff6e4a687d68731b",
+    "newJobs": [
+      {
+        "jobId": "444f39dd-bf31-4412-9091-5a7f6ac26340",
+        "requestId": "a3bc62cc-ce93-4787-90dc-cd4fa30ecfbe",
+        "mode": "refresh",
+        "state": "succeeded",
+        "embeddingProfile": "local-qwen3",
+        "startedAt": "2026-11-06T11:12:00.033Z",
+        "updatedAt": "2026-11-06T11:12:00.857Z",
+        "error": null,
+        "report": {
+          "documents": 6,
+          "embedded": 1,
+          "reused": 0,
+          "failures": []
+        }
+      }
+    ]
+  },
+  "isolation": {
+    "containerConfigBefore": {
+      "config.json": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+      "config.fastembed.json": "716c12831b43095e4919bde13d079272106a28ffa0c25ccb1a4af32fddd91327"
+    },
+    "containerConfigAfter": {
+      "config.json": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+      "config.fastembed.json": "716c12831b43095e4919bde13d079272106a28ffa0c25ccb1a4af32fddd91327"
+    },
+    "hostConfigBefore": "ABSENT",
+    "hostConfigAfter": "ABSENT",
+    "cleanup": "Verified shared configuration hashes, confirmed the owned service had stopped and removed only the isolated QA tree."
+  },
+  "verification": {
+    "check": "passed",
+    "lint": "passed",
+    "typecheck": "passed",
+    "build": "passed",
+    "supplyChain": "passed",
+    "fullVitest": {
+      "passed": 3367,
+      "skipped": 67,
+      "failed": 0
+    },
+    "implementationMatchesTestedSnapshot": true
+  }
+}
