@@ -1,0 +1,698 @@
+{
+  "implementationCommit": "474fbcbcd95a361e45388297ae3d7dd52012c018",
+  "baselineCommit": "db7358a4d1ff8e40318104ec4f03c39f3ea063c9",
+  "environment": {
+    "entry": "Real Node CLI in a PTY, from an extracted npm package in the isolated Docker QA fixture",
+    "model": "deepseek/deepseek-flash",
+    "policy": "on-demand",
+    "permissionMode": "full",
+    "GitHubMcpConfigured": false,
+    "embedding": {
+      "ready": true,
+      "model": "Qwen/Qwen3-Embedding-0.6B",
+      "dimension": 1024,
+      "revision": "af95f2c416ffe9379369ad64f9113e865db6112c/fastembed-0.9.1/v1",
+      "maxInputTokens": 2048,
+      "maxInputs": 32,
+      "device": "cpu",
+      "prefixOwner": "client",
+      "pooling": "last-token",
+      "normalization": "l2",
+      "tokenizerPath": "/tmp/autorag-index-skill.klq5SzmW/frozen/models/qwen3-0.6b-af95f2c416ffe9379369ad64f9113e865db6112c",
+      "artifact": {
+        "model": "Qwen/Qwen3-Embedding-0.6B",
+        "repository": "Qdrant/Qwen3-Embedding-0.6B-onnx",
+        "revision": "af95f2c416ffe9379369ad64f9113e865db6112c",
+        "dimension": 1024,
+        "license": "Apache-2.0",
+        "files": {
+          "config.json": "da2b52e46d1469b9f6ff3a45e2bec36b2bb667de5ea9dd5a076e8bfe3b30cc05",
+          "tokenizer_config.json": "1c45aaa97b2bec1d2e1ab0df53e1b2ed2f9568b871b25ca56095c0b83a5d4e93",
+          "special_tokens_map.json": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd",
+          "tokenizer.json": "def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a",
+          "onnx/model.onnx": "754d6ba1c7a323d7b3af0d85b8268f8b716b0cd362ce73295e0f71d3dd831639",
+          "onnx/model.onnx_data": "15d02a315e3b95296700c73d72a436e79facf4e17d919345bed730e98433bcb4"
+        }
+      }
+    },
+    "piVersion": "1.4.0",
+    "packageSha256": "38769b961aadf9f25d591fa555894c1e836ac94954b543867c79a0b665518543",
+    "skillSha256": "549c01b6ce81d1708ca637a012e4e4fcf68b33b80bb7100f76e927bf061437cd",
+    "journalRead": "Open ready.json, open active profile/journal.sqlite with mode=ro, SELECT id FROM sources ORDER BY id",
+    "seedFilesOnDisk": [
+      "会议记录.md",
+      "值班手册.md",
+      "新增纪要.md",
+      "青岚交接.md",
+      "项目计划.md"
+    ]
+  },
+  "shortFollowUp": {
+    "sessionFile": "2026-11-06T09-22-41-472Z_01a1b02a-dcc0-7601-8fcf-0be661932b25.jsonl",
+    "packagedSkillInProviderPayload": {
+      "via": "Pi before_provider_request (serialized payload)",
+      "model": "deepseek-flash",
+      "catalog": "<skill>\n    <name>autorag-index</name>\n    <description>Build, refresh, rebuild or cancel local document indexing when the user requests it, including a follow-up to an earlier turn that actually identified unregistered files. Without that context, ask what the user wants to add.</description>\n    <location>/tmp/autorag-index-skill.klq5SzmW/frozen/installed/package/skills/autorag-index/SKILL.md</location>\n  </skill>"
+    },
+    "seedJobIds": [
+      "fc989fd6-9063-4554-ba9f-329e8d8dfe6a"
+    ],
+    "firstTurn": {
+      "input": "当前本地资料库里有哪些文件，各自的索引状态怎么样？",
+      "submittedUTC": "2026-11-06T09:22:41.854926+00:00",
+      "answerRunIds": [
+        "eb22acde-660c-4d72-a7d6-3bfada2c4e39"
+      ],
+      "tools": [
+        {
+          "name": "manage_local_index",
+          "args": {
+            "operation": "status",
+            "includeFiles": true,
+            "i": "检查本地资料库文件清单及各文件索引注册状态"
+          }
+        }
+      ],
+      "fileCoverageResults": [
+        {
+          "files": [
+            {
+              "id": "/docs/会议记录.md",
+              "status": "registered"
+            },
+            {
+              "id": "/docs/值班手册.md",
+              "status": "registered"
+            },
+            {
+              "id": "/docs/新增纪要.md",
+              "status": "unregistered"
+            },
+            {
+              "id": "/docs/青岚交接.md",
+              "status": "registered"
+            },
+            {
+              "id": "/docs/项目计划.md",
+              "status": "registered"
+            }
+          ],
+          "total": 5,
+          "registered": 4,
+          "complete": true,
+          "diagnostics": []
+        }
+      ],
+      "toolErrors": [],
+      "journalBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "journalAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "newJobs": {},
+      "indexClassifierCalls": 0,
+      "assistantAnswer": "**本地资料库当前共有 **5** 个文件：**4** 个已注册到索引，**1** 个尚未注册；索引（向量配置为 local-qwen3）已经就绪。**\n\n| 文件 | 索引状态 |\n|---|---|\n| /docs/会议记录.md | 已注册 |\n| /docs/值班手册.md | 已注册 |\n| /docs/新增纪要.md | **未注册** |\n| /docs/青岚交接.md | 已注册 |\n| /docs/项目计划.md | 已注册 |\n\n- 索引覆盖扫描已经完整完成、没有诊断异常，因此上述清单就是当前实际的本地文件全集 [e1]。\n- 唯一缺少索引的是 **/docs/新增纪要.md**，它目前无法被内容检索到；其余 4 个文件均可正常检索 [e1]。\n- 最近一次构建任务（build）的状态为**成功**，不过注册本身不代表文件内容是最新的，这个文件需要刷新索引才能纳入检索 [e1]。"
+    },
+    "secondTurn": {
+      "input": "把刚才漏掉的资料补进去",
+      "submittedUTC": "2026-11-06T09:22:45.731522+00:00",
+      "answerRunIds": [
+        "1f1095ea-ef31-4e94-b07a-222d55507207"
+      ],
+      "tools": [
+        {
+          "name": "read",
+          "args": {
+            "i": "读取索引技能说明，确认刷新遗漏文件的正确操作",
+            "path": "/tmp/autorag-index-skill.klq5SzmW/frozen/installed/package/skills/autorag-index/SKILL.md",
+            "offset": null,
+            "limit": null
+          }
+        },
+        {
+          "name": "manage_local_index",
+          "args": {
+            "i": "把上一轮发现的未注册文件 /docs/新增纪要.md 增量补入索引",
+            "operation": "refresh",
+            "embeddingProfile": "local-qwen3",
+            "missingSource": "/docs/新增纪要.md"
+          }
+        },
+        {
+          "name": "manage_local_index",
+          "args": {
+            "i": "查看刷新任务 e81f81a0 是否完成",
+            "operation": "status"
+          }
+        },
+        {
+          "name": "manage_local_index",
+          "args": {
+            "i": "再次确认刷新任务终态",
+            "operation": "status"
+          }
+        },
+        {
+          "name": "manage_local_index",
+          "args": {
+            "i": "刷新成功后复核所有文件注册状态，确认新增纪要已入索引",
+            "includeFiles": true,
+            "operation": "status"
+          }
+        }
+      ],
+      "fileCoverageResults": [
+        {
+          "files": [
+            {
+              "id": "/docs/会议记录.md",
+              "status": "registered"
+            },
+            {
+              "id": "/docs/值班手册.md",
+              "status": "registered"
+            },
+            {
+              "id": "/docs/新增纪要.md",
+              "status": "registered"
+            },
+            {
+              "id": "/docs/青岚交接.md",
+              "status": "registered"
+            },
+            {
+              "id": "/docs/项目计划.md",
+              "status": "registered"
+            }
+          ],
+          "total": 5,
+          "registered": 5,
+          "complete": true,
+          "diagnostics": []
+        }
+      ],
+      "toolErrors": [],
+      "journalBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "journalAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/新增纪要.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "newJobs": {
+        "e81f81a0-26b4-4984-af42-1890dc74567b": {
+          "mode": "refresh",
+          "state": "succeeded",
+          "embeddingProfile": "local-qwen3",
+          "startedAt": "2026-11-06T09:22:48.553Z",
+          "updatedAt": "2026-11-06T09:22:50.305Z",
+          "error": null,
+          "report": {
+            "documents": 5,
+            "unchanged": 0,
+            "embedded": 2,
+            "failures": []
+          }
+        }
+      },
+      "indexClassifierCalls": 0,
+      "assistantAnswer": "**`/docs/新增纪要.md` 已成功补入索引，现在 5 个文件全部为已注册状态。**\n\n- 增量刷新任务 **e81f81a0-26b4-4984-af42-1890dc74567b** 的最终状态为 **succeeded**，没有失败的文档 [e2]。\n- 本次共处理 **5** 个文档、**10** 个文本块，其中新向量化 **2** 块、复用 **8** 块，删除 **0** 块 [e2]。\n- 刷新后的覆盖检查显示已注册 **5/5** 个文件，覆盖扫描完整，没有诊断异常 [e3]。\n- 索引的向量配置仍为 **local-qwen3**（Qwen3-Embedding-0.6B）[e2]。"
+    }
+  },
+  "longFollowUp": {
+    "sessionFile": "2026-11-06T09-23-00-191Z_01a1b02b-25de-75bc-a951-572d692bff3b.jsonl",
+    "packagedSkillInProviderPayload": {
+      "via": "Pi before_provider_request (serialized payload)",
+      "model": "deepseek-flash",
+      "catalog": "<skill>\n    <name>autorag-index</name>\n    <description>Build, refresh, rebuild or cancel local document indexing when the user requests it, including a follow-up to an earlier turn that actually identified unregistered files. Without that context, ask what the user wants to add.</description>\n    <location>/tmp/autorag-index-skill.klq5SzmW/frozen/installed/package/skills/autorag-index/SKILL.md</location>\n  </skill>"
+    },
+    "seedJobIds": [
+      "fc989fd6-9063-4554-ba9f-329e8d8dfe6a"
+    ],
+    "firstTurn": {
+      "input": "当前本地资料库里有哪些文件，各自的索引状态怎么样？",
+      "submittedUTC": "2026-11-06T09:23:00.600504+00:00",
+      "answerRunIds": [
+        "883a73af-0df9-4fe5-970b-e10f9b89b64f"
+      ],
+      "tools": [
+        {
+          "name": "manage_local_index",
+          "args": {
+            "operation": "status",
+            "includeFiles": true,
+            "i": "查看本地资料库文件清单及其索引注册状态"
+          }
+        }
+      ],
+      "fileCoverageResults": [
+        {
+          "files": [
+            {
+              "id": "/docs/会议记录.md",
+              "status": "registered"
+            },
+            {
+              "id": "/docs/值班手册.md",
+              "status": "registered"
+            },
+            {
+              "id": "/docs/新增纪要.md",
+              "status": "unregistered"
+            },
+            {
+              "id": "/docs/青岚交接.md",
+              "status": "registered"
+            },
+            {
+              "id": "/docs/项目计划.md",
+              "status": "registered"
+            }
+          ],
+          "total": 5,
+          "registered": 4,
+          "complete": true,
+          "diagnostics": []
+        }
+      ],
+      "toolErrors": [],
+      "journalBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "journalAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "newJobs": {},
+      "indexClassifierCalls": 0,
+      "assistantAnswer": "**本地资料库当前共 **5** 个文件，其中 **4** 个已登记索引、**1** 个尚未登记（`/docs/新增纪要.md`）。**\n\n| 文件 | 索引状态 |\n|---|---|\n| /docs/会议记录.md | 已登记 |\n| /docs/值班手册.md | 已登记 |\n| /docs/新增纪要.md | **未登记** |\n| /docs/青岚交接.md | 已登记 |\n| /docs/项目计划.md | 已登记 |\n\n- 当前活动索引使用 **local-qwen3** 嵌入配置，状态**就绪**，本次文件扫描**完整**，没有诊断告警。\n- 唯一缺口是 **`/docs/新增纪要.md`** 未进入索引，因此按内容检索时可能检索不到它；需要的话可以让我把它补建进索引。"
+    },
+    "secondTurn": {
+      "input": "请把刚才漏掉的资料也建进本地索引，按当前配置做增量更新就好。",
+      "submittedUTC": "2026-11-06T09:23:03.543126+00:00",
+      "answerRunIds": [
+        "50fd361f-e12b-4290-90e3-d46f947dc01f"
+      ],
+      "tools": [
+        {
+          "name": "read",
+          "args": {
+            "path": "/tmp/autorag-index-skill.klq5SzmW/frozen/installed/package/skills/autorag-index/SKILL.md",
+            "offset": null,
+            "limit": null,
+            "i": "读取索引技能的增量更新操作说明"
+          }
+        },
+        {
+          "name": "manage_local_index",
+          "args": {
+            "i": "按当前配置对漏掉的 /docs/新增纪要.md 做增量索引",
+            "operation": "refresh",
+            "embeddingProfile": "local-qwen3",
+            "missingSource": "/docs/新增纪要.md",
+            "scope": "all"
+          }
+        },
+        {
+          "name": "manage_local_index",
+          "args": {
+            "i": "确认增量索引任务是否已完成",
+            "operation": "status",
+            "jobId": "accfd988-147b-460d-ac4d-d6486fc96d26"
+          }
+        },
+        {
+          "name": "manage_local_index",
+          "args": {
+            "i": "再次确认索引任务最终状态并核对文件覆盖",
+            "includeFiles": true,
+            "jobId": "accfd988-147b-460d-ac4d-d6486fc96d26",
+            "operation": "status"
+          }
+        }
+      ],
+      "fileCoverageResults": [
+        {
+          "files": [
+            {
+              "id": "/docs/会议记录.md",
+              "status": "registered"
+            },
+            {
+              "id": "/docs/值班手册.md",
+              "status": "registered"
+            },
+            {
+              "id": "/docs/新增纪要.md",
+              "status": "registered"
+            },
+            {
+              "id": "/docs/青岚交接.md",
+              "status": "registered"
+            },
+            {
+              "id": "/docs/项目计划.md",
+              "status": "registered"
+            }
+          ],
+          "total": 5,
+          "registered": 5,
+          "complete": true,
+          "diagnostics": []
+        }
+      ],
+      "toolErrors": [],
+      "journalBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "journalAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/新增纪要.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "newJobs": {
+        "accfd988-147b-460d-ac4d-d6486fc96d26": {
+          "mode": "refresh",
+          "state": "succeeded",
+          "embeddingProfile": "local-qwen3",
+          "startedAt": "2026-11-06T09:23:09.165Z",
+          "updatedAt": "2026-11-06T09:23:10.956Z",
+          "error": null,
+          "report": {
+            "documents": 5,
+            "unchanged": 0,
+            "embedded": 2,
+            "failures": []
+          }
+        }
+      },
+      "indexClassifierCalls": 0,
+      "assistantAnswer": "**增量索引已完成，**`/docs/新增纪要.md` 现在已登记进索引，全部 **5** 个文件均已覆盖。**\n\n- 任务 **accfd988-147b-460d-ac4d-d6486fc96d26**（mode `refresh`）最终状态为 **succeeded**，使用原有 **local-qwen3** 配置，未重建整个索引。\n- 这是全量扫描范围内的增量刷新：共识别 5 篇文档、10 个分块，仅补齐新增内容。\n- 复核覆盖结果：**registered 5 / total 5**，扫描完整、无诊断告警，索引仍为**就绪**状态。"
+    }
+  },
+  "boundaryScenarios": {
+    "negative": {
+      "userInput": "不要重建，只查缺项",
+      "toolNames": [],
+      "newJobs": {},
+      "registeredBefore": 4,
+      "registeredAfter": 4,
+      "answerModelCalls": 1,
+      "answer": "**缺项只有 **/docs/新增纪要.md** 一个：它当前是 unregistered，其余 4 个都已登记。按你的要求，我只做只读状态核查，没有重建、也没有刷新索引。\n\n- 缺项文件：**/docs/新增纪要.md**，index status = unregistered\n- 其余 4 个文件均为已登记：**/docs/会议记录.md**、**/docs/值班手册.md**、**/docs/青岚交接.md**、**/docs/项目计划.md**\n- 扫描完整，没有诊断异常，也没有其他待处理项\n\n要把这个缺项补进索引，只需登记这一个文件即可，不必整体重建；在你明确要求之前，它仍不会出现在检索结果里。"
+    },
+    "explicit": {
+      "userInput": "/skill:autorag-index",
+      "toolNames": [],
+      "newJobs": {},
+      "registeredBefore": 4,
+      "registeredAfter": 4,
+      "answerModelCalls": 1,
+      "answer": "What would you like me to do with the local document index?\n\n- **Build or refresh** — if you want your documents indexed (or newly added ones picked up), tell me and I'll start it.\n- **Check coverage** — if you want to know which files are registered, I can show the current status per file.\n- **Rebuild or cancel** — if you need a full rebuild or want to stop a running job.\n\nTell me which one, and I'll run it."
+    },
+    "explicit-args": {
+      "userInput": "/skill:autorag-index 刷新当前索引",
+      "toolNames": [
+        "manage_local_index"
+      ],
+      "newJobs": {
+        "d251681c-6473-41ef-9a0f-36976d57b5cf": {
+          "mode": "refresh",
+          "state": "succeeded"
+        }
+      },
+      "registeredBefore": 4,
+      "registeredAfter": 5,
+      "answerModelCalls": 2,
+      "answer": "**인덱스 새로고침(refresh) 작업이 제출되었습니다. 현재 상태는 `queued`입니다.**\n\n- 작업 ID: **d251681c-6473-41ef-9a0f-36976d57b5cf**\n- 모드: **refresh**(기존 인덱스에 변경분만 증분 반영), 임베딩 프로필 **local-qwen3**\n- 범위: **설정된 모든 로컬 루트**, 현재 활성 인덱스는 **ready** 상태\n- 진행 상황은 TUI에서 표시되며, 완료 후 등록 결과를 확인할 수 있습니다."
+    },
+    "offline": {
+      "userInput": "/index build",
+      "toolNames": [],
+      "newJobs": {
+        "82d69818-7e42-44d9-874c-c3025d67d5dc": {
+          "mode": "build",
+          "state": "succeeded"
+        }
+      },
+      "registeredBefore": 4,
+      "registeredAfter": 5,
+      "answerModelCalls": 0,
+      "answer": ""
+    },
+    "ensure-ready": {
+      "userInput": "帮我建立索引",
+      "toolNames": [
+        "read",
+        "manage_local_index",
+        "manage_local_index",
+        "manage_local_index",
+        "manage_local_index",
+        "manage_local_index"
+      ],
+      "newJobs": {
+        "76864a11-af69-445e-b9a6-3d0381411a66": {
+          "mode": "refresh",
+          "state": "succeeded"
+        }
+      },
+      "registeredBefore": 4,
+      "registeredAfter": 5,
+      "answerModelCalls": 6,
+      "answer": "**인덱스 구축이 완료되었습니다** — 작업 ID `76864a11-af69-445e-b9a6-3d0381411a66`, 상태 **succeeded**. 기존 인덱스가 이미 있었기 때문에 전체 재구축이 아닌 증분 갱신(refresh)으로 처리되었습니다.\n\n- 대상 범위는 설정된 **모든 로컬 루트**, 임베딩 프로파일은 **local-qwen3** (Qwen/Qwen3-Embedding-0.6B)입니다.\n- 총 **문서 5건 / 청크 10개**를 처리했고, 새로 임베딩된 청크 **2개**, 기존 캐시 재사용 **8개**, 삭제 **0개**입니다. 실패 항목은 없습니다.\n- 이전에 미등록 상태였던 **/docs/新增纪要.md**가 이번 실행으로 등록되었습니다.\n- 현재 등록 현황은 **5건 중 5건 등록(complete)** 이며, 会议记录·值"
+    },
+    "rebuild": {
+      "userInput": "重建当前索引",
+      "toolNames": [
+        "read",
+        "manage_local_index"
+      ],
+      "newJobs": {
+        "9c13d5fb-d6fd-4f42-9725-4f8b35ed52fb": {
+          "mode": "build",
+          "state": "succeeded"
+        }
+      },
+      "registeredBefore": 4,
+      "registeredAfter": 5,
+      "answerModelCalls": 3,
+      "answer": "**索引 재구축 작업이 시작되었습니다.** 작업 ID는 **9c13d5fb-d6fd-4f42-9725-4f8b35ed52fb**입니다.\n\n- 모드: **build**(전체 재구축), 대상 범위: **설정된 모든 로컬 루트**\n- 임베딩 프로필: **local-qwen3** (Qwen/Qwen3-Embedding-0.6B), 로컬 전용\n- 현재 상태: **queued** — 시작 시각 2026-11-06 09:26:43 UTC, 진행 상황은 TUI에서 확인할 수 있습니다\n- 기존 인덱스는 재구축이 완료될 때까지 **ready** 상태로 유지됩니다\n\n완료 여부는 `status`로 확인할 수 있으며, 끝나기 전에는 재구축 결과를 확정할 수 없습니다."
+    },
+    "subset": {
+      "userInput": "只给新增纪要.md 建索引，不要扫描其他文件或目录。",
+      "toolNames": [
+        "read",
+        "fsearch_search"
+      ],
+      "newJobs": {},
+      "registeredBefore": 4,
+      "registeredAfter": 4,
+      "answerModelCalls": 2,
+      "answer": "**索引工具只能按“已配置的整个根目录”建立或刷新索引，无法只把单个文件 新增纪要.md 加进去，因此需要你先确认范围。**\n\n- 我找到了目标文件：**新增纪要.md**（38 字节，2026-11-06 修改），路径与名称都唯一。\n- 索引能力本身只支持全量范围（所有已配置的本地根目录），`scope` 参数没有“单文件”选项，因此按你“不扫描其他文件或目录”的要求，我暂时没有提交任何索引任务。\n- 请选择一种方式：**(A)** 允许对已配置的整个根目录做一次索引或增量刷新；本次索引过程会扫描这些目录，但只会真正把新增或变更的文档纳入索引（包含 新增纪要.md）；**(B)** 仍然严格只处理这一个文件，那样就无法用索引功能完成，只能保持该文件不登记在索引中。\n- 你确认 A 之后，我会立即提交索引任务并回报任务 ID 与状态；若已有索引，则会做增量刷新而不是重建。"
+    },
+    "ambiguous": {
+      "userInput": "把刚才漏掉的补进去",
+      "toolNames": [
+        "check_memory",
+        "bash",
+        "bash",
+        "read",
+        "manage_local_index"
+      ],
+      "newJobs": {},
+      "registeredBefore": 4,
+      "registeredAfter": 4,
+      "answerModelCalls": 4,
+      "answer": "这个请求指向不明确，我不能凭猜测直接写入，所以想先请你确认“刚才漏掉”的地方是什么。\n\n- 当前对话里没有你先前提到的清单、摘要或检索结果，因此我无法确定“补进去”的对象是索引、文件，还是某份文档。\n- 如果指的是**本地索引**：最近一次覆盖检查显示共有 **5** 个文件，其中 **4** 个已登记，只有 **/docs/新增纪要.md** 处于未注册状态，其余 **会议记录.md、值班手册.md、青岚交接.md、项目计划.md** 都已登记完成 [e1]。\n- 如果你确认要把这个文件补进索引，回一句“把新增纪要补进索引”，我就按当前配置 **local-qwen3** 提交增量刷新，并回报作业 ID 和实际状态。\n- 如果“漏掉的”其实是别的东西，例如某份报告里少的一节，或清单里少的一条，请说明对应的文件或上一轮结果，我再补。"
+    },
+    "quote": {
+      "userInput": "只解释“重建索引”这句话的意思。不要查文件，不要执行。",
+      "toolNames": [],
+      "newJobs": {},
+      "registeredBefore": 4,
+      "registeredAfter": 4,
+      "answerModelCalls": 1,
+      "answer": "**“重建索引”的意思是：把现有的索引整体作废，再从原始文件出发全部重新生成一遍，而非只做增量补充。**\n\n- 索引是系统为了让搜索更快而预先建好的“目录或对照表”，里面记录每份文件被切分后的片段（chunk）、这些片段的位置，以及它们对应的向量等。\n- **重建（rebuild）** 会先清空旧索引，也就是连文件清单和向量数据一起丢弃，然后重新扫描所有源文件，重新切片、重新计算向量、重新写入。\n- 它与**刷新/增量更新（refresh）**的区别在于：增量更新只处理新增或改动的文件，速度快、代价小；重建不受旧索引状态影响，因此能修正先前删除残留、切片规则变更、向量模型更换等遗留问题。\n- 它的代价是**耗时明显更长**，而且在重建期间，搜索可能暂时不可用，或者结果不完整。\n- 典型使用场景：更换了 embedding 模型，调整了切片或解析规则，索引损坏、出现异常，或者怀疑索引与源文件长期不一致时。\n\n需要我进一步说明它在你"
+    },
+    "no-match": {
+      "userInput": "查找文档中是否提到 ZQX987 人工条目，只查询。",
+      "toolNames": [
+        "search_all_documents",
+        "semantic_search_local_docs",
+        "bash",
+        "manage_local_index",
+        "bash"
+      ],
+      "newJobs": {},
+      "registeredBefore": 4,
+      "registeredAfter": 4,
+      "answerModelCalls": 6,
+      "answer": "**没有找到：在全部 5 个文档中，均未出现 “ZQX987”，也没有任何“人工条目”相关表述。**\n\n- 检出结果只给出了文档的标题行和统一占位内容「合成 QA 样本。」，没有该编号的任何匹配 [e5][e6][e7][e8]。\n- 对每个文档全文进行精确字符串检索后，也同样没有命中 ZQX987 [file:/tmp/autorag-index-skill.klq5SzmW/frozen/fixtures-naskv_52/docs/会议记录.md]。\n- 文档集合规模很小，共 5 个文件：**会议记录、值班手册、新增纪要、青岚交接、项目计划**；正文都只有一两行占位文字，没有可供检索的业务细节。\n- 其中 **「新增纪要.md」尚未加入索引**，内容是「新增合成记录。」，我已直接读取其原文确认，其中同样不含该编号 [file:/tmp/autorag-index-skill.klq5SzmW/frozen/fixtures"
+    },
+    "unknown": {
+      "userInput": "仅使用名为 not-configured 的本地 profile 刷新索引。",
+      "toolNames": [
+        "read",
+        "manage_local_index"
+      ],
+      "newJobs": {},
+      "registeredBefore": 4,
+      "registeredAfter": 4,
+      "answerModelCalls": 3,
+      "answer": "**未執行刷新：目前設定的 profile 只有 `local-qwen3`，不存在名為 `not-configured` 的本地 profile，因此無法受理這個指定。**\n\n- 目前的索引狀態是 **succeeded**（作業 `fc989fd6-9063-4554-ba9f-329e8d8dfe6a`，模式 build，使用 `local-qwen3`），已完成 **4 份文件 / 8 個 chunk** 的嵌入。\n- 目前可用的 profile 清單只有一筆：**`local-qwen3`**（kind `local-http`，模型 `Qwen/Qwen3-Embedding-0.6B`），它同時也是預設 profile。\n- 為避免用不存在的 profile 名稱送出索引寫入作業，我沒有提交任何刷新請求，索引內容維持原狀。\n- 若你的意思是「僅限本地、不呼叫遠端嵌入」，那正是 `local-qwen3` 這種 `l"
+    },
+    "empty-increment": {
+      "userInput": "仅增量更新，不要建立新索引。",
+      "toolNames": [
+        "read",
+        "manage_local_index",
+        "manage_local_index"
+      ],
+      "newJobs": {},
+      "registeredBefore": 0,
+      "registeredAfter": 0,
+      "answerModelCalls": 3,
+      "answer": "**目前无法执行增量更新：系统中还没有任何已建成的索引，因此没有可供增量的基线。**\n\n- 当前索引状态为**未就绪**，已配置的 embedding 配置是 `local-qwen3`，但没有活动索引 [e1]。\n- 覆盖检查在 **5 个**本地文件上返回的状态全部为 **unknown**，该检查也未完成；原因是索引就绪标记缺失，因此没有任何文件处于“已注册”状态，可归入“新增/变更”范围 [e2]。\n- 由于增量刷新需要以既有索引为起点，此时只能执行**首次建库**；而首次建库会新建索引，与您“不要建立新索引”的要求冲突，所以我尚未提交任何索引任务。\n\n如果您同意先做一次首次建库，请告诉我，我会立即提交；如果您的本意是“已有索引只做增量”，可能需要先确认这台机器上是否应该存在另一个索引目录。"
+    },
+    "initial": {
+      "userInput": "帮我建立索引",
+      "toolNames": [
+        "read",
+        "manage_local_index",
+        "manage_local_index",
+        "manage_local_index"
+      ],
+      "newJobs": {
+        "df369f34-9711-4472-ac34-17bd20281f16": {
+          "mode": "build",
+          "state": "succeeded"
+        }
+      },
+      "registeredBefore": 0,
+      "registeredAfter": 5,
+      "answerModelCalls": 4,
+      "answer": "**로컬 문서 인덱스 구축이 시작되어 현재 임베딩 단계에서 실행 중입니다** — 작업 ID `df369f34-9711-4472-ac34-17bd20281f16`.\n\n- 범위: 설정된 **모든 로컬 루트 전체**, 모드 **build(최초 구축)**.\n- 임베딩 프로필: **local-qwen3** (Qwen/Qwen3-Embedding-0.6B) — 로컬 모델만 사용합니다.\n- 진행 상황(마지막 확인): 문서 **5개**, 청크 **10개**, 임베딩 완료 **0개**.\n- 시작 시각 **2026-11-06 09:28:46 UTC**, 상태 `running`, 단계 `embed`.\n- 완료 후 `ready`가 되면 시맨틱 검색이 가능해집니다. 필요하시면 완료 상태를 다시 확인해 드리겠습니다."
+    }
+  },
+  "readyEnsureFirstAttempt": {
+    "driverEnd": "timeout",
+    "sampleSeconds": 150.0,
+    "newJobs": {
+      "d79588e2-3eed-4b04-a4b7-b732f36005d7": {
+        "mode": "refresh",
+        "state": "succeeded",
+        "embeddingProfile": "local-qwen3",
+        "startedAt": "2026-11-06T09:23:56.598Z",
+        "updatedAt": "2026-11-06T09:23:58.449Z",
+        "error": null,
+        "report": {
+          "documents": 5,
+          "unchanged": 0,
+          "embedded": 2,
+          "failures": []
+        }
+      }
+    },
+    "journalBefore": [
+      "/docs/会议记录.md",
+      "/docs/值班手册.md",
+      "/docs/青岚交接.md",
+      "/docs/项目计划.md"
+    ],
+    "journalAfter": [
+      "/docs/会议记录.md",
+      "/docs/值班手册.md",
+      "/docs/新增纪要.md",
+      "/docs/青岚交接.md",
+      "/docs/项目计划.md"
+    ],
+    "finalAssistantAnswerObserved": false,
+    "retry": "Repeated on a fresh fixture with the same installed package."
+  },
+  "candidatePreservation": {
+    "harness": "scripts/manual-qa/run-qa-fastembed.mts",
+    "result": "PASS",
+    "candidateJobs": [
+      {
+        "jobId": "13133a8d-d2d3-4196-ae6f-176e80512ef4",
+        "mode": "build",
+        "state": "failed",
+        "error": "fetch failed"
+      },
+      {
+        "jobId": "67617326-0cd8-451e-a9d9-e26a807f409a",
+        "mode": "build",
+        "state": "cancelled",
+        "error": "Index task cancelled by user"
+      }
+    ]
+  },
+  "isolation": {
+    "sharedContainerConfigHashes": {
+      "before": {
+        "config.json": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+        "config.fastembed.json": "716c12831b43095e4919bde13d079272106a28ffa0c25ccb1a4af32fddd91327"
+      },
+      "after": {
+        "config.json": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+        "config.fastembed.json": "716c12831b43095e4919bde13d079272106a28ffa0c25ccb1a4af32fddd91327"
+      },
+      "unchanged": true
+    },
+    "syntheticSourceFileHashesUnchanged": true,
+    "hostConfigBefore": "ABSENT",
+    "hostConfigAfter": "ABSENT",
+    "cleanup": "Verified both container config hashes again after the independent retry, no owned FastEmbed service remained, and removed only the dedicated Docker QA tree."
+  },
+  "validation": {
+    "snapshot": "Compared all 18 implementation commit paths, including deletions, byte-for-byte with the frozen QA snapshot.",
+    "check": "passed",
+    "lint": "passed",
+    "typecheck": "passed",
+    "build": "passed",
+    "supplyChain": "passed with bun.lock dependency versions",
+    "fullVitest": {
+      "passed": 3366,
+      "skipped": 67,
+      "failed": 0,
+      "filesPassed": 296,
+      "filesSkipped": 17
+    },
+    "piSessionSuiteAfterAdditionalReplacementCase": {
+      "passed": 45,
+      "failed": 0
+    },
+    "A7": [
+      "test/agent/pi-session.test.ts — local and bridged follow-ups, remote slash input, programmatic queries, internal continuation, remote steer, abort and session replacement",
+      "test/agent/index-controls.test.ts — foreign cancellation, local-only/unknown profile and subset restrictions",
+      "test/embedding/resolve.test.ts — trusted per-consumer remote opt-in before HTTP"
+    ],
+    "A8": [
+      "test/indexing/jobs.test.ts — stable request ID, conflict, writer contention, owner-only cancellation and interrupted owner",
+      "scripts/manual-qa/run-qa-fastembed.mts — candidate failure/cancellation preserve active generation; restart and incremental refresh checked"
+    ],
+    "liveE2E": "Core cold/warm runner exercises retrieval and embedding through CLI/API. Its corpus and protocol did not change. Its core-workflow-invariant tests passed. Fresh real TUI cold builds, warm refreshes and the local FastEmbed harness cover the changed interactive entry."
+  }
+}

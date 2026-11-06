@@ -1,6 +1,6 @@
 # TUI 本地索引 Skill 开发规格
 
-状态为待实现。代码基线为 `8fe6953f`。本目录指导后续开发，产品 Skill 的交付位置为 `skills/autorag-index/SKILL.md`。以本文件定义行为，以[验收标准](验收标准.md)判定完成。
+实现提交为 `474fbcbc`，规格基线为 `8fe6953f`。A1–A9 已验收。本目录指导后续开发，产品 Skill 的交付位置为 `skills/autorag-index/SKILL.md`。以本文件定义行为，以[验收标准](验收标准.md)判定完成。
 
 ## 用户故事
 
