@@ -4,7 +4,7 @@ import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ContextSelectionReport } from "../agent/context-selection-projector.ts";
 import type { RetrievalPolicy } from "../agent/query-routing.ts";
 
-export type ModelUsageScope = "answer_session" | "pi_compaction" | "jev" | "query_decomposition" | "index_intent";
+export type ModelUsageScope = "answer_session" | "pi_compaction" | "jev" | "query_decomposition";
 
 export type AutoRAGRunEvent =
 	| {

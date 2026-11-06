@@ -81,6 +81,13 @@ export class IndexJobs {
 		}
 		return job;
 	}
+	private requestPath(id: string): string {
+		return join(this.directory, `request-${createHash("sha256").update(id).digest("hex")}.json`);
+	}
+	forRequest(id: string): IndexJob | undefined {
+		const file = this.requestPath(id);
+		return existsSync(file) ? this.status(JSON.parse(readFileSync(file, "utf8")).jobId) : undefined;
+	}
 	start(
 		request: IndexJobRequest & { embeddingProfile: string },
 		execute: (signal: AbortSignal, event: (event: IndexEvent) => void) => Promise<IndexReport>,
@@ -88,13 +95,8 @@ export class IndexJobs {
 		const release = acquireIndexLease(join(this.directory, "submission"));
 		try {
 			const previous = this.status();
-			const requestPath = request.requestId
-				? join(this.directory, `request-${createHash("sha256").update(request.requestId).digest("hex")}.json`)
-				: undefined;
-			const repeated =
-				requestPath && existsSync(requestPath)
-					? this.status(JSON.parse(readFileSync(requestPath, "utf8")).jobId)
-					: undefined;
+			const requestPath = request.requestId ? this.requestPath(request.requestId) : undefined;
+			const repeated = request.requestId ? this.forRequest(request.requestId) : undefined;
 			if (repeated) {
 				if (
 					repeated.configurationFingerprint !== request.configurationFingerprint ||

@@ -1,8 +1,7 @@
-import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import type { ExtensionFactory, ToolResultEvent, ToolResultEventResult } from "@earendil-works/pi-coding-agent";
 import type { EvidenceLedger } from "./evidence-ledger.ts";
+
+import { packagedSkillPath } from "./packaged-skill.ts";
 
 export const GITHUB_READ_TOOLS = ["pull_request_read", "issue_read", "actions_list", "actions_get", "get_job_logs"];
 
@@ -38,15 +37,7 @@ function browserSource(value: unknown, repo: string): string | undefined {
 }
 
 export function githubPrSkillPath(): string | undefined {
-	let dir = dirname(fileURLToPath(import.meta.url));
-	for (let depth = 0; depth < 6; depth++) {
-		const path = join(dir, "skills", "github-pr-analysis", "SKILL.md");
-		if (existsSync(path)) return path;
-		const parent = dirname(dir);
-		if (parent === dir) break;
-		dir = parent;
-	}
-	return undefined;
+	return packagedSkillPath("github-pr-analysis");
 }
 
 /** Per-runtime identities: a log's job URL must have come from an actual earlier GitHub result. */

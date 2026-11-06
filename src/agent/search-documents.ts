@@ -58,7 +58,6 @@ export type SearchDocumentDiagnosticCode =
 	| "no-final-answer"
 	| "model-request-failed"
 	| "tool-call-burst"
-	| "index-intent"
 	| "query-routed"
 	| "query-route-fallback"
 	| "query-decomposition-failed"

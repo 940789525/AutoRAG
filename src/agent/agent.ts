@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { existsSync, watch as fsWatch, mkdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -153,8 +154,7 @@ import { EvidenceOriginIndex } from "./evidence-origins.ts";
 import { createEvidencePersistence } from "./evidence-persistence.ts";
 import { createFSearchSearchTool, FSEARCH_SEARCH_TOOL_NAME } from "./fsearch-search-tool.ts";
 import { createGitHubMcpEvidence } from "./github-mcp-evidence.ts";
-import { createIndexControls, createIndexTool, INDEX_TOOL_NAME } from "./index-controls.ts";
-import { IndexIntentRouter } from "./index-intent.ts";
+import { createIndexControls, createIndexTool, INDEX_TOOL_NAME, requireIndexSkill } from "./index-controls.ts";
 import { intentOfMessage } from "./intent-tracing.ts";
 import {
 	createJevExtension,
@@ -171,6 +171,7 @@ import {
 	type MergedJikjiPolicy,
 } from "./jikji-find-tool.ts";
 import { loadLocalAutoRAGModel } from "./local-model.ts";
+import { packagedSkillPath } from "./packaged-skill.ts";
 import { createPermissionGate, PermissionController, type PermissionMode } from "./permission-gate.ts";
 import type { AutoRAGPiSessionOptions, RequestContextInfo } from "./pi-session.ts";
 import {
@@ -795,6 +796,12 @@ export interface RerankAgentOptions {
 	timeoutMs?: number;
 }
 
+interface InteractiveQuery {
+	readonly text: string;
+	readonly sessionId?: string;
+	readonly requestId?: string;
+}
+
 export interface AutoRAGSearchSession {
 	readonly agent: Agent;
 	readonly piSession?: AutoRAGPiSession["session"];
@@ -852,7 +859,7 @@ export class AutoRAGAgent {
 		/** The detached TUI search in flight, if any. */
 		run: Promise<void> | undefined;
 		/** Queries asked in order once the running search answers: Alt+Enter follow-ups, unanswered steers. */
-		readonly followUps: string[];
+		readonly followUps: InteractiveQuery[];
 		/** Steers this run received; any steer forces verification and is restated to it. */
 		readonly steers: string[];
 		/**
@@ -860,7 +867,7 @@ export class AutoRAGAgent {
 		 * taken yet; the next request drains them. A TUI turns any left when the search
 		 * ends into follow-up queries instead of letting them leak into the next prompt.
 		 */
-		readonly queuedSteers: string[];
+		readonly queuedSteers: InteractiveQuery[];
 		/** Steers that arrived before the run's pi session existed; queued on it once it does. */
 		readonly preSessionSteers: AgentMessage[];
 		/** The run still takes steers: false once its last model request settled. */
@@ -951,7 +958,8 @@ export class AutoRAGAgent {
 	private readonly localIndexOptions: LocalIndexOptions;
 	private readonly localIndexRevision?: string;
 	readonly indexJobs: IndexJobs;
-	private indexIntentRouter?: IndexIntentRouter;
+	private interactiveQuery?: InteractiveQuery;
+	private readonly indexPrompt = new AsyncLocalStorage<InteractiveQuery | undefined>();
 	private localIndexJobId?: string;
 	private readonly minSyncEmbedderConfig: MinSyncEmbedderConfig | undefined;
 	private readonly jikjiClient: JikjiClient | undefined;
@@ -1662,10 +1670,22 @@ export class AutoRAGAgent {
 	): Promise<AutoRAGSearchSession> {
 		if (this.boundPiRuntime !== undefined) {
 			const session = this.boundPiRuntime.session;
+			let originalInput = this.indexPrompt.getStore();
 			return {
 				agent: session.agent,
 				piSession: session,
-				prompt: async (prompt) => session.prompt(prompt, { source: "extension" }),
+				prompt: async (prompt) => {
+					// Only the first prompt answering this input owns it. Verification/continuation prompts are independent.
+					const input = originalInput;
+					originalInput = undefined;
+					const send = () =>
+						session.prompt(prompt, {
+							source: "extension",
+							// Pi dispatches slash commands before input hooks. Never reinterpret a bridged or generated prompt as a command.
+							expandPromptTemplates: Boolean(input?.requestId && input.text === prompt),
+						});
+					return this.indexPrompt.run(input, send);
+				},
 				abort: async () => session.abort(),
 				dispose: () => {},
 			};
@@ -1896,8 +1916,7 @@ export class AutoRAGAgent {
 		return {
 			...runtime,
 			dispose: async () => {
-				this.indexIntentRouter?.reset();
-				this.indexIntentRouter = undefined;
+				this.interactiveQuery = undefined;
 				this.localIndexJobId = undefined;
 				await this.indexJobs.close();
 				await this.embedder.close();
@@ -1924,10 +1943,10 @@ export class AutoRAGAgent {
 				const state = this.interactive;
 				if (state.run === undefined) {
 					this.userRequests.record(text);
-					this.startInteractiveQuery(text, pi);
+					this.startInteractiveQuery({ text }, pi);
 				} else if (!this.steer(text)) {
 					this.userRequests.record(text);
-					state.followUps.push(text);
+					state.followUps.push({ text });
 				}
 			},
 			isRunning: () => this.interactive.run !== undefined,
@@ -2040,127 +2059,30 @@ export class AutoRAGAgent {
 	 * user is correcting a search that is going wrong) and Alt+Enter queues a
 	 * follow-up question that runs once this search answers.
 	 */
-	private routeInteractiveInput(
-		input: AutoRAGInteractiveInput,
-		pi: ExtensionAPI,
-	): AutoRAGInputDisposition | Promise<AutoRAGInputDisposition> {
-		if (input.source === "extension") return this.routeOrdinaryInput(input, pi);
-		this.indexIntentRouter ??= new IndexIntentRouter({
-			observe: (data) =>
-				this.routingDiagnostics.push({
-					code: "index-intent",
-					severity: "info",
-					source: "agent",
-					message: JSON.stringify(data),
-				}),
-			snapshot: () => {
-				const manager = this.embedder instanceof ProfileEmbedder ? this.embedder : undefined;
-				return {
-					profiles: manager
-						? Object.entries(manager.config.profiles).map(([id, p]) => ({ id, kind: p.kind, model: p.model }))
-						: [{ id: "injected", kind: "local-http", model: "injected" }],
-					activeProfile: manager?.profileId ?? "injected",
-					defaultProfile: manager?.config.defaultProfile ?? "injected",
-					ready: this.minSyncMethod.index.isReady(),
-					localJobId: this.localIndexJobId,
-				};
-			},
-			complete: async (prompt, signal) => {
-				if (!this.boundPiRuntime?.session.model)
-					throw new Error("Natural-language indexing needs a conversation model");
-				const resolved = await this.resolveSessionModel();
-				signal.throwIfAborted();
-				const started = performance.now();
-				const sessionId = this.lastSessionId ?? "unbound";
-				return createModelDecompositionCompleter(resolved, signal, 512, (message) => {
-					this.runLogger.write(
-						assistantUsageEvent(message, "index_intent", sessionId, { latencyMs: performance.now() - started }),
-					);
-					if (!message) return;
-					this.routingDiagnostics.push({
-						code: "index-intent",
-						severity: "info",
-						source: "agent",
-						message: JSON.stringify({
-							model: message.model,
-							inputTokens: message.usage?.input ?? null,
-							outputTokens: message.usage?.output ?? null,
-							cost: message.usage?.cost?.total ?? null,
-						}),
-					});
-				})(prompt);
-			},
-			notify: (text) =>
-				pi.sendMessage(
-					{ customType: "autorag.index", content: [{ type: "text", text }], display: true },
-					{ triggerTurn: false },
-				),
-			execute: (plan, requestId) => {
-				const ops = this.indexOperations();
-				const job =
-					plan.operation === "status"
-						? ops.jobs.status(plan.jobId)
-						: plan.operation === "cancel"
-							? ops.jobs.cancel(plan.jobId ?? "")
-							: ops.start({
-									mode: plan.operation,
-									embeddingProfile: "embeddingProfile" in plan ? plan.embeddingProfile : undefined,
-									requestId,
-								});
-				pi.sendMessage(
-					{
-						customType: "autorag.index",
-						content: [
-							{
-								type: "text",
-								text: JSON.stringify({
-									operation: plan.operation,
-									scope: "全部已配置本地目录",
-									job: job ?? null,
-									activeIndex: ops.activeIndex(),
-								}),
-							},
-						],
-						display: true,
-					},
-					{ triggerTurn: false },
-				);
-			},
-		});
-		const router = this.indexIntentRouter;
-		const gate = router.gate(input.text);
-		if (gate.kind === "ordinary") {
-			router.reset();
-			return this.routeOrdinaryInput(input, pi);
-		}
-		this.userRequests.record(input.text);
-		return router
-			.handle(input.text, gate)
-			.then((handled) => (handled ? { kind: "handled" } : this.routeOrdinaryInput(input, pi, true)));
-	}
-
-	private routeOrdinaryInput(
-		input: AutoRAGInteractiveInput,
-		pi: ExtensionAPI,
-		recorded = false,
-	): AutoRAGInputDisposition {
+	private routeInteractiveInput(input: AutoRAGInteractiveInput, pi: ExtensionAPI): AutoRAGInputDisposition {
+		const query: InteractiveQuery = {
+			text: input.text,
+			sessionId: this.boundPiRuntime?.session.sessionId,
+			requestId: input.source === "interactive" && input.text !== "/skill:autorag-index" ? randomUUID() : undefined,
+		};
 		const state = this.interactive;
 		const followUp = input.streamingBehavior === "followUp" || state.nextSubmitIsFollowUp;
 		state.nextSubmitIsFollowUp = false;
 		if (state.run === undefined) {
-			if (!recorded) this.userRequests.record(input.text);
-			this.startInteractiveQuery(input.text, pi);
+			this.userRequests.record(input.text);
+			this.startInteractiveQuery(query, pi);
 			return { kind: "handled" };
 		}
 		if (followUp) {
-			if (!recorded) this.userRequests.record(input.text);
-			state.followUps.push(input.text);
+			this.userRequests.record(input.text);
+			state.followUps.push(query);
 			return { kind: "handled" };
 		}
+		this.interactiveQuery = undefined;
 		if (input.streamingBehavior === "steer") {
 			// A turn is streaming: pi queues the user's text as steering for that turn.
 			state.steers.push(input.text);
-			if (!recorded) this.userRequests.record(input.text, "steer");
+			this.userRequests.record(input.text, "steer");
 			state.steerTexts.add(input.text);
 			this.conversationQueries.add(input.text);
 			// Cut any in-flight retrieval short so the steer reaches the model promptly.
@@ -2170,9 +2092,9 @@ export class AutoRAGAgent {
 		// Between phases no turn streams, so pi would start a new prompt. Queue the
 		// steer on the search instead: the next phase's model request takes it. A
 		// search past its last request (or between queued queries) answers it next.
-		if (!this.steer(input.text, input.images)) {
-			if (!recorded) this.userRequests.record(input.text);
-			state.followUps.push(input.text);
+		if (!this.steerQuery(query, input.images)) {
+			this.userRequests.record(input.text);
+			state.followUps.push(query);
 		}
 		return { kind: "handled" };
 	}
@@ -2183,10 +2105,7 @@ export class AutoRAGAgent {
 	 * Alt+Enter like Enter, so AutoRAG acts on them there.
 	 */
 	private handleInteractiveKey(key: AutoRAGInteractiveKey): boolean {
-		if (key === "interrupt" && this.indexIntentRouter?.recognizing) {
-			this.indexIntentRouter.reset();
-			return true;
-		}
+		if (key === "interrupt") this.interactiveQuery = undefined;
 		const state = this.interactive;
 		if (state.run === undefined || this.boundPiRuntime?.session.isStreaming === true) return false;
 		if (key === "followUp") {
@@ -2200,13 +2119,17 @@ export class AutoRAGAgent {
 	}
 
 	/** Runs one TUI query detached from pi's input loop, then any follow-ups queued behind it. */
-	private startInteractiveQuery(query: string, pi: ExtensionAPI): void {
+	private startInteractiveQuery(query: InteractiveQuery, pi: ExtensionAPI): void {
 		const state = this.interactive;
 		const run = (async () => {
-			let next: string | undefined = query;
+			let next: InteractiveQuery | undefined = query;
 			while (next !== undefined) {
 				try {
-					await this.runInteractivePiQuery(next, pi);
+					if (next.sessionId === undefined || next.sessionId === this.boundPiRuntime?.session.sessionId) {
+						this.interactiveQuery = next;
+						const input = next;
+						await this.indexPrompt.run(input, () => this.runInteractivePiQuery(input.text, pi));
+					}
 				} catch (error) {
 					pi.sendMessage(
 						{
@@ -2217,6 +2140,7 @@ export class AutoRAGAgent {
 						{ triggerTurn: false },
 					);
 				}
+				this.interactiveQuery = undefined;
 				next = state.followUps.shift();
 			}
 		})().finally(() => {
@@ -2281,8 +2205,14 @@ export class AutoRAGAgent {
 	 * the text as a new question.
 	 */
 	steer(text: string, images: readonly ImageContent[] = []): boolean {
+		return this.steerQuery({ text }, images);
+	}
+
+	private steerQuery(query: InteractiveQuery, images: readonly ImageContent[] = []): boolean {
+		const { text } = query;
 		const state = this.interactive;
 		if (!this.activeRun || !state.acceptingSteers || state.userAborted || text.trim() === "") return false;
+		this.interactiveQuery = undefined;
 		state.steers.push(text);
 		this.userRequests.record(text, "steer");
 		state.steerTexts.add(text);
@@ -2294,7 +2224,7 @@ export class AutoRAGAgent {
 		const agent = this.activeSession?.agent;
 		if (agent === undefined) state.preSessionSteers.push(message);
 		else agent.steer(message);
-		state.queuedSteers.push(text);
+		state.queuedSteers.push(query);
 		return true;
 	}
 
@@ -2494,7 +2424,11 @@ export class AutoRAGAgent {
 					if (sessionAgent !== undefined) sessionAgent.setThinkingLevel(clamped);
 					else activeSession.agent.state.thinkingLevel = clamped;
 				};
-				const plan = conversational ? undefined : await this.planQuery(trimmedQuery, resolved, planAbort.signal);
+				const explicitSkill = this.indexPrompt.getStore()?.text.startsWith("/skill:autorag-index ");
+				const plan =
+					conversational || explicitSkill
+						? undefined
+						: await this.planQuery(trimmedQuery, resolved, planAbort.signal);
 				if (!plan || (this.retrievalPolicy === "on-demand" && plan.route !== "config")) {
 					if (this.interactive.userAborted || planAbort.signal.aborted) return;
 					const limit = options.topK === undefined ? "" : ` Cite at most ${options.topK} sources.`;
@@ -3536,7 +3470,7 @@ export class AutoRAGAgent {
 		return (
 			`Answer this query directly from your own general knowledge: ${query}\n\n` +
 			`It needs no search: it is general knowledge, simple reasoning, or conversation. Do NOT call any search, retrieval, web, or file-reading tools. ` +
-			`Reply naturally and concisely; for small talk, just respond conversationally. Do not cite sources or mention retrieval.`
+			`If the actual user request matches an available Skill, read and apply that Skill instead. Reply naturally and concisely; for small talk, just respond conversationally. Do not cite sources or mention retrieval.`
 		);
 	}
 
@@ -3660,9 +3594,13 @@ export class AutoRAGAgent {
 		return {
 			jobs: this.indexJobs,
 			fileCoverage: (offset: number, signal?: AbortSignal) => this.localFileCoverage(offset, signal),
-			onCommand: () => this.indexIntentRouter?.reset(),
+			onSessionEnd: () => {
+				this.interactiveQuery = undefined;
+				this.localIndexJobId = undefined;
+			},
 			activeIndex: () => ({
 				embeddingProfile: this.embedder instanceof ProfileEmbedder ? this.embedder.profileId : "injected",
+				defaultProfile: this.embedder instanceof ProfileEmbedder ? this.embedder.config.defaultProfile : "injected",
 				ready: this.minSyncMethod.index.isReady(),
 			}),
 			start: (request: IndexJobRequest) => {
@@ -3673,8 +3611,32 @@ export class AutoRAGAgent {
 			profiles: () =>
 				this.embedder instanceof ProfileEmbedder
 					? Object.entries(this.embedder.config.profiles).map(([id, p]) => ({ id, kind: p.kind, model: p.model }))
-					: [],
-			canWriteFromModel: () => false,
+					: [{ id: "injected", kind: "local-http", model: "injected" }],
+			authorizeWrite: (missingSource?: string, refresh?: boolean) => {
+				const input = this.indexPrompt.getStore();
+				const session = this.boundPiRuntime?.session;
+				if (
+					!input?.requestId ||
+					input !== this.interactiveQuery ||
+					!session ||
+					session.sessionId !== input.sessionId ||
+					this.interactive.userAborted ||
+					this.activeRunAbort?.signal.aborted
+				) {
+					throw new Error("Index writes require a current explicit TUI indexing request; use /index");
+				}
+				const skill = session.resourceLoader.getSkills().skills.find((s) => s.name === "autorag-index");
+				if (!skill || skill.filePath !== packagedSkillPath("autorag-index"))
+					throw new Error("The packaged autorag-index Skill is unavailable in this TUI session");
+				requireIndexSkill(
+					session.messages,
+					skill.filePath,
+					input.text.startsWith("/skill:autorag-index "),
+					missingSource,
+					refresh,
+				);
+				return { requestId: input.requestId, ownedJobId: this.localIndexJobId };
+			},
 		};
 	}
 

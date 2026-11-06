@@ -21,7 +21,9 @@ import {
 	DefaultResourceLoader,
 	type ExtensionAPI,
 	type ExtensionFactory,
+	formatSkillsForPrompt,
 	getAgentDir,
+	loadSkills,
 	ModelRuntime,
 	SessionManager,
 	SettingsManager,
@@ -40,6 +42,7 @@ import {
 } from "./context-token-guard.ts";
 import { registerIntentTracing } from "./intent-tracing.ts";
 import { createAutoRAGMcpClient, mcpPromptAddendum } from "./mcp-client.ts";
+import { packagedSkillPath } from "./packaged-skill.ts";
 import { fitRequestLimits } from "./request-limits.ts";
 import { createWelcomeHeader } from "./welcome-header.ts";
 export const PI_BUILTIN_TOOL_NAMES = ["read", "bash", "edit", "write", "grep", "find", "ls"] as const;
@@ -414,13 +417,19 @@ function createAutoRAGInteractiveExtension(
 	options: Pick<AutoRAGPiInteractiveRuntimeOptions, "onInput" | "isSearchRunning" | "onKey">,
 	updateNotice: (() => Promise<string | undefined>) | undefined,
 	settingsManager: SettingsManager,
+	indexSkillPath: string,
 	onPrepared?: (messages: AgentMessage[]) => void,
 	finalize?: (messages: AgentMessage[]) => AgentMessage[],
 	lifecycle?: Pick<AutoRAGPiSessionOptions, "onContextReset" | "onContextSettled">,
 ): ExtensionFactory {
 	return (pi) => {
 		pi.on("before_agent_start", (event) => ({
-			systemPrompt: getSystemPrompt() + mcpPromptAddendum(event.systemPromptOptions.sections),
+			systemPrompt: [
+				getSystemPrompt() + mcpPromptAddendum(event.systemPromptOptions.sections),
+				formatSkillsForPrompt(
+					event.systemPromptOptions.skills.filter((skill) => skill.filePath === indexSkillPath),
+				),
+			].join("\n\n"),
 		}));
 		guardContext(pi, contextTransform);
 		enforceRequestLimits(pi, onPrepared, finalize);
@@ -472,7 +481,8 @@ function createAutoRAGInteractiveExtension(
 			// handed back to pi then, it would start pi's own prompt on the bound
 			// session outside the search. Registered commands never reach this
 			// handler; pi runs them first.
-			if (text.startsWith("/") && isSearchRunning?.() !== true) return undefined;
+			if (text.startsWith("/") && !text.startsWith("/skill:autorag-index ") && isSearchRunning?.() !== true)
+				return undefined;
 			let disposition: AutoRAGInputDisposition;
 			try {
 				disposition = await onInput(
@@ -621,6 +631,8 @@ export async function createAutoRAGPiInteractiveRuntime(
 	}) => {
 		// Built per runtime: /new, /resume, and fork each start a fresh session whose servers connect anew.
 		const mcp = createAutoRAGMcpClient(runtimeAgentDir);
+		const indexSkillPath = packagedSkillPath("autorag-index");
+		if (!indexSkillPath) throw new Error("Packaged skills/autorag-index/SKILL.md is missing");
 		const services = await createAgentSessionServices({
 			cwd,
 			agentDir: runtimeAgentDir,
@@ -630,7 +642,22 @@ export async function createAutoRAGPiInteractiveRuntime(
 				? {}
 				: { extensionFlagValues: new Map(Object.entries(options.extensionFlags)) }),
 			resourceLoaderOptions: {
-				additionalSkillPaths: [...(mcp?.skillPaths ?? [])],
+				additionalSkillPaths: [indexSkillPath, ...(mcp?.skillPaths ?? [])],
+				skillsOverride: (loaded) => {
+					// Pi normally keeps the first same-name skill. The index tool requires the packaged instructions.
+					const shadow = loaded.skills.find((s) => s.name === "autorag-index" && s.filePath !== indexSkillPath);
+					if (!shadow) return loaded;
+					const pinned = loadSkills({
+						cwd,
+						agentDir: runtimeAgentDir,
+						skillPaths: [indexSkillPath],
+						includeDefaults: false,
+					});
+					return {
+						skills: [...loaded.skills.filter((s) => s !== shadow), ...pinned.skills],
+						diagnostics: [...loaded.diagnostics, ...pinned.diagnostics],
+					};
+				},
 				...(options.extensionPaths === undefined ? {} : { additionalExtensionPaths: [...options.extensionPaths] }),
 				extensionFactories: [
 					...(mcp?.extensionFactories ?? []),
@@ -643,6 +670,7 @@ export async function createAutoRAGPiInteractiveRuntime(
 						{ onInput: options.onInput, isSearchRunning: options.isSearchRunning, onKey: options.onKey },
 						options.updateNotice,
 						settingsManager,
+						indexSkillPath,
 						options.onContextPrepared,
 						options.finalizeContext,
 						options,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isIndexOperationInput, parseIndexCommand } from "../../src/agent/index-controls.ts";
+import { parseIndexCommand } from "../../src/agent/index-controls.ts";
 import { defaultEmbeddingConfig, embeddingFingerprint, normalizeEmbeddingConfig } from "../../src/embedding/config.ts";
 
 describe("trusted embedding configuration", () => {
@@ -43,10 +43,5 @@ describe("TUI index entry", () => {
 		expect(parseIndexCommand("cancel --job abc")).toEqual({ operation: "cancel", jobId: "abc" });
 		expect(() => parseIndexCommand("build --embedding")).toThrow(/Missing/);
 		expect(() => parseIndexCommand("build --url https://example.com")).toThrow(/Unsupported/);
-	});
-	it("routes indexing operations before retrieval without routing ordinary search", () => {
-		expect(isIndexOperationInput("用本地 Qwen 模型给已配置的文档目录建立索引")).toBe(true);
-		expect(isIndexOperationInput("查看索引进度")).toBe(true);
-		expect(isIndexOperationInput("Who approves refunds?")).toBe(false);
 	});
 });
