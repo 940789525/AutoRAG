@@ -68,7 +68,7 @@ function jevRoute(route: QueryRoute, followUp = 0.9): JevBackend {
 async function tuiAgent(
 	responses: FauxResponseStep[],
 	jev: JevBackend = jevRoute("direct"),
-	extra: Pick<AutoRAGAgentOptions, "datasourceSkills" | "answerMode"> = {},
+	extra: Pick<AutoRAGAgentOptions, "datasourceSkills" | "answerMode" | "retrievalPolicy"> = {},
 	ui: Partial<ExtensionUIContext> = {},
 ) {
 	const registration = registerFauxProvider({ api: `faux-tui-${randomUUID()}`, models: [{ id: "tui-model" }] });
@@ -1588,16 +1588,30 @@ describe("1102 index input routing", () => {
 			await tui.dispose();
 		}
 	});
-	it("uses the configured model for one candidate interpretation and skips retrieval", async () => {
-		const tui = await tuiAgent([
-			fauxAssistantMessage(JSON.stringify({ kind: "operation", request: { intent: "status", constraints: [] } }), {
-				stopReason: "stop",
-			}),
-		]);
+	it.each([
+		JSON.stringify({ kind: "operation", request: { intent: "status", constraints: [] } }),
+		"invalid classification",
+	])("answers the original inquiry once after interpreting %s", async (classification) => {
+		const query = "当前有哪些文件，这些文件是否都已建立索引？";
+		const tui = await tuiAgent(
+			[
+				fauxAssistantMessage(classification, { stopReason: "stop" }),
+				fauxAssistantMessage("Coverage answer.", { stopReason: "stop" }),
+			],
+			undefined,
+			{ retrievalPolicy: "on-demand" },
+		);
 		try {
-			await tui.session.prompt("帮我看看索引现在怎么样了", { source: "interactive" });
-			expect(tui.session.messages.some((m) => m.role === "custom" && m.customType === "autorag.index")).toBe(true);
-			expect(tui.session.messages.some((m) => m.role === "assistant")).toBe(false);
+			await tui.session.prompt(query, { source: "interactive" });
+			await tui.agent.waitForIdle();
+			const requests = tui.session.sessionManager
+				.getEntries()
+				.filter((e) => e.type === "custom" && e.customType === "autorag.user-request");
+			expect(requests).toHaveLength(1);
+			expect(requests[0]).toMatchObject({ data: { text: query } });
+			const answers = tui.session.messages.filter((m) => m.role === "assistant");
+			expect(answers).toHaveLength(1);
+			expect(answers[0].content).toContainEqual({ type: "text", text: "Coverage answer." });
 		} finally {
 			await tui.dispose();
 		}

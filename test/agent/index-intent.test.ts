@@ -162,6 +162,18 @@ describe("index intent conversation", () => {
 		expect(await r.route.handle("新资料怎么搜不到")).toBe(false);
 		expect(r.execute).not.toHaveBeenCalled();
 	});
+	it.each([
+		"当前有哪些文件，这些文件是否都已建立索引？",
+		"当前本地资料库中有哪些内容，资料库是否都已完成索引建立？",
+		"先列出文件，再看是否均已建索引",
+	])("hands the whole inquiry back even when the classifier chooses status: %s", async (query) => {
+		const r = router(vi.fn(async () => output(request("status"))));
+		expect(r.route.gate(query)).toEqual({ kind: "candidate" });
+		expect(await r.route.handle(query)).toBe(false);
+		expect(r.complete).toHaveBeenCalledTimes(1);
+		expect(r.execute).not.toHaveBeenCalled();
+		expect(r.notify).not.toHaveBeenCalled();
+	});
 	it("clarifies missing parameters and resolves a contextual reply", async () => {
 		const complete = vi
 			.fn()
@@ -197,7 +209,7 @@ describe("index intent conversation", () => {
 			}),
 		]) {
 			const r = router(complete);
-			await r.route.handle("给新资料建索引");
+			expect(await r.route.handle("给新资料建索引")).toBe(false);
 			expect(r.execute).not.toHaveBeenCalled();
 			expect(r.notify).toHaveBeenCalled();
 		}
@@ -215,7 +227,7 @@ describe("index intent conversation", () => {
 		const work = r.route.handle("给新资料建索引");
 		r.route.reset();
 		finish(output(request("rebuild")));
-		await work;
+		expect(await work).toBe(true);
 		expect(r.execute).not.toHaveBeenCalled();
 	});
 	it("newer input invalidates an older candidate", async () => {
@@ -231,7 +243,7 @@ describe("index intent conversation", () => {
 		const old = r.route.handle("给新资料建索引");
 		await r.route.handle("查看当前索引进度");
 		finish(output(request("rebuild")));
-		await old;
+		expect(await old).toBe(true);
 		expect(r.execute).toHaveBeenCalledTimes(1);
 		expect(r.execute.mock.calls[0][0].operation).toBe("status");
 	});
@@ -241,12 +253,21 @@ describe("index intent conversation", () => {
 			const r = router(vi.fn(() => new Promise<string>(() => {})));
 			const work = r.route.handle("给新资料建索引");
 			await vi.advanceTimersByTimeAsync(12_001);
-			await work;
+			expect(await work).toBe(false);
 			expect(r.execute).not.toHaveBeenCalled();
 			expect(r.notify.mock.calls[0][0]).toContain("timed out");
 		} finally {
 			vi.useRealTimers();
 		}
+	});
+	it("surfaces a dispatch failure without replaying an authorized write as a new question", async () => {
+		const r = router();
+		r.execute.mockImplementation(() => {
+			throw new Error("index writer busy");
+		});
+		expect(await r.route.handle("给新资料建索引")).toBe(true);
+		expect(r.execute).toHaveBeenCalledTimes(1);
+		expect(r.notify.mock.calls[0][0]).toContain("index writer busy");
 	});
 });
 
