@@ -1402,6 +1402,7 @@ export function buildAgentOptions(config: CliConfig, agentDir?: string): Omit<Au
 	// The Jev `config` branch edits the very file this process resolved; it only
 	// takes effect when Jev is on, so the option is always safe to pass.
 	if (config.configPath !== undefined) {
+		opts.indexConfigPath = config.configPath;
 		opts.selfConfig = {
 			configPath: config.configPath,
 			validate: (path: string) => validateAgentConfigFile(path),
@@ -2077,6 +2078,28 @@ export function readRawConfigObject(path: string): Record<string, unknown> {
 	const parsed = readConfigFile(path, true);
 	if (parsed === undefined) throw new ConfigError(`Config file not found: ${path}`);
 	return { ...(parsed as Record<string, unknown>) };
+}
+
+export function persistedExclusions(path: string): string[] {
+	const raw = readRawConfigObject(path);
+	const origin = dirname(resolve(path));
+	return (
+		resolveExcludePaths(
+			raw.excludePaths,
+			typeof raw.workspacePath === "string" ? resolve(origin, raw.workspacePath) : origin,
+		) ?? []
+	);
+}
+/** Read and merge the latest config under its writer lock. */
+export function updateConfigObject(path: string, edit: (raw: Record<string, unknown>) => void): void {
+	const lock = acquireConfigWriteLock(path);
+	try {
+		const raw = readRawConfigObject(path);
+		edit(raw);
+		replaceFileAtomically(path, `${JSON.stringify(raw, null, 2)}\n`, lock.assertOwned);
+	} finally {
+		lock.release();
+	}
 }
 
 /** Atomically replace a config file, preserving the caller's JSON object. */

@@ -7,6 +7,7 @@ import type { Api, CredentialStore, ImageContent, Model, TextContent } from "@ea
 import { clampThinkingLevel } from "@earendil-works/pi-ai/compat";
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { getAgentDir, keyText } from "@earendil-works/pi-coding-agent";
+import { persistedExclusions } from "../cli/config.ts";
 import { resolveAutoRAGHome } from "../config/home.ts";
 import {
 	convertAndRelate,
@@ -47,6 +48,7 @@ import { contentHash } from "../indexing/chunker.ts";
 import { type IndexJobRequest, IndexJobs } from "../indexing/jobs.ts";
 import { acquireIndexLease } from "../indexing/lease.ts";
 import { LocalIndexMethod } from "../indexing/method.ts";
+import { completeSourceRestore, prepareSourceOperation } from "../indexing/source-operation.ts";
 import type { IndexDocument, IndexEvent, IndexReport, LocalIndexOptions } from "../indexing/types.ts";
 import { jikjiFindDiagnostic, jikjiPrepareDiagnostic } from "../jikji/diagnostics.ts";
 import {
@@ -459,6 +461,8 @@ export interface AutoRAGRefreshProgress {
 }
 
 export interface AutoRAGRefreshOptions {
+	/** Local preparation under the same writer lease as the ensuing refresh. */
+	readonly beforeSync?: () => void;
 	/** Detailed native indexing spans. Also persisted locally under .autorag/local-index/runs. */
 	readonly onIndexEvent?: (event: IndexEvent) => void;
 	/** Restrict refresh to specific methods. Defaults to all when undefined. */
@@ -709,6 +713,7 @@ export interface AutoRAGAgentOptions {
 	queryDecomposition?: { readonly model?: Model<Api>; readonly apiKey?: string };
 	excludeExactDuplicates?: boolean;
 	excludePaths?: readonly string[];
+	indexConfigPath?: string;
 	/**
 	 * Hard caps on retrieval, baseline prefetch, and model-facing candidate
 	 * lists. Omitted fields keep their shipped defaults — see
@@ -987,7 +992,8 @@ export class AutoRAGAgent {
 	/** Routing diagnostics for the in-flight search; reset per run. */
 	private routingDiagnostics: SearchDocumentDiagnostic[] = [];
 	private readonly excludeExactDuplicates: boolean;
-	private readonly excludePaths: readonly string[];
+	private readonly excludePaths: string[];
+	private readonly indexConfigPath?: string;
 	private readonly baseSystemPromptConfig: SystemPromptConfig;
 	private readonly droppedCallerToolNames: readonly string[];
 	private readonly piAgentDir: string | undefined;
@@ -1064,6 +1070,7 @@ export class AutoRAGAgent {
 		this.dupeyOptions = options.dupey ?? {};
 		this.fileeOptions = options.filee ?? {};
 		this.excludeExactDuplicates = options.excludeExactDuplicates ?? true;
+		this.indexConfigPath = options.indexConfigPath;
 		this.excludePaths = (options.excludePaths ?? []).map(pinExcludedPath);
 		this.limits = resolveRetrievalLimits(options.limits);
 		this.refreshLimits = validateRefreshLimits(options.refresh);
@@ -3604,6 +3611,14 @@ export class AutoRAGAgent {
 				ready: this.minSyncMethod.index.isReady(),
 			}),
 			start: (request: IndexJobRequest) => {
+				const run = this.activeRetrievalOptions;
+				if (
+					request.sourceId &&
+					(!matchesVirtualPathScope(request.sourceId, run?.scope) ||
+						(run?.sourceIds && !run.sourceIds.includes(request.sourceId)) ||
+						(run?.filters && Object.keys(run.filters).length))
+				)
+					throw new Error("Index target outside the current scope");
 				const job = this.startIndexJob(request);
 				this.localIndexJobId = job.jobId;
 				return job;
@@ -3685,8 +3700,12 @@ export class AutoRAGAgent {
 	}
 
 	startIndexJob(request: IndexJobRequest) {
-		if (request.mode !== "build" && request.mode !== "refresh")
-			throw new Error("Index mode must be build or refresh");
+		const fileMode = request.mode === "remove" || request.mode === "restore" ? request.mode : undefined;
+		if (!fileMode && request.mode !== "build" && request.mode !== "refresh")
+			throw new Error("Unknown index operation");
+		if (!!fileMode !== !!request.sourceId) throw new Error("Single-file tasks require one source ID");
+		if (fileMode && (!this.indexConfigPath || this.telegram || this.discordRemote))
+			throw new Error("File indexing requires a local persisted configuration");
 		if (request.scopeIds !== undefined) {
 			const known = this.searchPaths.map((p) => `local-${contentHash(p).slice(0, 12)}`).sort();
 			if (JSON.stringify([...new Set(request.scopeIds)].sort()) !== JSON.stringify(known))
@@ -3697,7 +3716,7 @@ export class AutoRAGAgent {
 			request.embeddingProfile ??
 			(request.mode === "build" ? manager?.config.defaultProfile : manager?.profileId) ??
 			"injected";
-		if (request.mode === "refresh" && id !== (manager?.profileId ?? "injected"))
+		if (request.mode !== "build" && id !== (manager?.profileId ?? "injected"))
 			throw new Error("Switching embedding profiles requires build, not refresh");
 		const profile = manager?.profile(id);
 		const target = manager?.forProfile(id) ?? this.embedder;
@@ -3728,8 +3747,35 @@ export class AutoRAGAgent {
 					await target.start?.(signal, (detail) =>
 						onIndexEvent({ runId: "prepare", phase: "prepare", state: "start", elapsedMs: 0, detail }),
 					);
-					if (request.mode === "refresh" && this.minSyncMethod.index.readinessError())
+					if (request.mode !== "build" && this.minSyncMethod.index.readinessError())
 						throw new Error("Active index is not ready; run /index build before refresh");
+					signal.throwIfAborted();
+					const previousChunks =
+						fileMode && request.sourceId
+							? await this.minSyncMethod.index.sourceChunkCount(request.sourceId)
+							: undefined;
+					if (fileMode && request.sourceId) {
+						try {
+							prepareSourceOperation(
+								fileMode,
+								this.workspaceProjectRoot,
+								this.searchPaths,
+								this.indexConfigPath!,
+								request.sourceId,
+								this.minSyncMethod.index.registeredSources([request.sourceId]).has(request.sourceId),
+							);
+						} finally {
+							this.reloadIndexExclusions();
+						}
+						onIndexEvent({
+							runId: "source",
+							phase: "write",
+							state: "end",
+							source: request.sourceId,
+							detail: "Exclusion updated and parsed mirror cleared",
+							elapsedMs: 0,
+						});
+					}
 					const candidate =
 						request.mode === "build"
 							? new LocalIndexMethod({
@@ -3756,6 +3802,19 @@ export class AutoRAGAgent {
 					const report = result.minsync?.report;
 					if (!report) throw new Error("Index run did not produce a report");
 					if (!report.ok) return report;
+					if (fileMode && request.sourceId) {
+						const registered = this.minSyncMethod.index
+							.registeredSources([request.sourceId])
+							.has(request.sourceId);
+						const chunks = await this.minSyncMethod.index.sourceChunkCount(request.sourceId);
+						if (registered !== (fileMode === "restore") || (fileMode === "remove" && chunks !== 0))
+							throw new Error(
+								`File operation incomplete: ${request.sourceId}, registered=${registered}, chunks=${chunks}`,
+							);
+						if (fileMode === "restore") completeSourceRestore(this.workspaceProjectRoot, request.sourceId);
+						return { ...report, sourceResult: { id: request.sourceId, registered, chunks, previousChunks } };
+					}
+
 					if (candidate) {
 						const errors = result.diagnostics.filter((d) => d.severity === "error");
 						if (errors.length) throw new Error(errors.map((d) => d.message).join("\n"));
@@ -3783,10 +3842,20 @@ export class AutoRAGAgent {
 	async refresh(force = false, opts?: AutoRAGRefreshOptions): Promise<AutoRAGRefreshResult> {
 		const release = acquireIndexLease(join(this.workspaceProjectRoot, ".autorag", "refresh-writer"));
 		try {
+			opts?.beforeSync?.();
 			return await this.refreshUnlocked(force, opts);
 		} finally {
 			release();
 		}
+	}
+
+	private reloadIndexExclusions() {
+		if (this.indexConfigPath && existsSync(this.indexConfigPath))
+			this.excludePaths.splice(
+				0,
+				this.excludePaths.length,
+				...persistedExclusions(this.indexConfigPath).map(pinExcludedPath),
+			);
 	}
 
 	private async refreshUnlocked(
@@ -3794,6 +3863,7 @@ export class AutoRAGAgent {
 		opts?: AutoRAGRefreshOptions,
 		candidate?: LocalIndexMethod,
 	): Promise<AutoRAGRefreshResult> {
+		this.reloadIndexExclusions();
 		const indexAbort = new AbortController();
 		const signal = opts?.signal ? AbortSignal.any([opts.signal, indexAbort.signal]) : indexAbort.signal;
 		signal?.throwIfAborted();

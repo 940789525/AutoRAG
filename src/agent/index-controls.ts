@@ -57,11 +57,19 @@ export interface IndexOperations {
 const parameters = Type.Object({
 	operation: Type.Union([
 		Type.Literal("ensure"),
+		Type.Literal("remove"),
+		Type.Literal("restore"),
 		Type.Literal("build"),
 		Type.Literal("refresh"),
 		Type.Literal("status"),
 		Type.Literal("cancel"),
 	]),
+	sourceId: Type.Optional(
+		Type.String({
+			minLength: 1,
+			description: "Exact virtual file ID from inventory or removal receipt; required only for remove/restore.",
+		}),
+	),
 	embeddingProfile: Type.Optional(Type.String({ minLength: 1 })),
 	jobId: Type.Optional(Type.String({ minLength: 1 })),
 	localOnly: Type.Optional(Type.Boolean({ description: "Require a local embedding profile." })),
@@ -82,6 +90,10 @@ export function createIndexTool(operations: IndexOperations): AgentTool<typeof p
 			"For local library inventory, missing files, or index coverage, call status with includeFiles:true. It compares current filenames to the active index and returns per-file registration without reading bodies. For job progress alone use plain status. For an explicit local index change read the autorag-index Skill, then submit the operation it describes.",
 		parameters,
 		async execute(_id, input, signal) {
+			const single = input.operation === "remove" || input.operation === "restore";
+			if (single !== (input.sourceId !== undefined))
+				throw new Error("remove/restore require one exact sourceId; other operations do not accept it");
+			if (single && (input.jobId || input.embeddingProfile)) throw new Error("File operations use the active index");
 			if (
 				(input.includeFiles || input.fileOffset !== undefined) &&
 				(input.operation !== "status" || !input.includeFiles)
@@ -130,7 +142,8 @@ export function createIndexTool(operations: IndexOperations): AgentTool<typeof p
 						throw new Error("No ready index. Ask whether to build the first index.");
 					if (mode === "refresh" && id !== active.embeddingProfile)
 						throw new Error("Switching embedding profiles requires an explicit rebuild.");
-					job = operations.start({ mode, embeddingProfile: id, requestId });
+					job = operations.start({ mode, embeddingProfile: id, requestId, sourceId: input.sourceId });
+					if (single) job = await operations.jobs.wait(job.jobId);
 				}
 			}
 			return {

@@ -41,6 +41,9 @@ export class LanceIndexStore implements IndexStore {
 			.toArray();
 		return rows[0] as IndexEvidenceChunk | undefined;
 	}
+	async sourceChunkCount(sourceId: string): Promise<number> {
+		return this.table.countRows(`source_id = ${sqlString(sourceId)}`);
+	}
 	async hasSource(sourceId: string): Promise<boolean> {
 		return (
 			(

@@ -7,7 +7,8 @@ import { ownerAlive, processBirth } from "./process-owner.ts";
 import type { IndexEvent, IndexReport } from "./types.ts";
 
 export interface IndexJobRequest {
-	mode: "build" | "refresh";
+	mode: "build" | "refresh" | "remove" | "restore";
+	sourceId?: string;
 	embeddingProfile?: string;
 	scopeIds?: readonly string[];
 	requestId?: string;
@@ -22,7 +23,8 @@ export interface IndexJob {
 	owner: string;
 	pid: number;
 	birth?: string;
-	mode: "build" | "refresh";
+	mode: "build" | "refresh" | "remove" | "restore";
+	sourceId?: string;
 	embeddingProfile: string;
 	state: "queued" | "running" | "cancelling" | "succeeded" | "failed" | "cancelled" | "interrupted";
 	startedAt: string;
@@ -32,6 +34,7 @@ export interface IndexJob {
 	report?: IndexReport;
 	error?: string;
 	partial?: boolean;
+	sourceStage?: string;
 }
 
 const terminal = (job: IndexJob) => ["succeeded", "failed", "cancelled", "interrupted"].includes(job.state);
@@ -101,6 +104,7 @@ export class IndexJobs {
 				if (
 					repeated.configurationFingerprint !== request.configurationFingerprint ||
 					repeated.mode !== request.mode ||
+					repeated.sourceId !== request.sourceId ||
 					repeated.embeddingProfile !== request.embeddingProfile ||
 					JSON.stringify(repeated.scopeIds ?? []) !== JSON.stringify(request.scopeIds ?? [])
 				)
@@ -119,6 +123,7 @@ export class IndexJobs {
 				birth: processBirth(),
 				scopeIds: request.scopeIds ? [...request.scopeIds] : undefined,
 				mode: request.mode,
+				sourceId: request.sourceId,
 				embeddingProfile: request.embeddingProfile,
 				state: "queued",
 				startedAt: new Date().toISOString(),
@@ -135,6 +140,7 @@ export class IndexJobs {
 					this.write(job);
 					let lastWrite = 0;
 					job.report = await execute(controller.signal, (event) => {
+						if (event.runId === "source") job.sourceStage = event.detail;
 						const changed = job.phase !== event.phase;
 						job.phase = event.phase;
 						job.event = event;
@@ -160,6 +166,10 @@ export class IndexJobs {
 		} finally {
 			release();
 		}
+	}
+	async wait(id: string): Promise<IndexJob> {
+		if (this.current?.job.jobId === id) await this.current.done;
+		return this.status(id)!;
 	}
 	cancel(id: string): IndexJob {
 		const job = this.status(id);

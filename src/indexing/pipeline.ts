@@ -144,6 +144,13 @@ export class LocalDocumentIndex {
 	isReady(): boolean {
 		return this.status() !== "configured";
 	}
+	async sourceChunkCount(id: string): Promise<number> {
+		const { profile } = JSON.parse(readFileSync(join(this.directory, "ready.json"), "utf8"));
+		if (typeof profile !== "string" || !/^[a-f0-9]{64}$/u.test(profile))
+			throw new Error("Invalid active index profile");
+		const store = await LanceIndexStore.openExisting(join(this.directory, profile, "store"));
+		return store.sourceChunkCount(id);
+	}
 	/** Inventory checks committed membership only; it never initializes an embedder or index. */
 	registeredSources(ids: readonly string[]): Set<string> {
 		const path = join(this.directory, "ready.json");
