@@ -17,6 +17,16 @@ function judgeWith(backend: JevBackend) {
 }
 
 describe("routeQuery (Jev intrinsic-knowledge vs local branch + decomposition check)", () => {
+	it("stops waiting for a stalled optional config decision when the run deadline fires", async () => {
+		const controller = new AbortController();
+		const decision = routeQuery(() => new Promise(() => {}), "Who approves?", {
+			selfConfig: true,
+			checkDecomposition: false,
+			signal: controller.signal,
+		});
+		controller.abort(new Error("Jev route timed out"));
+		expect(await decision).toMatchObject({ fallbackReason: "Jev route timed out", decompose: false });
+	});
 	it("falls back to local search when a direct verdict is below the confidence floor", async () => {
 		const decision = await routeQuery(
 			judgeWith(

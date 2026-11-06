@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "independentHumanReview": "pending",
+  "description": "Synthetic offline engineering probe. Each positive is answered by its own document. None of the documents in that split answers any negative. Splits use different documents, entities and question families.",
+  "calibration": [
+    ["en", "ledger", "The North ledger's signing officer is Robin Cole. Signatures are recorded in blue ink.", "Who signs the North ledger?", "Who signs the West ledger?"],
+    ["en", "permit", "The solar permit for Elm expires on 6 May. The renewal procedure is documented separately.", "When does the Elm solar permit expire?", "When does the Pine solar permit expire?"],
+    ["en", "archive", "The Linden archive stores original film rolls in room 32, behind the viewing area.", "Where are the Linden original reels kept?", "Where are the Laurel original reels kept?"],
+    ["en", "grant", "Cedar's education grant is capped at 730 credits for a single laboratory.", "What is the grant limit for Cedar?", "What is the grant limit for Juniper?"],
+    ["zh", "gate", "青鹭公寓夜间进门须向值班员梁禾领取通行卡。", "青鹭公寓的夜间通行卡向谁领取？", "白鹭公寓的夜间通行卡向谁领取？"],
+    ["zh", "samples", "栖山站的岩芯统一封存在北楼三层的干燥室。", "栖山站的岩芯在哪里封存？", "栖海站的岩芯在哪里封存？"],
+    ["zh", "lift", "杉桥仓库的升降梯将在四月九日恢复使用。", "杉桥仓库的升降梯何时恢复使用？", "松桥仓库的升降梯何时恢复使用？"],
+    ["zh", "paint", "桐叶车间的检验底稿必须保管九十天。到期由质检组统一处理。", "桐叶车间检验底稿保留多少天？", "银叶车间检验底稿保留多少天？"]
+  ],
+  "validation": [
+    ["en", "radio", "Alder field crews must return broken radios to the red locker at the ferry pier.", "Where do Alder crews leave faulty handsets?", "Where do Birch crews leave faulty handsets?"],
+    ["en", "seed", "The Honeydew seed exchange will open on 18 September. Doors open at the east gate.", "When does the Honeydew seed exchange open?", "When does next year's Honeydew seed exchange open?"],
+    ["en", "badge", "Project Amber authorizes Lin Park to deactivate compromised badges. Hotline staff may only take reports.", "Who can revoke an Amber badge?", "Who can revoke a Copper badge?"],
+    ["en", "loan", "The Oriole instrument loan agreement sets a late fee of 16 credits per day. Overdue borrowers receive a notice by mail.", "What is the late fee for an Oriole instrument?", "What is the repair fee for an Oriole instrument?"],
+    ["zh", "interview", "青川校招通知：2024 届技术岗面试由苏晨主持。本通知只适用于 2024 届。", "青川 2024 届技术岗面试由谁主持？", "青川 2026 届技术岗面试由谁主持？"],
+    ["zh", "sensor", "云台温室的备用湿度探头放在玻璃门内第二个抽屉。", "云台温室的备用湿度探头在哪里？", "云台温室的备用温度探头在哪里？"],
+    ["zh", "concert", "江岸乐团的春季公开排练定于三月十七日，地点是西厅。", "江岸乐团的春季公开排练何时举行？", "江岸乐团的秋季公开排练何时举行？"],
+    ["zh", "log", "石榴站要求巡更签到表留档三十天，下班前由领班核对。", "石榴站巡更签到表保留多少天？", "石榴站交接班手册保留多少天？"]
+  ]
+}

@@ -1,0 +1,289 @@
+{
+  "fixtureSha256": "d07f2396a09fad93c67798ca5a8c9e503d90dc7cde89d42737b6e2c65690c6ff",
+  "independentHumanReview": "pending",
+  "calibration": [
+    {
+      "language": "en",
+      "id": "ledger",
+      "kind": "positive",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.8190137147903442
+    },
+    {
+      "language": "en",
+      "id": "ledger",
+      "kind": "negative",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.6898616552352905
+    },
+    {
+      "language": "en",
+      "id": "permit",
+      "kind": "positive",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.9033838510513306
+    },
+    {
+      "language": "en",
+      "id": "permit",
+      "kind": "negative",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.6443915367126465
+    },
+    {
+      "language": "en",
+      "id": "archive",
+      "kind": "positive",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.7338574528694153
+    },
+    {
+      "language": "en",
+      "id": "archive",
+      "kind": "negative",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.6390630602836609
+    },
+    {
+      "language": "en",
+      "id": "grant",
+      "kind": "positive",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.7340919375419617
+    },
+    {
+      "language": "en",
+      "id": "grant",
+      "kind": "negative",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.4792993664741516
+    },
+    {
+      "language": "zh",
+      "id": "gate",
+      "kind": "positive",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.8605510592460632
+    },
+    {
+      "language": "zh",
+      "id": "gate",
+      "kind": "negative",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.7421327829360962
+    },
+    {
+      "language": "zh",
+      "id": "samples",
+      "kind": "positive",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.7961404323577881
+    },
+    {
+      "language": "zh",
+      "id": "samples",
+      "kind": "negative",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.7004250884056091
+    },
+    {
+      "language": "zh",
+      "id": "lift",
+      "kind": "positive",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.8536829352378845
+    },
+    {
+      "language": "zh",
+      "id": "lift",
+      "kind": "negative",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.7750023007392883
+    },
+    {
+      "language": "zh",
+      "id": "paint",
+      "kind": "positive",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.8952224254608154
+    },
+    {
+      "language": "zh",
+      "id": "paint",
+      "kind": "negative",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.7337645888328552
+    }
+  ],
+  "validation": [
+    {
+      "language": "en",
+      "id": "radio",
+      "kind": "positive",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.7107021808624268
+    },
+    {
+      "language": "en",
+      "id": "radio",
+      "kind": "negative",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.5836794376373291
+    },
+    {
+      "language": "en",
+      "id": "seed",
+      "kind": "positive",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.896885097026825
+    },
+    {
+      "language": "en",
+      "id": "seed",
+      "kind": "negative",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.843687891960144
+    },
+    {
+      "language": "en",
+      "id": "badge",
+      "kind": "positive",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.6210851669311523
+    },
+    {
+      "language": "en",
+      "id": "badge",
+      "kind": "negative",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.46167027950286865
+    },
+    {
+      "language": "en",
+      "id": "loan",
+      "kind": "positive",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.8013275265693665
+    },
+    {
+      "language": "en",
+      "id": "loan",
+      "kind": "negative",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.6884462833404541
+    },
+    {
+      "language": "zh",
+      "id": "interview",
+      "kind": "positive",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.8752709031105042
+    },
+    {
+      "language": "zh",
+      "id": "interview",
+      "kind": "negative",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.8326572179794312
+    },
+    {
+      "language": "zh",
+      "id": "sensor",
+      "kind": "positive",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.9016022086143494
+    },
+    {
+      "language": "zh",
+      "id": "sensor",
+      "kind": "negative",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.8258116245269775
+    },
+    {
+      "language": "zh",
+      "id": "concert",
+      "kind": "positive",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.9039214253425598
+    },
+    {
+      "language": "zh",
+      "id": "concert",
+      "kind": "negative",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.8343037366867065
+    },
+    {
+      "language": "zh",
+      "id": "log",
+      "kind": "positive",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.7201606631278992
+    },
+    {
+      "language": "zh",
+      "id": "log",
+      "kind": "negative",
+      "profile": "0ce236278ac933fe4e979a1af6dc692e232bd7dc9b75b665e6f6bc031eafce4b",
+      "rawCount": 8,
+      "score": 0.6066147685050964
+    }
+  ],
+  "results": [
+    {
+      "language": "en",
+      "threshold": 0.7338574528694153,
+      "requiredRetention": 0.5,
+      "unanswerableWithBody": 0.25,
+      "lowestRequired": 0.6210851669311523,
+      "highestDistractor": 0.843687891960144,
+      "sampleSeparable": false
+    },
+    {
+      "language": "zh",
+      "threshold": 0.7961404323577881,
+      "requiredRetention": 0.75,
+      "unanswerableWithBody": 0.75,
+      "lowestRequired": 0.7201606631278992,
+      "highestDistractor": 0.8343037366867065,
+      "sampleSeparable": false
+    }
+  ],
+  "answerModelCalls": 0,
+  "remoteModelCalls": 0,
+  "kind": "forced-local-retrieval-probe",
+  "meetsSampleGates": false,
+  "note": "Forced retrieval; this does not measure end-to-end injection rate, answer quality or provider cost."
+}

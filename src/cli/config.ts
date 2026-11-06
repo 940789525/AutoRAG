@@ -19,6 +19,12 @@ import {
 	parsePermissionMode,
 } from "../agent/permission-gate.ts";
 import type { DecompositionModel } from "../agent/query-decomposition.ts";
+import {
+	type LocalEvidenceFilterConfig,
+	normalizeLocalEvidenceFilter,
+	normalizeRetrievalPolicy,
+	type RetrievalPolicy,
+} from "../agent/query-routing.ts";
 import type { SearchDocumentDiagnostic } from "../agent/search-documents.ts";
 import {
 	DAZZI_INPUT_LIMITS,
@@ -198,6 +204,8 @@ export interface AgentModelConfig {
 export interface CliConfig {
 	embedding?: EmbeddingConfig;
 	contextSelection?: ContextSelectionConfig;
+	retrievalPolicy?: RetrievalPolicy;
+	localEvidenceFilter?: LocalEvidenceFilterConfig;
 	/** `single` (default) delivers one complete answer; `progressive` enables legacy two-phase delivery. */
 	answerMode?: "single" | "progressive";
 	/** Absolute path of the config file this config was resolved from (it may not exist yet). */
@@ -1056,6 +1064,8 @@ export function resolveConfig(input: ResolveConfigInput): CliConfig {
 	if (file.rerank !== undefined) config.rerank = normalizeRerankConfig(file.rerank, "rerank");
 	try {
 		config.contextSelection = normalizeContextSelection(file.contextSelection);
+		config.retrievalPolicy = normalizeRetrievalPolicy(file.retrievalPolicy);
+		config.localEvidenceFilter = normalizeLocalEvidenceFilter(file.localEvidenceFilter);
 	} catch (error) {
 		throw new ConfigError(error instanceof Error ? error.message : String(error));
 	}
@@ -1364,6 +1374,8 @@ export function buildAgentOptions(config: CliConfig, agentDir?: string): Omit<Au
 		languages: config.languages,
 		answerMode: config.answerMode ?? "single",
 		contextSelection: config.contextSelection,
+		retrievalPolicy: normalizeRetrievalPolicy(config.retrievalPolicy),
+		localEvidenceFilter: normalizeLocalEvidenceFilter(config.localEvidenceFilter),
 	};
 	if (config.workspacePath) opts.workspacePath = config.workspacePath;
 	if (config.memoryPath) opts.memoryPath = config.memoryPath;
@@ -2132,6 +2144,9 @@ export function writeDefaultConfig(
 	full.localIndex = normalizeLocalIndex(partial.localIndex);
 	if (partial.contextSelection !== undefined)
 		full.contextSelection = normalizeContextSelection(partial.contextSelection);
+	if (partial.retrievalPolicy !== undefined) full.retrievalPolicy = normalizeRetrievalPolicy(partial.retrievalPolicy);
+	if (partial.localEvidenceFilter !== undefined)
+		full.localEvidenceFilter = normalizeLocalEvidenceFilter(partial.localEvidenceFilter);
 	if (partial.excludePaths !== undefined) full.excludePaths = resolveExcludePaths(partial.excludePaths, workspacePath);
 	if (partial.limits !== undefined) full.limits = normalizeLimitsConfig(partial.limits);
 	if (partial.refresh !== undefined) full.refresh = normalizeRefreshConfig(partial.refresh);

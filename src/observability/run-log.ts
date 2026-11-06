@@ -2,6 +2,7 @@ import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ContextSelectionReport } from "../agent/context-selection-projector.ts";
+import type { RetrievalPolicy } from "../agent/query-routing.ts";
 
 export type ModelUsageScope = "answer_session" | "pi_compaction" | "jev" | "query_decomposition" | "index_intent";
 
@@ -25,10 +26,18 @@ export type AutoRAGRunEvent =
 	  }
 	| { event: "context_selection"; timestamp: string; sessionId: string; report: ContextSelectionReport }
 	| {
+			event: "retrieval_step";
+			timestamp: string;
+			sessionId: string;
+			action: "baseline_prefetch" | "tool_call";
+			tool?: string;
+	  }
+	| {
 			event: "search_started";
 			timestamp: string;
 			sessionId: string;
 			queryLength: number;
+			retrievalPolicy?: RetrievalPolicy;
 			model: string;
 			/** All application-owned answer, judgment and decomposition calls are observed. */
 			usageVersion?: 1;

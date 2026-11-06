@@ -28,6 +28,7 @@ async function fixture(
 	mode: ContextSelectionConfig["mode"],
 	answerMode: "single" | "progressive" = "single",
 	toolCall = false,
+	retrievalPolicy: "legacy" | "on-demand" = "legacy",
 ) {
 	const root = mkdtempSync(join(tmpdir(), "autorag-selection-session-"));
 	roots.push(root);
@@ -71,6 +72,7 @@ async function fixture(
 		memoryEmbedder: false,
 		permissionMode: "full",
 		answerMode,
+		retrievalPolicy,
 		contextSelection: { mode, evidenceBudgetTokens: 650 },
 	});
 	await agent.refresh(false, { methods: ["minsync"] });
@@ -78,6 +80,29 @@ async function fixture(
 }
 
 describe("context selection at the actual provider seam", () => {
+	it("on-demand TUI sends bodies only after a tool call and adds none on a later public question", async () => {
+		const f = await fixture("adaptive", "progressive", true, "on-demand");
+		const runtime = await f.agent.createPiInteractiveRuntime();
+		try {
+			await f.agent.searchDocuments("What is the ordinary refund threshold?");
+			await f.agent.searchDocuments("今天合肥天气怎么样？");
+			expect(f.requests).toHaveLength(3);
+			const [first, afterTool, weather] = f.requests.map((r) => texts(r.messages));
+			const bodies = (text: string) => text.match(/^\[e\d+\] \/.*\/docs\/\d+\.txt/gmu) ?? [];
+			expect(bodies(first)).toEqual([]);
+			expect(bodies(afterTool).length).toBeGreaterThan(0);
+			expect(bodies(weather)).toEqual(bodies(afterTool));
+			expect(weather).toContain("今天合肥天气怎么样？");
+			const events = readFileSync(join(f.root, "logs/runs.jsonl"), "utf8")
+				.trim()
+				.split("\n")
+				.map((s) => JSON.parse(s));
+			expect(events.filter((e) => e.action === "baseline_prefetch")).toHaveLength(0);
+			expect(events.filter((e) => e.action === "tool_call").map((e) => e.tool)).toEqual(["search_all_documents"]);
+		} finally {
+			await runtime.dispose();
+		}
+	});
 	it.each(["off", "observe", "adaptive"] as const)(
 		"single baseline in %s preserves API results and projects only provider input",
 		async (mode) => {

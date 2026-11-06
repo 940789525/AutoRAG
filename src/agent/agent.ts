@@ -186,9 +186,13 @@ import { createModelDecompositionCompleter, type DecompositionModel, decomposeQu
 import {
 	type DatasourceCandidate,
 	FALLBACK_QUERY_ROUTE,
+	type LocalEvidenceFilterConfig,
 	needsFollowUp,
+	normalizeLocalEvidenceFilter,
+	normalizeRetrievalPolicy,
 	type PastSearchHint,
 	type QueryRoute,
+	type RetrievalPolicy,
 	routeQuery,
 	selectDatasources,
 } from "./query-routing.ts";
@@ -596,6 +600,9 @@ export interface AutoRAGThinkingOptions {
 
 export interface AutoRAGAgentOptions {
 	embedding?: EmbeddingConfig;
+	/** Let the tool-enabled answer model decide which sources it needs, without first-turn prefetch. */
+	retrievalPolicy?: RetrievalPolicy;
+	localEvidenceFilter?: LocalEvidenceFilterConfig;
 	contextSelection?: ContextSelectionConfig;
 	/** One complete answer by default; `progressive` explicitly opts into the legacy fast-answer/verification flow. */
 	answerMode?: "single" | "progressive";
@@ -912,6 +919,7 @@ export class AutoRAGAgent {
 	private readonly fastThinkingLevel: AutoRAGThinkingLevel;
 	private readonly finalThinkingLevel: AutoRAGThinkingLevel;
 	private readonly answerMode: "single" | "progressive";
+	private readonly retrievalPolicy: RetrievalPolicy;
 	private autoRefreshTimer: NodeJS.Timeout | undefined;
 	private refreshing = false;
 	private refreshState: RefreshState = {
@@ -1009,6 +1017,8 @@ export class AutoRAGAgent {
 		this.fastThinkingLevel = options.thinking?.fast ?? "minimal";
 		this.finalThinkingLevel = options.thinking?.final ?? "high";
 		this.answerMode = options.answerMode ?? "single";
+		this.retrievalPolicy = normalizeRetrievalPolicy(options.retrievalPolicy);
+		normalizeLocalEvidenceFilter(options.localEvidenceFilter);
 		if (this.answerMode !== "single" && this.answerMode !== "progressive") {
 			throw new Error("answerMode must be 'single' or 'progressive'");
 		}
@@ -1425,7 +1435,7 @@ export class AutoRAGAgent {
 	}
 
 	private async withMemoryContext(messages: AgentMessage[]): Promise<AgentMessage[]> {
-		if (this.lastQuery === undefined) return messages;
+		if (this.lastQuery === undefined || this.retrievalPolicy === "on-demand") return messages;
 		const context = await this.loadMemoryContextFor(this.lastQuery);
 		if (this.contextSelection.adaptive) {
 			this.contextSelection.setMemoryContext(context.empty ? "" : context.text);
@@ -1732,6 +1742,15 @@ export class AutoRAGAgent {
 	}
 
 	private recordSearchToolEvent(event: AgentEvent): void {
+		if (event.type === "tool_execution_start" && this.lastSessionId) {
+			this.runLogger.write({
+				event: "retrieval_step",
+				timestamp: new Date().toISOString(),
+				sessionId: this.lastSessionId,
+				action: "tool_call",
+				tool: event.toolName,
+			});
+		}
 		if (
 			event.type === "tool_execution_end" &&
 			(this.searchToolNames.has(event.toolName) || event.toolName === READ_LOCAL_EVIDENCE_TOOL_NAME)
@@ -1784,7 +1803,8 @@ export class AutoRAGAgent {
 	private currentSystemPromptConfig(models: Partial<SystemPromptConfig> = {}): SystemPromptConfig {
 		return {
 			...this.baseSystemPromptConfig,
-			answerMode: this.answerMode,
+			answerMode: this.retrievalPolicy === "on-demand" ? "single" : this.answerMode,
+			retrievalPolicy: this.retrievalPolicy,
 			...models,
 		};
 	}
@@ -2350,8 +2370,8 @@ export class AutoRAGAgent {
 
 		// A later turn of an interactive conversation is a plain agent turn: the
 		// user's message reaches the model as typed, and the model answers from
-		// the conversation or searches by tool call. Only the first turn runs the
-		// Jev gate and the baseline pipeline.
+		// the conversation or searches by tool call. The legacy first turn may prefetch;
+		// an on-demand first turn uses that same tool loop after any self-config decision.
 		const conversational = this.isConversationTurn();
 		this.activeRun = true;
 		this.searchProgress.begin(trimmedQuery);
@@ -2444,6 +2464,7 @@ export class AutoRAGAgent {
 				timestamp: new Date().toISOString(),
 				sessionId,
 				queryLength: trimmedQuery.length,
+				retrievalPolicy: this.retrievalPolicy,
 				model: resolved.model.id,
 				usageVersion: 1,
 			});
@@ -2472,9 +2493,14 @@ export class AutoRAGAgent {
 					if (sessionAgent !== undefined) sessionAgent.setThinkingLevel(clamped);
 					else activeSession.agent.state.thinkingLevel = clamped;
 				};
-				if (conversational) {
+				const plan = conversational ? undefined : await this.planQuery(trimmedQuery, resolved, planAbort.signal);
+				if (!plan || (this.retrievalPolicy === "on-demand" && plan.route !== "config")) {
+					if (this.interactive.userAborted || planAbort.signal.aborted) return;
+					const limit = options.topK === undefined ? "" : ` Cite at most ${options.topK} sources.`;
+					const scope = options.scope ? ` Restrict search to virtual path scope ${options.scope}.` : "";
+					const prompt = this.retrievalPolicy === "on-demand" ? trimmedQuery + limit + scope : trimmedQuery;
 					setThinking(this.finalThinkingLevel);
-					await this.searchProgress.step("answer", "Answering", () => activeSession.prompt(trimmedQuery));
+					await this.searchProgress.step("answer", "Answering", () => activeSession.prompt(prompt));
 					// A steer typed after the turn's last model request is still owed an answer.
 					while (
 						!this.interactive.userAborted &&
@@ -2484,12 +2510,11 @@ export class AutoRAGAgent {
 						await activeSession.prompt(buildSteerContinuationPrompt(this.interactive.steers));
 					}
 					steering.acceptingSteers = false;
-					if (this.interactive.userAborted) return;
+					if (this.interactive.userAborted || planAbort.signal.aborted) return;
 					const turnText = finalAnswerText(transcript());
 					if (turnText !== undefined) captured = await this.deriveAnswer(turnText);
 					return;
 				}
-				const plan = await this.planQuery(trimmedQuery, resolved, planAbort.signal);
 				if (plan.route === "config" && plan.selfConfigSkill !== undefined && this.selfConfig !== undefined) {
 					// Self-configuration: no retrieval and no fast answer. The model
 					// gets the full setup skill and edits the config itself, then
@@ -3030,18 +3055,25 @@ export class AutoRAGAgent {
 		readonly selfConfigSkill?: string;
 	}> {
 		const judge = this.jevJudge;
-		if (judge === undefined) return { route: FALLBACK_QUERY_ROUTE, queries: [query], datasources: [] };
+		const onDemand = this.retrievalPolicy === "on-demand";
+		if (judge === undefined || (onDemand && !this.selfConfig))
+			return { route: FALLBACK_QUERY_ROUTE, queries: [query], datasources: [] };
 		const decision = await this.searchProgress.step(
 			"route",
 			"Routing the question",
-			() => routeQuery(judge, query, { selfConfig: this.selfConfig !== undefined }),
+			() =>
+				routeQuery(judge, query, {
+					selfConfig: this.selfConfig !== undefined,
+					checkDecomposition: !onDemand,
+					signal: onDemand ? AbortSignal.any([signal, AbortSignal.timeout(15_000)]) : undefined,
+				}),
 			(routed) => routed.route,
 		);
 		if (decision.fallbackReason !== undefined) {
 			this.routingDiagnostics.push({
 				code: "query-route-fallback",
 				severity: "warning",
-				message: `Jev query routing fell back to local search. ${decision.fallbackReason}`,
+				message: `Jev query routing fell back to ${onDemand ? "the tool-enabled answer model" : "local search"}. ${decision.fallbackReason}`,
 				source: "jev",
 			});
 			return { route: FALLBACK_QUERY_ROUTE, queries: [query], datasources: [] };
@@ -3055,11 +3087,20 @@ export class AutoRAGAgent {
 				this.routingDiagnostics.push({
 					code: "self-config-unavailable",
 					severity: "warning",
-					message: `Jev routed the question to AutoRAG configuration, but the setup skill could not be loaded; searching local sources instead. ${error instanceof Error ? error.message : String(error)}`,
+					message: `Jev routed the question to AutoRAG configuration, but the setup skill could not be loaded; ${onDemand ? "continuing with the tool-enabled answer model" : "searching local sources instead"}. ${error instanceof Error ? error.message : String(error)}`,
 					source: "self-config",
 				});
 				route = FALLBACK_QUERY_ROUTE;
 			}
+		}
+		if (onDemand && route !== "config") {
+			this.routingDiagnostics.push({
+				code: "query-routed",
+				severity: "info",
+				source: "jev",
+				message: "Jev did not select self-configuration; the answer model will choose sources on demand.",
+			});
+			return { route, queries: [query], datasources: [] };
 		}
 		const datasourcesPromise =
 			route === "local"
@@ -3071,7 +3112,7 @@ export class AutoRAGAgent {
 					)
 				: Promise.resolve([]);
 		let queries: readonly string[] = [query];
-		if (decision.decompose && route !== "direct") {
+		if (!onDemand && decision.decompose && route !== "direct") {
 			const target = this.queryDecompositionModel ?? {
 				model: resolved.model,
 				...((resolved.apiKey ?? resolved.providerApiKeys?.[resolved.model.provider]) !== undefined
@@ -3202,6 +3243,12 @@ export class AutoRAGAgent {
 		options: RetrievalOptions,
 		datasources: readonly string[] = [],
 	): Promise<string> {
+		this.runLogger.write({
+			event: "retrieval_step",
+			timestamp: new Date().toISOString(),
+			sessionId: this.lastSessionId ?? "unbound",
+			action: "baseline_prefetch",
+		});
 		// A steer typed during the prefetch stops it: the fast phase then starts with
 		// whatever already returned plus the steer, instead of waiting on a slow source.
 		const signal = this.interactive.steerInterrupt.signal;
@@ -4567,11 +4614,14 @@ export class AutoRAGAgent {
 		query: string,
 		options: { readonly topK?: number; readonly scope?: string; readonly signal?: AbortSignal } = {},
 	): Promise<{ results: RetrievalResult[]; diagnostics: RetrievalDiagnostic[] }> {
-		return this.retrieveWithDiagnostics(query, {
-			topK: options.topK,
-			scope: options.scope,
-			...(options.signal === undefined ? {} : { signal: options.signal }),
-		});
+		return this.retrieveWithDiagnostics(
+			query,
+			this.boundToolOptions({
+				topK: options.topK,
+				scope: options.scope,
+				...(options.signal === undefined ? {} : { signal: options.signal }),
+			}),
+		);
 	}
 
 	/**
@@ -4589,12 +4639,12 @@ export class AutoRAGAgent {
 		query: string,
 		options: { readonly topK?: number; readonly scope?: string; readonly signal?: AbortSignal } = {},
 	): Promise<{ results: RetrievalResult[]; diagnostics: RetrievalDiagnostic[] }> {
-		const retrievalOptions: RetrievalOptions = {
+		const retrievalOptions: RetrievalOptions = this.boundToolOptions({
 			...this.activeRetrievalOptions,
 			topK: options.topK,
 			scope: options.scope,
 			...(options.signal === undefined ? {} : { signal: options.signal }),
-		};
+		});
 		const methods = this.methodRegistry.list().filter((method) => {
 			const descriptor = method.describe();
 			return descriptor.datasourceId === datasourceId;
@@ -4605,9 +4655,9 @@ export class AutoRAGAgent {
 			query,
 			retrievalOptions,
 		);
-		const filteredByMethod = filterDatasourceScope(byMethod, methods, options.scope);
+		const filteredByMethod = filterDatasourceScope(byMethod, methods, retrievalOptions.scope);
 		const merged = this.merger.merge(filteredByMethod, {
-			topK: options.topK ?? this.limits.singleDatasourceTopK,
+			topK: retrievalOptions.topK ?? this.limits.singleDatasourceTopK,
 			dedup: true,
 		});
 		// Single-datasource retrieval is intentionally NOT model-reranked: the
@@ -4692,7 +4742,7 @@ export class AutoRAGAgent {
 			get: (target, property, receiver) => {
 				if (property !== "retrieve") return Reflect.get(target, property, receiver);
 				return async (query: string, options: RetrievalOptions) => {
-					const effective = { ...this.activeRetrievalOptions, ...options };
+					const effective = this.boundToolOptions({ ...this.activeRetrievalOptions, ...options });
 					return target.retrieve.call(target, query, effective);
 				};
 			},
@@ -4706,6 +4756,23 @@ export class AutoRAGAgent {
 			return rest;
 		}
 		return { ...options, scope };
+	}
+
+	/** An on-demand tool call can narrow the caller's scope, never drop it by omitting its own scope. */
+	private boundToolOptions(options: RetrievalOptions): RetrievalOptions {
+		const run = this.activeRetrievalOptions;
+		if (this.retrievalPolicy !== "on-demand" || !run) return options;
+		const requested = this.resolveRetrievalScope(options.scope);
+		const boundary = run.scope;
+		if (boundary && requested && boundary !== requested) {
+			const parent = boundary.replace(/\/\*\*$/u, "");
+			if (parent.includes("*") || !matchesVirtualPathScope(requested, parent))
+				throw new Error(
+					`Tool scope ${requested} is outside or cannot be proven to narrow the requested scope ${boundary}`,
+				);
+		}
+		const topK = options.topK === undefined ? run.topK : Math.min(options.topK, run.topK ?? options.topK);
+		return { ...run, ...options, scope: requested ?? boundary, topK };
 	}
 
 	private resolveRetrievalScope(scope: string | undefined): string | undefined {
