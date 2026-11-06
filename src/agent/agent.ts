@@ -3612,7 +3612,7 @@ export class AutoRAGAgent {
 				this.embedder instanceof ProfileEmbedder
 					? Object.entries(this.embedder.config.profiles).map(([id, p]) => ({ id, kind: p.kind, model: p.model }))
 					: [{ id: "injected", kind: "local-http", model: "injected" }],
-			authorizeWrite: (missingSource?: string, refresh?: boolean) => {
+			authorizeWrite: () => {
 				const input = this.indexPrompt.getStore();
 				const session = this.boundPiRuntime?.session;
 				if (
@@ -3628,13 +3628,7 @@ export class AutoRAGAgent {
 				const skill = session.resourceLoader.getSkills().skills.find((s) => s.name === "autorag-index");
 				if (!skill || skill.filePath !== packagedSkillPath("autorag-index"))
 					throw new Error("The packaged autorag-index Skill is unavailable in this TUI session");
-				requireIndexSkill(
-					session.messages,
-					skill.filePath,
-					input.text.startsWith("/skill:autorag-index "),
-					missingSource,
-					refresh,
-				);
+				requireIndexSkill(session.messages, skill.filePath, input.text.startsWith("/skill:autorag-index "));
 				return { requestId: input.requestId, ownedJobId: this.localIndexJobId };
 			},
 		};

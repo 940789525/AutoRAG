@@ -1,15 +1,9 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-	createIndexControls,
-	createIndexTool,
-	type IndexOperations,
-	requireIndexSkill,
-} from "../../src/agent/index-controls.ts";
+import { createIndexControls, createIndexTool, type IndexOperations } from "../../src/agent/index-controls.ts";
 import { IndexJobs } from "../../src/indexing/jobs.ts";
 import type { IndexReport } from "../../src/indexing/types.ts";
 
@@ -49,31 +43,6 @@ function operations() {
 		},
 	} satisfies IndexOperations;
 }
-it("resolves a missing source only from a previous conversation turn", () => {
-	const user: AgentMessage = { role: "user", content: "question", timestamp: 0 };
-	const inventory: AgentMessage = {
-		role: "toolResult",
-		toolName: "manage_local_index",
-		toolCallId: "coverage",
-		isError: false,
-		timestamp: 0,
-		content: [
-			{
-				type: "text",
-				text: JSON.stringify({ coverage: { files: [{ id: "/docs/missing", status: "unregistered" }] } }),
-			},
-		],
-	};
-	expect(() => requireIndexSkill([user, inventory], "skill", true, "/docs/missing", true)).toThrow(
-		"earlier inventory",
-	);
-	expect(() => requireIndexSkill([user, inventory], "skill", true, undefined, true)).toThrow("earlier inventory");
-	expect(() => requireIndexSkill([user, inventory, user], "skill", true, "/docs/missing", true)).not.toThrow();
-	expect(() => requireIndexSkill([user, inventory, user], "skill", true, "/docs/other", true)).toThrow(
-		"earlier inventory",
-	);
-});
-
 describe("TUI indexing commands and native tool", () => {
 	it("works without a conversation model and subscribes again after session replacement", async () => {
 		vi.useFakeTimers();

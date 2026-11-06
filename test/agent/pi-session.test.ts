@@ -26,6 +26,7 @@ import {
 import type { DatasourceSkill } from "../../src/datasource/types.ts";
 import type { RetrievalMethod, RetrievalOptions, RetrievalResult } from "../../src/retrieval/types.ts";
 import { citationsRelevant } from "../helpers/citations-relevant.ts";
+import { nativeIndexFixture } from "../helpers/native-index.ts";
 
 let root: string;
 
@@ -68,7 +69,12 @@ function jevRoute(route: QueryRoute, followUp = 0.9): JevBackend {
 async function tuiAgent(
 	responses: FauxResponseStep[],
 	jev: JevBackend = jevRoute("direct"),
-	extra: Pick<AutoRAGAgentOptions, "datasourceSkills" | "answerMode" | "retrievalPolicy"> = {},
+	extra: Partial<
+		Pick<
+			AutoRAGAgentOptions,
+			"datasourceSkills" | "answerMode" | "retrievalPolicy" | "embedder" | "localIndex" | "searchPaths"
+		>
+	> = {},
 	ui: Partial<ExtensionUIContext> = {},
 ) {
 	const registration = registerFauxProvider({ api: `faux-tui-${randomUUID()}`, models: [{ id: "tui-model" }] });
@@ -1613,6 +1619,48 @@ describe("local TUI index skill", () => {
 			expect(sent).toContain("skills/autorag-index/SKILL.md");
 			expect(tui.registration.state.callCount).toBe(1);
 			expect(tui.agent.indexJobs.status()).toBeUndefined();
+		} finally {
+			await tui.dispose();
+		}
+	});
+
+	it("can refresh a file first discovered while answering the same local request", async () => {
+		const docs = join(root, "docs");
+		mkdirSync(docs);
+		writeFileSync(join(docs, "existing.txt"), "Existing policy.");
+		const inventory = () =>
+			fauxAssistantMessage(
+				[
+					fauxToolCall("manage_local_index", {
+						operation: "status",
+						includeFiles: true,
+					}),
+				],
+				{ stopReason: "toolUse" },
+			);
+		const tui = await tuiAgent([inventory(), done(), inventory(), readSkill(), refresh(), done()], undefined, {
+			...nativeIndexFixture(),
+			searchPaths: [docs],
+			retrievalPolicy: "on-demand",
+		});
+		try {
+			await tui.agent.refresh(false, { methods: ["minsync"] });
+			await tui.session.prompt("List the files.", { source: "interactive" });
+			await tui.agent.waitForIdle();
+			expect(tui.agent.indexJobs.status()).toBeUndefined();
+
+			writeFileSync(join(docs, "new.txt"), "New policy.");
+			await tui.session.prompt("Check for additions and index them if found.", { source: "interactive" });
+			await tui.agent.waitForIdle();
+			const results = tui.session.messages.flatMap((m) =>
+				m.role === "toolResult" && m.toolName === "manage_local_index" ? [JSON.parse(textOf(m.content))] : [],
+			);
+			expect(results[0].coverage).toMatchObject({ total: 1, registered: 1 });
+			expect(results[1].coverage.files).toContainEqual({ id: "/docs/new.txt", status: "unregistered" });
+			expect(results[2].job).toMatchObject({ mode: "refresh", jobId: expect.any(String) });
+			await vi.waitFor(() => expect(tui.agent.indexJobs.status(results[2].job.jobId)?.state).toBe("succeeded"), {
+				timeout: 10_000,
+			});
 		} finally {
 			await tui.dispose();
 		}

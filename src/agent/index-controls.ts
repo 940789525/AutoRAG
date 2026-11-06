@@ -5,37 +5,17 @@ import type { IndexJob, IndexJobRequest, IndexJobs } from "../indexing/jobs.ts";
 import { formatIndexEvent } from "../indexing/progress.ts";
 
 export const INDEX_TOOL_NAME = "manage_local_index";
-/** A compacted or interrupted historical tool result may no longer contain usable coverage. */
-function coverageMisses(text: string): string[] | undefined {
-	try {
-		const files = JSON.parse(text)?.coverage?.files;
-		if (Array.isArray(files))
-			return files.filter((f) => f?.status === "unregistered" && typeof f.id === "string").map((f) => f.id);
-	} catch {
-		// Missing evidence cannot resolve a reference to an earlier inventory.
-	}
-	return undefined;
-}
-
-/** The model may use prior inventory, but a retrieved document cannot become a write request. */
+/** Require the packaged Skill and isolate index writes from external tool results. */
 export function requireIndexSkill(
 	messages: readonly AgentMessage[],
 	skillPath: string,
 	explicitInvocation: boolean,
-	missingSource?: string,
-	refresh = false,
 ): void {
 	const reads = new Set<string>();
 	let loaded = explicitInvocation;
 	let externalResult = false;
-	let inventory: Set<string> | undefined;
-	let previousInventory: Set<string> | undefined;
 	for (const message of messages) {
-		if (message.role === "user") {
-			externalResult = false;
-			if (inventory) previousInventory = inventory;
-			inventory = undefined;
-		}
+		if (message.role === "user") externalResult = false;
 		if (message.role === "assistant") {
 			for (const block of message.content) {
 				if (block.type === "toolCall" && block.name === "read" && block.arguments.path === skillPath)
@@ -45,22 +25,10 @@ export function requireIndexSkill(
 		if (message.role !== "toolResult") continue;
 		if (message.toolName === "read" && reads.has(message.toolCallId)) {
 			if (!message.isError) loaded = true;
-		} else if (message.toolName === INDEX_TOOL_NAME && !message.isError) {
-			const block = message.content.find((b) => b.type === "text");
-			if (block?.type === "text") {
-				const misses = coverageMisses(block.text);
-				if (misses) {
-					inventory ??= new Set<string>();
-					for (const id of misses) inventory.add(id);
-				}
-			}
 		} else if (message.toolName !== INDEX_TOOL_NAME) {
 			externalResult = true;
 		}
 	}
-	// Today's inventory cannot supply the missing reference in an ambiguous follow-up.
-	if ((missingSource && !previousInventory?.has(missingSource)) || (refresh && inventory && !previousInventory?.size))
-		throw new Error("No earlier inventory identified that missing file. Ask the user what to add before refreshing.");
 	if (externalResult) throw new Error("This turn read external content. Ask for a separate local indexing request.");
 	if (!loaded)
 		throw new Error(`Read the packaged autorag-index Skill at ${skillPath} before submitting an index operation.`);
@@ -83,7 +51,7 @@ export interface IndexOperations {
 		diagnostics: string[];
 	}>;
 	profiles(): readonly { id: string; kind: string; model: string }[];
-	authorizeWrite(missingSource?: string, refresh?: boolean): { requestId: string; ownedJobId?: string };
+	authorizeWrite(): { requestId: string; ownedJobId?: string };
 }
 
 const parameters = Type.Object({
@@ -96,12 +64,6 @@ const parameters = Type.Object({
 	]),
 	embeddingProfile: Type.Optional(Type.String({ minLength: 1 })),
 	jobId: Type.Optional(Type.String({ minLength: 1 })),
-	missingSource: Type.Optional(
-		Type.String({
-			minLength: 1,
-			description: "For a follow-up refresh: the unregistered virtual ID from a previous turn.",
-		}),
-	),
 	localOnly: Type.Optional(Type.Boolean({ description: "Require a local embedding profile." })),
 	scope: Type.Optional(Type.String({ description: "Only all configured local roots (all) are supported." })),
 	includeFiles: Type.Optional(
@@ -142,10 +104,7 @@ export function createIndexTool(operations: IndexOperations): AgentTool<typeof p
 			if (input.operation === "status") {
 				job = operations.jobs.status(input.jobId);
 			} else {
-				const { requestId, ownedJobId } = operations.authorizeWrite(
-					input.missingSource,
-					input.operation === "refresh",
-				);
+				const { requestId, ownedJobId } = operations.authorizeWrite();
 				if (input.scope !== undefined && input.scope !== "all")
 					throw new Error("Index tasks require all configured local roots. Clarify the requested scope.");
 				if (input.operation === "cancel") {
