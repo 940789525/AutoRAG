@@ -84,6 +84,7 @@ import { PARSED_MIRROR_SUBDIR, refreshReadinessPath } from "../mirror/paths.ts";
 import {
 	detectMirrorStaleness,
 	isPathExcluded,
+	listLocalInventory,
 	type ParsedMirrorDiagnostic,
 	type ParsedMirrorSyncOptions,
 	type ParsedMirrorSyncResult,
@@ -3658,6 +3659,7 @@ export class AutoRAGAgent {
 	private indexOperations() {
 		return {
 			jobs: this.indexJobs,
+			fileCoverage: (offset: number, signal?: AbortSignal) => this.localFileCoverage(offset, signal),
 			onCommand: () => this.indexIntentRouter?.reset(),
 			activeIndex: () => ({
 				embeddingProfile: this.embedder instanceof ProfileEmbedder ? this.embedder.profileId : "injected",
@@ -3673,6 +3675,56 @@ export class AutoRAGAgent {
 					? Object.entries(this.embedder.config.profiles).map(([id, p]) => ({ id, kind: p.kind, model: p.model }))
 					: [],
 			canWriteFromModel: () => false,
+		};
+	}
+
+	private async localFileCoverage(offset: number, signal?: AbortSignal) {
+		if (this.telegram || this.discordRemote)
+			throw new Error("Local file inventory is unavailable in remote sessions");
+		const run = this.activeRetrievalOptions;
+		if (run?.filters && Object.keys(run.filters).length)
+			throw new Error("Local file inventory cannot apply these retrieval filters");
+		const allowed = run?.sourceIds && new Set(run.sourceIds);
+		const visible = (id: string) => matchesVirtualPathScope(id, run?.scope) && (!allowed || allowed.has(id));
+		const abort = signal && run?.signal ? AbortSignal.any([signal, run.signal]) : (signal ?? run?.signal);
+		const listing = await listLocalInventory(this.searchPaths, this.refreshLimits, {
+			excluded: new Set(this.excludePaths),
+			signal: abort,
+			verifyRoot: (root) => {
+				if (
+					realpathSync(this.configuredSearchPaths[this.searchPaths.indexOf(root)]) !== root ||
+					realpathSync(root) !== root
+				)
+					throw new Error(`Configured search root changed: ${root}`);
+			},
+		});
+		abort?.throwIfAborted();
+		const ids = listing.ids.filter(visible);
+		const diagnostics = listing.diagnostics.filter((d) => visible(d.source)).map((d) => `${d.source}: ${d.message}`);
+		if (diagnostics.length < listing.diagnostics.length)
+			diagnostics.push("Directory scan incomplete outside the disclosed file list");
+		let registered: Set<string> | undefined;
+		try {
+			registered = this.minSyncMethod.index.registeredSources(ids);
+		} catch (error) {
+			diagnostics.push(error instanceof Error ? error.message : String(error));
+		}
+		const end = offset + 100;
+		const files = ids.slice(offset, end).map((id) => ({
+			id,
+			status: !registered
+				? ("unknown" as const)
+				: registered.has(id)
+					? ("registered" as const)
+					: ("unregistered" as const),
+		}));
+		return {
+			files,
+			total: ids.length,
+			registered: registered?.size ?? null,
+			complete: diagnostics.length === 0,
+			diagnostics,
+			...(end < ids.length ? { nextOffset: end } : {}),
 		};
 	}
 

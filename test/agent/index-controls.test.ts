@@ -38,6 +38,7 @@ function operations() {
 	return {
 		jobs,
 		profiles: () => [{ id: "local-qwen3", kind: "local-http", model: "Qwen" }],
+		fileCoverage: vi.fn(async () => ({ files: [], total: 0, registered: 0, complete: true, diagnostics: [] })),
 		start: vi.fn((request) =>
 			jobs.start({ ...request, embeddingProfile: request.embeddingProfile ?? "local-qwen3" }, async () => report),
 		),
@@ -81,6 +82,13 @@ describe("TUI indexing commands and native tool", () => {
 			activeIndex: () => ({ embeddingProfile: "old-active", ready: true }),
 		}).execute("status", { operation: "status" });
 		expect(status.content).toEqual([expect.objectContaining({ text: expect.stringContaining("old-active") })]);
+		expect(ops.fileCoverage).not.toHaveBeenCalled();
+		const files = await tool.execute("files", { operation: "status", includeFiles: true, fileOffset: 100 });
+		expect(ops.fileCoverage).toHaveBeenCalledWith(100, undefined);
+		expect(files.content).toEqual([expect.objectContaining({ text: expect.stringContaining('"coverage"') })]);
+		await expect(tool.execute("write", { operation: "refresh", includeFiles: true })).rejects.toThrow(
+			"requires operation status",
+		);
 		expect(ops.start).not.toHaveBeenCalled();
 		await expect(tool.execute("write", { operation: "build", embeddingProfile: "local-qwen3" })).rejects.toThrow(
 			/explicit TUI/,

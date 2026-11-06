@@ -796,6 +796,12 @@ interface WalkLimits {
 	readonly maxDepth: number;
 }
 
+interface InventoryWalkOptions {
+	readonly excluded: ReadonlySet<string>;
+	readonly signal?: AbortSignal;
+	verifyRoot(root: string): void;
+}
+
 interface CurrentFileListing {
 	readonly entries: CurrentEntry[];
 	readonly diagnostics: ParsedMirrorDiagnostic[];
@@ -807,7 +813,9 @@ interface CurrentFileListing {
 
 interface WalkState {
 	readonly sourceRoot: SourceRoot;
-	readonly supportedExtensions: ReadonlySet<string>;
+	readonly supportedExtensions: ReadonlySet<string> | undefined;
+	readonly excluded?: ReadonlySet<string>;
+	readonly signal?: AbortSignal;
 	readonly limits: WalkLimits;
 	readonly listing: CurrentFileListing;
 	readonly unreadableDirectories: Set<string>;
@@ -816,7 +824,7 @@ interface WalkState {
 	stopped: boolean;
 }
 
-function walkLimits(options: ParsedMirrorSyncOptions): WalkLimits {
+function walkLimits(options: Pick<ParsedMirrorSyncOptions, "maxDepth" | "maxScannedEntries">): WalkLimits {
 	return {
 		maxScannedEntries: options.maxScannedEntries ?? DEFAULT_MAX_SCANNED_ENTRIES,
 		maxDepth: options.maxDepth ?? DEFAULT_MAX_WALK_DEPTH,
@@ -861,11 +869,27 @@ async function probeSearchRoot(rootPath: string): Promise<SearchRootUnavailableR
 
 async function listCurrentFiles(
 	searchPaths: readonly string[],
-	supportedExtensions: ReadonlySet<string>,
+	supportedExtensions: ReadonlySet<string> | undefined,
 	limits: WalkLimits,
+	inventory?: InventoryWalkOptions,
 ): Promise<CurrentFileListing> {
 	const listing: CurrentFileListing = { entries: [], diagnostics: [], unreliablePrefixes: [], unavailableRoots: [] };
 	for (const sourceRoot of planSourceRoots(searchPaths)) {
+		inventory?.signal?.throwIfAborted();
+		if (inventory && isPathExcluded(sourceRoot.rootPath, inventory.excluded)) continue;
+		if (inventory) {
+			try {
+				inventory.verifyRoot(sourceRoot.rootPath);
+			} catch (error) {
+				listing.diagnostics.push({
+					code: "search-root-unavailable",
+					severity: "warning",
+					source: sourceRoot.prefix,
+					message: error instanceof Error ? error.message : String(error),
+				});
+				continue;
+			}
+		}
 		const reason = await probeSearchRoot(sourceRoot.rootPath);
 		if (reason !== undefined) {
 			listing.unavailableRoots.push({ prefix: sourceRoot.prefix, reason });
@@ -874,6 +898,8 @@ async function listCurrentFiles(
 		const state: WalkState = {
 			sourceRoot,
 			supportedExtensions,
+			excluded: inventory?.excluded,
+			signal: inventory?.signal,
 			limits,
 			listing,
 			unreadableDirectories: new Set(),
@@ -885,6 +911,24 @@ async function listCurrentFiles(
 	}
 	listing.entries.sort((a, b) => a.virtualPath.localeCompare(b.virtualPath));
 	return listing;
+}
+
+/** Inventory includes unregistered regular files, even if no parser handles their extension. */
+export async function listLocalInventory(
+	searchPaths: readonly string[],
+	limits: Pick<ParsedMirrorSyncOptions, "maxDepth" | "maxScannedEntries">,
+	options: InventoryWalkOptions,
+) {
+	const listing = await listCurrentFiles(searchPaths, undefined, walkLimits(limits), options);
+	return {
+		ids: listing.entries.map((entry) => entry.virtualPath),
+		diagnostics: [
+			...listing.diagnostics.map(({ source, message }) => ({ source, message })),
+			...listing.unavailableRoots
+				.filter((root) => root.reason !== "empty")
+				.map(({ prefix, reason }) => ({ source: prefix, message: reason })),
+		],
+	};
 }
 
 function warnDirectoryUnreadable(state: WalkState, directory: string, code: string): void {
@@ -930,6 +974,7 @@ async function collectFiles(state: WalkState, directory: string, depth: number):
 	}
 	try {
 		for await (const entry of dir) {
+			state.signal?.throwIfAborted();
 			if (state.visited >= state.limits.maxScannedEntries) {
 				state.stopped = true;
 				listing.unreliablePrefixes.push(sourceRoot.prefix);
@@ -940,6 +985,7 @@ async function collectFiles(state: WalkState, directory: string, depth: number):
 			if (SKIP_DIR_NAMES.has(entry.name)) continue;
 			if (PRODUCT_ARTIFACT_FILE_NAMES.has(entry.name)) continue;
 			const sourcePath = resolve(directory, entry.name);
+			if (isPathExcluded(sourcePath, state.excluded)) continue;
 			if (entry.isDirectory()) {
 				if (depth + 1 > state.limits.maxDepth) {
 					listing.unreliablePrefixes.push(sourceIdentifier(sourceRoot, sourcePath));
@@ -952,7 +998,7 @@ async function collectFiles(state: WalkState, directory: string, depth: number):
 			}
 			if (!entry.isFile()) continue;
 			const extension = normalizeExtension(extname(entry.name));
-			if (!state.supportedExtensions.has(extension)) continue;
+			if (state.supportedExtensions && !state.supportedExtensions.has(extension)) continue;
 			let fileStat: Awaited<ReturnType<typeof stat>>;
 			try {
 				fileStat = await stat(sourcePath, { bigint: true });

@@ -12,6 +12,17 @@ export interface IndexOperations {
 	onCommand?(): void;
 	start(request: IndexJobRequest): IndexJob;
 	activeIndex?(): { embeddingProfile: string; ready: boolean };
+	fileCoverage(
+		offset: number,
+		signal?: AbortSignal,
+	): Promise<{
+		files: { id: string; status: "registered" | "unregistered" | "unknown" }[];
+		total: number;
+		registered: number | null;
+		nextOffset?: number;
+		complete: boolean;
+		diagnostics: string[];
+	}>;
 	profiles(): readonly { id: string; kind: string; model: string }[];
 	canWriteFromModel(operation: "build" | "refresh" | "cancel"): boolean;
 }
@@ -25,6 +36,12 @@ const parameters = Type.Object({
 	]),
 	embeddingProfile: Type.Optional(Type.String({ minLength: 1 })),
 	jobId: Type.Optional(Type.String({ minLength: 1 })),
+	includeFiles: Type.Optional(
+		Type.Boolean({ description: "For status: list actual local files and their index registration." }),
+	),
+	fileOffset: Type.Optional(
+		Type.Integer({ minimum: 0, description: "Continue an includeFiles page from nextOffset." }),
+	),
 });
 
 export function createIndexTool(operations: IndexOperations): AgentTool<typeof parameters> {
@@ -32,11 +49,27 @@ export function createIndexTool(operations: IndexOperations): AgentTool<typeof p
 		name: INDEX_TOOL_NAME,
 		label: "Local Index Tasks",
 		description:
-			"Inspect local index task status and configured embedding profiles. Use operation status. Interactive build, refresh and cancel requests are validated and dispatched by the TUI input router, not by conversation tool calls. Never change configuration or authorize remote sending. No filesystem path or credential arguments.",
+			"For local library inventory, missing files, or index coverage, call status with includeFiles:true. It compares current filenames to the active index and returns per-file registration without reading bodies. For job progress alone use plain status. Index writes require explicit TUI indexing requests.",
 		parameters,
-		async execute(_id, input) {
+		async execute(_id, input, signal) {
+			if (
+				(input.includeFiles || input.fileOffset !== undefined) &&
+				(input.operation !== "status" || !input.includeFiles)
+			)
+				throw new Error("File inventory requires operation status and includeFiles:true");
 			if (input.operation !== "status" && !operations.canWriteFromModel(input.operation))
 				throw new Error("Index writes require an explicit TUI indexing request; use /index");
+			if (input.includeFiles) {
+				const coverage = await operations.fileCoverage(input.fileOffset ?? 0, signal);
+				const job = operations.jobs.status(input.jobId);
+				const snapshot = {
+					basis: "AutoRAG enumerated the permitted local files and checked registration in the active index journal. IDs are virtual source identifiers, not filesystem paths. For inventory/coverage answer directly from this result; do not recheck with bash or search.",
+					job: job ? { jobId: job.jobId, mode: job.mode, state: job.state } : null,
+					activeIndex: coverage.registered === null ? undefined : operations.activeIndex?.(),
+					coverage,
+				};
+				return { content: [{ type: "text", text: JSON.stringify(snapshot) }], details: {} };
+			}
 			const job =
 				input.operation === "status"
 					? operations.jobs.status(input.jobId)

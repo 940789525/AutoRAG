@@ -147,6 +147,20 @@ describe("native structure-aware chunking", () => {
 });
 
 describe("AutoRAG-owned indexing pipeline", () => {
+	it("reports membership of the active journal without creating a missing journal or embedding queries", async () => {
+		const { root, index, calls } = fixture();
+		const registered = document(root, "registered.md", "Registered content.");
+		const ids = [registered.virtualPath, "/docs/later.md"];
+		assert.equal((await index.sync(input([registered]))).ok, true);
+		const before = calls.length;
+		assert.deepEqual([...index.registeredSources(ids)], [registered.virtualPath]);
+		assert.equal(calls.length, before);
+		const pointer = JSON.parse(readFileSync(join(index.directory, "ready.json"), "utf8"));
+		const db = join(index.directory, pointer.profile, "journal.sqlite");
+		rmSync(db);
+		assert.throws(() => index.registeredSources(ids));
+		assert.throws(() => readFileSync(db), { code: "ENOENT" });
+	});
 	it("reports cumulative successful embeddings without changing batch size", async () => {
 		const events: IndexEvent[] = [];
 		const { root, index, calls } = fixture(undefined, undefined, undefined, {

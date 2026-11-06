@@ -349,6 +349,37 @@ describe("on-demand first question", () => {
 		},
 	);
 
+	it("limits status inventory to the caller scope, file allowlist and configured exclusions", async () => {
+		const folder = join(docs, "visible");
+		mkdirSync(folder);
+		for (const name of ["allowed.bin", "excluded.md", "other.md"])
+			writeFileSync(join(folder, name), "NOT_FILE_CONTENT");
+		let payload = "";
+		const model = fauxModel(
+			false,
+			fauxAssistantMessage([fauxToolCall("manage_local_index", { operation: "status", includeFiles: true })], {
+				stopReason: "toolUse",
+			}),
+			(context) => {
+				const toolMessage = context.messages.find((m) => m.role === "toolResult");
+				payload = JSON.stringify(toolMessage?.content);
+				return fauxAssistantMessage("Inventory complete.");
+			},
+		);
+		const agent = new AutoRAGAgent({
+			...agentOptions(model),
+			retrievalPolicy: "on-demand",
+			excludePaths: [join(folder, "excluded.md")],
+		});
+		await agent.searchDocuments("Which files are indexed?", {
+			scope: "/docs/visible",
+			sourceIds: ["/docs/visible/allowed.bin", "/docs/visible/excluded.md", "/docs/refund-policy.txt"],
+		});
+		expect(payload).toContain("/docs/visible/allowed.bin");
+		expect(payload).toContain("unknown");
+		expect(payload).not.toMatch(/excluded\.md|other\.md|refund-policy\.txt|NOT_FILE_CONTENT/u);
+	});
+
 	it("searches only after a tool call and carries the API scope through a tool that omits it", async () => {
 		const retrieve = vi.fn(async (_q: string, _o: RetrievalOptions) => [
 			{
