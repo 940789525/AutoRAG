@@ -5,9 +5,11 @@ import { AutoRAGAgent, type AutoRAGRefreshResult, type RefreshMethod } from "../
 import { removeRefreshProgress } from "../../agent/refresh-progress.ts";
 import { chunkMarkdown } from "../../indexing/chunker.ts";
 import { prepareSourceOperation } from "../../indexing/source-operation.ts";
+import { chunkStructured } from "../../indexing/table-chunker.ts";
 import { loadIndexTokenizer } from "../../indexing/tokenizer.ts";
-import { loadMirrorIndex, type ParsedMirrorEntry } from "../../mirror/index-store.ts";
+import { loadActiveMirrorIndex, type ParsedMirrorEntry } from "../../mirror/index-store.ts";
 import { PARSED_MIRROR_SUBDIR, refreshReadinessPath } from "../../mirror/paths.ts";
+import { readStructure } from "../../mirror/structured.ts";
 import { buildAgentOptions, type CliConfig, resolveConfig } from "../config.ts";
 import { createIndexProgress } from "../index-progress.ts";
 import { renderError, renderIndex } from "../output.ts";
@@ -53,7 +55,7 @@ export async function runIndex(ctx: CommandContext): Promise<number> {
 	if (sub === "inspect") {
 		try {
 			const source = ctx.positionals[1];
-			const entry = Object.values(loadMirrorIndex(config.workspacePath).entries).find(
+			const entry = Object.values(loadActiveMirrorIndex(config.workspacePath).entries).find(
 				(entry) => entry.virtualPath === source || entry.sourcePath === source,
 			);
 			if (!entry)
@@ -66,14 +68,23 @@ export async function runIndex(ctx: CommandContext): Promise<number> {
 				tokenizerPath: config.localIndex?.tokenizerPath,
 			});
 			const markdown = await readFile(entry.outputPath, "utf8");
+			const structure = await readStructure(config.workspacePath, entry, markdown);
+			const passagePrefix =
+				config.embedding?.profiles[config.embedding.defaultProfile]?.manifest?.passagePrefix ??
+				config.minSync?.embedder?.passagePrefix ??
+				"";
+			const chunks = structure
+				? chunkStructured(markdown, structure, tokenizer, config.localIndex ?? {}, passagePrefix)
+				: chunkMarkdown(markdown, tokenizer, config.localIndex);
 			ctx.stdout(
 				JSON.stringify(
 					{
 						source: entry.sourcePath,
 						virtualPath: entry.virtualPath,
 						tokenizer: tokenizer.fingerprint,
-						chunks: chunkMarkdown(markdown, tokenizer, config.localIndex).map((chunk) => {
-							const embeddingInput = `${config.minSync?.embedder?.passagePrefix ?? ""}${chunk.embeddingText}`;
+						structureSha256: entry.structureSha256,
+						chunks: chunks.map((chunk) => {
+							const embeddingInput = `${passagePrefix}${chunk.embeddingText}`;
 							return {
 								...chunk,
 								embeddingInput,
@@ -319,7 +330,7 @@ async function runIndexRemove(ctx: CommandContext, initial: CliConfig): Promise<
 
 /** Find the parsed-mirror entry for a virtual path, an absolute source path, or a cwd-relative path. */
 function findMirroredSource(workspacePath: string, requested: string, cwd: string): ParsedMirrorEntry | undefined {
-	const entries = Object.values(loadMirrorIndex(workspacePath).entries);
+	const entries = Object.values(loadActiveMirrorIndex(workspacePath).entries);
 	const absolute = resolve(cwd, requested);
 	return (
 		entries.find((entry) => entry.virtualPath === requested || entry.sourcePath === requested) ??

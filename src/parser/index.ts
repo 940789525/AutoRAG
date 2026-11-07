@@ -1,8 +1,11 @@
 export {
 	createDefaultParserRegistry,
 	type DefaultParserRegistryOptions,
+	type DocumentBackend,
+	documentBackend,
 	resolveParserOptions,
 } from "./defaults.ts";
+export { type DoclingOptions, DoclingParser } from "./docling.ts";
 export { EmlParser } from "./eml.ts";
 export { ParseError } from "./errors.ts";
 export {
@@ -21,6 +24,7 @@ export {
 export { PptxParser } from "./office.ts";
 export { PlainTextParser } from "./plain-text.ts";
 export { ParserRegistry } from "./registry.ts";
+export type { DocumentStructure, DocumentTable, TableField, TableRow } from "./table-structure.ts";
 export {
 	type ParseDiagnostic,
 	type ParseDiagnosticCode,

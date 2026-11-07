@@ -1,3 +1,5 @@
+import type { DocumentStructure } from "./table-structure.ts";
+
 export interface ParseInput {
 	readonly virtualPath: string;
 	readonly sourcePath?: string;
@@ -6,6 +8,7 @@ export interface ParseInput {
 
 export interface ParseOutput {
 	readonly markdown: string;
+	readonly structure?: DocumentStructure;
 	readonly metadata?: Readonly<Record<string, unknown>>;
 	readonly diagnostics?: readonly ParseDiagnostic[];
 }

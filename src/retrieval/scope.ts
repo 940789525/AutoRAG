@@ -1,7 +1,7 @@
 import { realpathSync } from "node:fs";
 import { dirname, posix, resolve, win32 } from "node:path";
 import { planSourceRoots } from "../filesystem/source-paths.ts";
-import { loadMirrorIndex } from "../mirror/index-store.ts";
+import { loadActiveMirrorIndex } from "../mirror/index-store.ts";
 
 export interface RetrievalScopeBinding {
 	readonly virtualPrefix: string;
@@ -168,7 +168,7 @@ function configuredPathAliases(paths: readonly string[]): readonly { configured:
 
 function persistedScopeRoots(workspaceRoot: string): ReadonlyMap<string, readonly string[]> {
 	const roots = new Map<string, Set<string>>();
-	for (const entry of Object.values(loadMirrorIndex(workspaceRoot).entries)) {
+	for (const entry of Object.values(loadActiveMirrorIndex(workspaceRoot).entries)) {
 		const normalized = normalizeVirtualPath(entry.virtualPath);
 		const segments = normalized.slice(1).split("/");
 		const virtualPrefix = segments[0] ? `/${segments[0]}` : "/";

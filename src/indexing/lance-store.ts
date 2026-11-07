@@ -24,6 +24,9 @@ export class LanceIndexStore implements IndexStore {
 	private constructor(table: Table) {
 		this.table = table;
 	}
+	close(): void {
+		this.table.close();
+	}
 	/** Opens only an existing table: no schema creation, maintenance, or embedding runtime. */
 	static async openExisting(directory: string): Promise<LanceIndexStore> {
 		if (!existsSync(join(directory, "chunks.lance")))

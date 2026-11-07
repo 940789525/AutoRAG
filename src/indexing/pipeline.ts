@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { constants, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cp, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { writeFileAtomic } from "../mirror/atomic-write.ts";
-import { loadMirrorIndex } from "../mirror/index-store.ts";
+import { loadActiveMirrorIndex, loadMirrorIndex } from "../mirror/index-store.ts";
+import { readStructure } from "../mirror/structured.ts";
 import { CHUNKER_VERSION, chunkMarkdown, contentHash } from "./chunker.ts";
 import type { LocalReadHandle } from "./evidence.ts";
 import {
@@ -18,6 +19,7 @@ import { IndexJournal } from "./journal.ts";
 import { LanceIndexStore } from "./lance-store.ts";
 import { acquireIndexLease } from "./lease.ts";
 import { createLexicalAnalyzer } from "./lexical.ts";
+import { chunkStructured, TABLE_CHUNKER_VERSION } from "./table-chunker.ts";
 import { loadIndexTokenizer } from "./tokenizer.ts";
 import type {
 	IndexDocument,
@@ -47,13 +49,15 @@ interface Context {
 /** Owns the indexing workflow. External engines only implement embedding or individual database operations. */
 export class LocalDocumentIndex {
 	readonly directory: string;
-	private readonly options: LocalIndexOptions;
+	private options: LocalIndexOptions;
+	private readonly seedProfile?: string;
 	private contextPromise: Promise<Context> | undefined;
 	private lastQuery:
 		| { text: string; at: number; vector: Promise<readonly number[]>; signal?: AbortSignal }
 		| undefined;
 	private candidateReady?: Record<string, unknown>;
-	constructor(options: LocalIndexOptions) {
+	constructor(options: LocalIndexOptions, seedProfile?: string) {
+		this.seedProfile = seedProfile;
 		const readyPath = join(options.root, ".autorag", "local-index", "ready.json");
 		let generation = options.generation;
 		if (generation === undefined && existsSync(readyPath)) {
@@ -88,15 +92,28 @@ export class LocalDocumentIndex {
 		authorize: (source: string, sourceId: string) => boolean,
 		signal?: AbortSignal,
 	): Promise<ReadonlyMap<string, LocalReadHandle>> {
-		const entries = loadMirrorIndex(this.options.root).entries;
+		const mirror = loadActiveMirrorIndex(this.options.root);
+		const { entries } = mirror;
 		const revisions = new Map<string, Promise<EvidenceRevision | undefined>>();
 		const handles = new Map<string, LocalReadHandle>();
 		for (const hit of hits) {
 			const entry = entries[hit.row.source_id];
-			if (!entry || !hit.profile || entry.sourcePath !== hit.row.source_path) continue;
+			if (
+				!entry ||
+				!hit.profile ||
+				(mirror.profile && mirror.profile !== hit.profile) ||
+				entry.sourcePath !== hit.row.source_path
+			)
+				continue;
 			let revision = revisions.get(entry.virtualPath);
 			if (!revision) {
-				revision = readEvidenceRevision(this.options.root, entry, authorize, signal);
+				revision = readEvidenceRevision(this.options.root, entry, authorize, signal, mirror.backend).catch(
+					(error) => {
+						signal?.throwIfAborted();
+						if (entry.structureSha256) return undefined;
+						throw error;
+					},
+				);
 				revisions.set(entry.virtualPath, revision);
 			}
 			const verified = await revision;
@@ -127,7 +144,7 @@ export class LocalDocumentIndex {
 			!row ||
 			row.id !== handle.chunkId ||
 			row.source_id !== handle.sourceId ||
-			row.source_path !== loadMirrorIndex(this.options.root).entries[handle.sourceId]?.sourcePath ||
+			row.source_path !== loadActiveMirrorIndex(this.options.root).entries[handle.sourceId]?.sourcePath ||
 			row.text !== revision.markdown.slice(row.start, row.end) ||
 			contentHash(row.text) !== handle.bodySha256
 		)
@@ -237,6 +254,12 @@ export class LocalDocumentIndex {
 			const analyzer =
 				this.options.analyzer ??
 				createLexicalAnalyzer({ root: this.options.root, koreanModelPath: this.options.koreanModelPath });
+			if (this.seedProfile && !existsSync(join(this.directory, profile))) {
+				await cp(join(this.directory, this.seedProfile), join(this.directory, profile), {
+					recursive: true,
+					mode: constants.COPYFILE_FICLONE,
+				});
+			}
 			const store =
 				this.options.store ??
 				(await LanceIndexStore.open(join(this.directory, profile, "store"), identity.dimension));
@@ -271,6 +294,43 @@ export class LocalDocumentIndex {
 		} = {},
 	): Promise<IndexReport> {
 		options.signal?.throwIfAborted();
+		const backend = this.options.parserBackend ?? "kordoc";
+		const readyPath = join(this.directory, "ready.json");
+		const previousReadyText = existsSync(readyPath) ? readFileSync(readyPath, "utf8") : undefined;
+		const previousReady = previousReadyText ? JSON.parse(previousReadyText) : undefined;
+		if (options.activate !== false && previousReady && (previousReady.parserBackend ?? "kordoc") !== backend)
+			throw new Error("Switching document parsers requires /index build; the previous index is still active");
+		if (backend === "docling" && previousReady && options.activate !== false && !this.options.store) {
+			if (typeof previousReady.profile !== "string" || !/^[a-f0-9]{64}$/u.test(previousReady.profile))
+				throw new Error(`Invalid active Docling index profile in ${readyPath}`);
+			const seed =
+				this.readinessError() === undefined &&
+				previousReady.semanticFingerprint === this.options.semanticFingerprint
+					? previousReady.profile
+					: undefined;
+			const candidate = new LocalDocumentIndex({ ...this.options, generation: randomUUID() }, seed);
+			let activated = false;
+			try {
+				const report = await candidate.sync(documents, { ...options, activate: false });
+				const unchanged = seed && !options.force && report.unchanged === report.documents && report.deleted === 0;
+				if (report.ok && !unchanged) {
+					await candidate.activateCandidate(options.signal, previousReadyText);
+					activated = true;
+					this.options = candidate.options;
+					this.contextPromise = candidate.contextPromise;
+				}
+				return report;
+			} finally {
+				if (!activated) {
+					const context = await candidate.contextPromise?.catch(() => undefined);
+					if (context) {
+						context.analyzer.close?.();
+						if (context.store instanceof LanceIndexStore) context.store.close();
+						rmSync(join(this.directory, context.profile), { recursive: true, force: true });
+					}
+				}
+			}
+		}
 		this.candidateReady = undefined;
 		const release = acquireIndexLease(this.directory);
 		const runId = randomUUID();
@@ -495,7 +555,7 @@ export class LocalDocumentIndex {
 				pendingTokens = 0;
 			};
 			let loadedTokenizer: TokenCounter | undefined;
-			for await (const document of documents ?? mirrorDocuments(this.options.root)) {
+			for await (const document of documents ?? mirrorDocuments(this.options.root, backend)) {
 				options.signal?.throwIfAborted();
 				if (seen.has(document.virtualPath)) continue;
 				seen.add(document.virtualPath);
@@ -517,6 +577,7 @@ export class LocalDocumentIndex {
 						document.outputPath,
 						document.sourcePath,
 						CHUNKER_VERSION,
+						...(document.structureSha256 ? [TABLE_CHUNKER_VERSION, document.structureSha256] : []),
 						tokenizer.fingerprint,
 						context.analyzer.fingerprint,
 						this.options.targetTokens ?? 512,
@@ -531,7 +592,13 @@ export class LocalDocumentIndex {
 				try {
 					const chunks = await stage(
 						"chunk",
-						async () => chunkMarkdown(await readFile(document.outputPath, "utf8"), tokenizer, this.options),
+						async () => {
+							const markdown = await readFile(document.outputPath, "utf8");
+							const structure = await readStructure(this.options.root, document, markdown, options.signal);
+							return structure
+								? chunkStructured(markdown, structure, tokenizer, this.options, context.passagePrefix)
+								: chunkMarkdown(markdown, tokenizer, this.options);
+						},
 						document.virtualPath,
 					);
 					chunkCount += chunks.length;
@@ -543,7 +610,10 @@ export class LocalDocumentIndex {
 						() =>
 							Promise.all(
 								chunks.map((chunk) =>
-									context.analyzer.analyze(`${chunk.heading}\n${chunk.text}`, options.signal),
+									context.analyzer.analyze(
+										document.structureSha256 ? chunk.embeddingText : `${chunk.heading}\n${chunk.text}`,
+										options.signal,
+									),
 								),
 							),
 						document.virtualPath,
@@ -560,7 +630,9 @@ export class LocalDocumentIndex {
 						const occurrence = occurrences.get(hash) ?? 0;
 						occurrences.set(hash, occurrence + 1);
 						rows.push({
-							id: contentHash(`${document.virtualPath}\0${CHUNKER_VERSION}\0${hash}\0${occurrence}`),
+							id: contentHash(
+								`${document.virtualPath}\0${document.structureSha256 ?? CHUNKER_VERSION}\0${hash}\0${occurrence}`,
+							),
 							source_id: document.virtualPath,
 							source_path: document.sourcePath,
 							text: chunk.text,
@@ -611,8 +683,25 @@ export class LocalDocumentIndex {
 				dirty = true;
 			}
 			if (dirty || this.status() !== "ready") await stage("maintain", () => context.store.maintain());
+			let mirrorSha256: string | undefined;
+			if (backend === "docling") {
+				const mirror = loadMirrorIndex(this.options.root, backend);
+				const failedSources = new Set(failures.map((failure) => failure.path));
+				const previous =
+					previousReady?.profile === context.profile ? loadActiveMirrorIndex(this.options.root).entries : {};
+				const entries = Object.fromEntries(
+					[...seen].flatMap((id) => {
+						const entry = failedSources.has(id) ? previous[id] : mirror.entries[id];
+						return entry ? [[id, entry]] : [];
+					}),
+				);
+				const text = JSON.stringify({ version: 1, entries, skipped: mirror.skipped });
+				writeFileAtomic(join(runDirectory, "mirrors.json"), text);
+				mirrorSha256 = contentHash(text);
+			}
 			const ready = {
 				version: 1,
+				...(backend === "docling" ? { parserBackend: backend, mirrorSha256 } : {}),
 				profile: context.profile,
 				runId,
 				model: context.model,
@@ -665,7 +754,7 @@ export class LocalDocumentIndex {
 		return JSON.parse(readFileSync(join(runDirectory, "report.json"), "utf8")) as IndexReport;
 	}
 	/** Candidate builds never replace the active pointer until a query smoke test succeeds. */
-	async activateCandidate(signal?: AbortSignal): Promise<void> {
+	async activateCandidate(signal?: AbortSignal, expectedReady?: string): Promise<void> {
 		if (!this.candidateReady) throw new Error("Candidate index is incomplete; active index was kept");
 		const context = await this.context();
 		const sample = await context.store.sampleRow?.();
@@ -677,6 +766,8 @@ export class LocalDocumentIndex {
 		} else if (context.store.sampleRow && (await context.store.countRows()))
 			throw new Error("Candidate index could not read a sample row");
 		signal?.throwIfAborted();
+		if (expectedReady !== undefined && readFileSync(join(this.directory, "ready.json"), "utf8") !== expectedReady)
+			throw new Error("Active index changed during candidate refresh");
 		writeFileAtomic(join(this.directory, "ready.json"), JSON.stringify(this.candidateReady));
 		this.candidateReady = undefined;
 	}
@@ -743,8 +834,11 @@ export class LocalDocumentIndex {
 	}
 }
 
-async function* mirrorDocuments(root: string): AsyncIterable<IndexDocument> {
-	for (const entry of Object.values(loadMirrorIndex(root).entries)) yield entry;
+async function* mirrorDocuments(
+	root: string,
+	backend: LocalIndexOptions["parserBackend"],
+): AsyncIterable<IndexDocument> {
+	for (const entry of Object.values(loadMirrorIndex(root, backend).entries)) yield entry;
 }
 
 function errorText(error: unknown): string {

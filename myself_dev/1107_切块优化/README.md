@@ -1,6 +1,6 @@
 # 中文英文表格解析与切块优化
 
-日期：2026-11-07。状态：**T1 本地解析与资源探针通过，冻结 ACCURATE；T2、T3 尚未开始**。
+日期：2026-11-07。状态：**T1 和 T2 已验收，T3 待实施**。
 
 采用 Docling＋RapidOCR 作为中文、英文常用文档的新主解析路径，保留结构化表格，按完整记录切块，再接入现有 BM25＋Qwen 向量检索。命中行组后能够回读所属表格，并在识别不足时核读原件页面。
 
@@ -24,10 +24,26 @@
 
 ## 关键决定
 
-1. 普通 PDF、DOCX、XLSX 计划迁移到 Docling；扫描 PDF 和图片共用 RapidOCR PP-OCRv6 multilingual small。T1 用 TableFormer ACCURATE 保留表格结构，解析结果将供 T2 生成 Markdown 与行组。
+1. 试用 Docling 时，PDF、DOCX、XLSX 走新解析器，扫描 PDF 和图片共用 RapidOCR PP-OCRv6 multilingual small。TableFormer ACCURATE 的结构结果用于生成 Markdown 与行组。
 2. 现有 Qwen 嵌入、LanceDB、BM25、多轮证据恢复、来源授权和 datasource 联邦继续复用。
 3. 保留 kordoc 的 HWP 系列兼容路径；旧 `.xls` 首版保留现有解析器，避免为迁移强制安装 LibreOffice。PPTX、EML、纯文本保持既有路由。
 4. CPU、单解析进程、最多 4 个推理线程、页面缓冲 1；关闭可选视觉大模型和内容增强。T1 已在 4 CPU／8 GiB 容器中验证所测样本与 FastEmbed 共存，解析任务结束释放进程。
 5. 新后端先显式试用，满足质量、兼容性和 8 GB 容器内共存门槛后，才切换常用格式的默认后端。
 
-T1 只新增隔离探针、QA 依赖锁和结果；模型与 Python 环境保存在任务缓存。产品源码、默认解析器、运行时依赖、日常容器配置和索引未变。后续接入按 [AGENTS.md](../../AGENTS.md) 处理产品依赖及许可证。
+## T2 试用方式
+
+使用 [T1 准备步骤](../../scripts/manual-qa/table-probe/README.md) 生成独立的 Python 环境和模型目录。启动 AutoRAG 的进程需要设置 `AUTORAG_DOCLING_PYTHON` 为该环境中 Python 的绝对路径，`AUTORAG_DOCLING_MODELS` 为预置模型目录的绝对路径。
+
+```json
+{
+  "languages": ["zh-hans", "en"],
+  "parserOptions": {
+    "documentBackend": "docling",
+    "ocr": { "enabled": true }
+  }
+}
+```
+
+在试用配置中加入上述字段，重启 TUI 并执行 `/index build`。构建通过后切换活动索引。回滚时改回 `"documentBackend": "kordoc"` 并重新执行 `/index build`。平时用 `/index refresh` 增量更新。`index inspect` 可核对结构哈希、行组正文、向量输入和 token 数。
+
+当前产品默认值为 kordoc。结构化镜像按版本保存，活动索引通过清单定位准确的一对 Markdown 和结构文件。增量刷新先在候选索引上更新，有变化且通过后再发布。候选可复用旧向量。工作区目前保留已发布的旧代次，大语料会增加磁盘开销。

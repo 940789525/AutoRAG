@@ -41,3 +41,30 @@
 - 产品路由与旧格式兼容性、行组切块、检索召回和父表回读还没有进行端到端验收。这一轮未处理真实成绩单，也未把试验依赖加入产品；生产集成时仍需单独确认 Python 依赖及模型许可。
 
 复现见[探针说明](../../scripts/manual-qa/table-probe/README.md)，逐文件结果见 [T1-results.json](T1-results.json)。本机原始结构输出、配置哈希与日志保存在 `.autorag/table-probe-t1/evidence/`；日常配置的前后哈希一致，探针进程已退出，容器已移除。仓库格式检查、lint、类型检查、构建与 JS 供应链检查通过；相关 TS 测试 110 项、Python 测试 11 项通过。
+
+## T2 结构镜像和检索
+
+2026-11-07。**A03、A04、A07、A09 的 T2 验收通过。** 离线 4 CPU／8 GiB 容器使用真实 ACCURATE、LanceDB 和本地 Qwen 1024 维向量。12 份合成表格与 1 份含“体育”字样的说明文档共生成 40 个块。验收使用 100／140 token 的目标和上限来覆盖多块表格，产品仍采用现有默认预算。
+
+| 检索模式 | 第 1 条命中 | 前 3 条命中 |
+| --- | ---: | ---: |
+| BM25 | 48/48 | 48/48 |
+| 向量 | 45/48 | 48/48 |
+| 混合 | 45/48 | 48/48 |
+
+逐门课在指定来源内查询。判定要求课程、学期、成绩和学分对应同一行。对齐 OCR 空格和数值显示差异后逐字段核对，并用真实 tokenizer、结构哈希与 Markdown 偏移核验证据。混排表头匹配允许 OCR 在汉字和英文之间漏空格，镜像保留识别文本。
+
+冷构建约 141 秒。暖刷新 13 份全部复用，新增嵌入为 0。删除文件后索引移除对应记录，旧证据无法核读。损坏 PDF 的错误保留 Docling 原始诊断，失败构建和取消保留活动指针。重启后可检索，回滚至 kordoc 后英文原生表仍可按关键词召回。容器峰值 3.98 GiB，OOM 为 0，日常配置前后哈希一致。
+
+形态测试覆盖多级表头、合并值继承、重复课程、空格、跨表边界、宽行和长单元格分片。索引测试覆盖候选写入后中断，活动 LanceDB 仍可读，后续正常刷新发布新记录。跨页片段保持各自来源，父表遍历与跨轮回答留到 T3 验收。
+
+本机逐查询排名、任务记录及配置哈希位于 `.autorag/table-t2/evidence/`。这次召回率针对已指定来源的合成表格，整库无范围召回、真实成绩单和回答正确率属于后续验收。
+
+准备 T1 缓存后，可以复用 [T1 探针说明](../../scripts/manual-qa/table-probe/README.md) 中的 `qa` 函数运行同一套 [T2 验收脚本](../../scripts/manual-qa/run-qa-docling-tables.mts)。
+
+```bash
+mkdir -p "$probe_host/evidence/t2"
+qa none env AUTORAG_DOCLING_PYTHON="$probe/venv/bin/python" \
+  AUTORAG_DOCLING_MODELS="$probe/models" \
+  node scripts/manual-qa/run-qa-docling-tables.mts "$probe" "$probe/evidence/t2"
+```

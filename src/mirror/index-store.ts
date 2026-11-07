@@ -1,4 +1,7 @@
+import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import type { DocumentBackend } from "../parser/defaults.ts";
 import { writeFileAtomic } from "./atomic-write.ts";
 import { parsedMirrorIndexPath } from "./paths.ts";
 
@@ -14,6 +17,7 @@ export interface ParsedMirrorEntry {
 	/** Optional on older mirrors; hashes bind the parsed text to the exact source bytes. */
 	readonly sourceSha256?: string;
 	readonly outputSha256?: string;
+	readonly structureSha256?: string;
 }
 
 /** Why refresh deliberately left a source out of the parsed mirror. */
@@ -43,6 +47,7 @@ export interface ParsedMirrorSkipEntry {
 	readonly parserName?: string;
 	/** `Parser.version` the skip was decided with. Absent on records written before version stamps. */
 	readonly parserVersion?: string;
+	readonly message?: string;
 }
 
 export interface ParsedMirrorIndex {
@@ -56,15 +61,39 @@ export function emptyMirrorIndex(): ParsedMirrorIndex {
 	return { version: 1, entries: {} };
 }
 
-export function loadMirrorIndex(root: string): ParsedMirrorIndex {
-	const path = parsedMirrorIndexPath(root);
+export function loadMirrorIndex(root: string, backend?: DocumentBackend): ParsedMirrorIndex {
+	const path = parsedMirrorIndexPath(root, backend);
 	if (!existsSync(path)) return emptyMirrorIndex();
-	const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+	return decodeMirrorIndex(readFileSync(path, "utf8"));
+}
+
+export function decodeMirrorIndex(text: string): ParsedMirrorIndex {
+	const parsed: unknown = JSON.parse(text);
 	return isParsedMirrorIndex(parsed) ? parsed : emptyMirrorIndex();
 }
 
-export function saveMirrorIndex(root: string, index: ParsedMirrorIndex): void {
-	writeFileAtomic(parsedMirrorIndexPath(root), `${JSON.stringify(index, null, 2)}\n`);
+export function saveMirrorIndex(root: string, index: ParsedMirrorIndex, backend?: DocumentBackend): void {
+	writeFileAtomic(parsedMirrorIndexPath(root, backend), `${JSON.stringify(index, null, 2)}\n`);
+}
+
+export function loadActiveMirrorIndex(root: string): ParsedMirrorIndex & {
+	readonly backend: DocumentBackend;
+	readonly profile?: string;
+} {
+	const directory = join(root, ".autorag", "local-index");
+	const readyPath = join(directory, "ready.json");
+	const ready = existsSync(readyPath) ? JSON.parse(readFileSync(readyPath, "utf8")) : undefined;
+	if (ready?.parserBackend !== "docling")
+		return { ...loadMirrorIndex(root), backend: "kordoc", profile: ready?.profile };
+	if (typeof ready.runId !== "string" || !/^[a-f0-9-]{36}$/u.test(ready.runId))
+		throw new Error(`Invalid Docling mirror generation in ${readyPath}`);
+	const path = join(directory, "runs", ready.runId, "mirrors.json");
+	const text = readFileSync(path, "utf8");
+	if (createHash("sha256").update(text).digest("hex") !== ready.mirrorSha256)
+		throw new Error(`Active Docling mirror manifest SHA-256 mismatch: ${path}`);
+	const parsed: unknown = JSON.parse(text);
+	if (!isParsedMirrorIndex(parsed)) throw new Error(`Invalid active Docling mirror manifest: ${path}`);
+	return { ...parsed, backend: "docling", profile: ready.profile };
 }
 
 function isParsedMirrorIndex(value: unknown): value is ParsedMirrorIndex {
@@ -90,7 +119,8 @@ function isParsedMirrorSkipEntry(value: unknown): value is ParsedMirrorSkipEntry
 		typeof value.sourceSizeBytes === "number" &&
 		typeof value.updatedAt === "string" &&
 		(value.parserName === undefined || typeof value.parserName === "string") &&
-		(value.parserVersion === undefined || typeof value.parserVersion === "string")
+		(value.parserVersion === undefined || typeof value.parserVersion === "string") &&
+		(value.message === undefined || typeof value.message === "string")
 	);
 }
 
@@ -111,13 +141,21 @@ function isParsedMirrorEntry(value: unknown): value is ParsedMirrorEntry {
 		typeof value.sourcePath === "string" &&
 		typeof value.outputPath === "string" &&
 		typeof value.parserName === "string" &&
+		(value.parserName !== "docling" || value.structureSha256 !== undefined) &&
+		(value.parserVersion === undefined || typeof value.parserVersion === "string") &&
 		typeof value.sourceMtimeNs === "number" &&
 		typeof value.sourceSizeBytes === "number" &&
 		typeof value.updatedAt === "string" &&
 		(value.sourceSha256 === undefined ||
 			(typeof value.sourceSha256 === "string" && /^[a-f0-9]{64}$/u.test(value.sourceSha256))) &&
 		(value.outputSha256 === undefined ||
-			(typeof value.outputSha256 === "string" && /^[a-f0-9]{64}$/u.test(value.outputSha256)))
+			(typeof value.outputSha256 === "string" && /^[a-f0-9]{64}$/u.test(value.outputSha256))) &&
+		(value.structureSha256 === undefined ||
+			(typeof value.structureSha256 === "string" &&
+				/^[a-f0-9]{64}$/u.test(value.structureSha256) &&
+				typeof value.sourceSha256 === "string" &&
+				typeof value.outputSha256 === "string" &&
+				typeof value.parserVersion === "string"))
 	);
 }
 

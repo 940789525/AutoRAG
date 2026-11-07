@@ -5,7 +5,13 @@ import { extname, resolve, sep } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileSha256 } from "../filesystem/content-fingerprint.ts";
 import { planSourceRoots, type SourceRoot, sourceIdentifier } from "../filesystem/source-paths.ts";
-import { createDefaultParserRegistry, type DefaultParserRegistryOptions } from "../parser/defaults.ts";
+import {
+	createDefaultParserRegistry,
+	type DefaultParserRegistryOptions,
+	type DocumentBackend,
+	documentBackend,
+} from "../parser/defaults.ts";
+import { DoclingParser } from "../parser/docling.ts";
 import { ParseError, ParseIsolationError } from "../parser/errors.ts";
 import {
 	ISOLATED_PARSER_NAMES,
@@ -29,6 +35,7 @@ import {
 	saveMirrorIndex,
 } from "./index-store.ts";
 import { parsedMirrorIndexPath, parsedOutputPath } from "./paths.ts";
+import { mirrorOutputPath, readStructure, writeStructuredMirror } from "./structured.ts";
 
 /** Refuse to fully load/parse sources larger than this. Keeps Node heap stable on home folders. */
 export const DEFAULT_MAX_SOURCE_BYTES = 50 * 1024 * 1024;
@@ -295,11 +302,30 @@ async function syncWithRegistry(
 	registry: ParserRegistry,
 	isolated: IsolatedParseRunner | undefined,
 ): Promise<ParsedMirrorSyncResult> {
+	const docling = registry
+		.list()
+		.find((parser) => parser instanceof DoclingParser)
+		?.openTask();
+	try {
+		return await syncMirrorEntries(options, registry, isolated, docling);
+	} finally {
+		await docling?.close();
+	}
+}
+
+async function syncMirrorEntries(
+	options: ParsedMirrorSyncOptions,
+	registry: ParserRegistry,
+	isolated: IsolatedParseRunner | undefined,
+	docling: ReturnType<DoclingParser["openTask"]> | undefined,
+): Promise<ParsedMirrorSyncResult> {
+	const backend = documentBackend(options.parserOptions);
+
 	const maxSourceBytes = options.maxSourceBytes ?? DEFAULT_MAX_SOURCE_BYTES;
 	const supportedExtensions = supportedExtensionSet(registry);
 	const listing = await listCurrentFiles(options.searchPaths, supportedExtensions, walkLimits(options));
 	const current = listing.entries;
-	const previous = loadMirrorIndex(options.root);
+	const previous = loadMirrorIndex(options.root, backend);
 	const nextEntries: Record<string, ParsedMirrorEntry> = {};
 	const nextSkipped: Record<string, ParsedMirrorSkipEntry> = {};
 	const handledPrevious = new Set<string>();
@@ -331,7 +357,12 @@ async function syncWithRegistry(
 	const retryPass = options.force === true || options.retrySkipped === true;
 
 	/** `parser` stamps a retryable skip so a later refresh can honor it while the parser is unchanged. */
-	const recordSkip = (entry: CurrentEntry, reason: ParsedMirrorSkipReason, parser?: Parser): void => {
+	const recordSkip = (
+		entry: CurrentEntry,
+		reason: ParsedMirrorSkipReason,
+		parser?: Parser,
+		message?: string,
+	): void => {
 		nextSkipped[entry.virtualPath] = {
 			virtualPath: entry.virtualPath,
 			sourcePath: entry.sourcePath,
@@ -340,6 +371,7 @@ async function syncWithRegistry(
 			sourceSizeBytes: entry.sizeBytes,
 			updatedAt: new Date().toISOString(),
 			...(parser === undefined ? {} : { parserName: parser.name, parserVersion: parser.version }),
+			...(message === undefined ? {} : { message }),
 		};
 	};
 
@@ -352,14 +384,28 @@ async function syncWithRegistry(
 		// a skip only when this pass recorded one; a transient read failure must not retain an old skip.
 		for (const virtualPath of handledPrevious) {
 			if (virtualPath in nextEntries) {
-				delete mergedSkipped[virtualPath];
+				if (!(virtualPath in nextSkipped)) delete mergedSkipped[virtualPath];
 				continue;
 			}
 			delete merged[virtualPath];
 			if (!(virtualPath in nextSkipped)) delete mergedSkipped[virtualPath];
 		}
-		saveMirrorIndex(options.root, { version: 1, entries: merged, skipped: mergedSkipped });
+		saveMirrorIndex(options.root, { version: 1, entries: merged, skipped: mergedSkipped }, backend);
 		sinceCheckpoint = 0;
+	};
+
+	const preserveOnFailure = (entry: CurrentEntry): boolean => {
+		const prior = previous.entries[entry.virtualPath];
+		if (
+			backend !== "docling" ||
+			!prior?.structureSha256 ||
+			prior.sourceMtimeNs !== entry.mtimeNs ||
+			prior.sourceSizeBytes !== entry.sizeBytes ||
+			prior.sourcePath !== entry.sourcePath
+		)
+			return false;
+		nextEntries[entry.virtualPath] = prior;
+		return true;
 	};
 
 	// Isolate one file's failure: drop its stale mirror, count the skip, surface one diagnostic, and
@@ -372,10 +418,13 @@ async function syncWithRegistry(
 		skipReason?: ParsedMirrorSkipReason,
 		parser?: Parser,
 	): void => {
-		deleted += removePrevious(options.root, previous, entry.virtualPath);
-		handledPrevious.add(entry.virtualPath);
+		if (!preserveOnFailure(entry)) {
+			deleted += removePrevious(options.root, previous, entry.virtualPath, backend);
+			handledPrevious.add(entry.virtualPath);
+		}
 		skipped += 1;
-		if (skipReason !== undefined) recordSkip(entry, skipReason, parser);
+		if (skipReason !== undefined)
+			recordSkip(entry, skipReason, parser, backend === "docling" ? diagnostic.message : undefined);
 		diagnostics.push({ ...diagnostic, source: entry.virtualPath });
 		sinceCheckpoint += 1;
 		if (sinceCheckpoint >= MIRROR_CHECKPOINT_EVERY) checkpoint();
@@ -395,14 +444,14 @@ async function syncWithRegistry(
 			throw abortReason(options.signal);
 		}
 		if (isPathExcluded(entry.sourcePath, options.userExcludedSourcePaths)) {
-			deleted += removePrevious(options.root, previous, entry.virtualPath);
+			deleted += removePrevious(options.root, previous, entry.virtualPath, backend);
 			handledPrevious.add(entry.virtualPath);
 			skipped += 1;
 			recordSkip(entry, "user-excluded");
 			continue;
 		}
 		if (options.excludeSourcePaths?.has(entry.sourcePath)) {
-			deleted += removePrevious(options.root, previous, entry.virtualPath);
+			deleted += removePrevious(options.root, previous, entry.virtualPath, backend);
 			handledPrevious.add(entry.virtualPath);
 			skipped += 1;
 			recordSkip(entry, "duplicate-excluded");
@@ -417,7 +466,7 @@ async function syncWithRegistry(
 		const parser = registry.getForVirtualPath(entry.virtualPath);
 		if (!parser) {
 			// Collect only filters to known extensions, so this is rare (double-check safety).
-			deleted += removePrevious(options.root, previous, entry.virtualPath);
+			deleted += removePrevious(options.root, previous, entry.virtualPath, backend);
 			handledPrevious.add(entry.virtualPath);
 			skipped += 1;
 			recordSkip(entry, "parser-skipped");
@@ -425,7 +474,7 @@ async function syncWithRegistry(
 		}
 
 		if (entry.sizeBytes > maxSourceBytes) {
-			deleted += removePrevious(options.root, previous, entry.virtualPath);
+			deleted += removePrevious(options.root, previous, entry.virtualPath, backend);
 			handledPrevious.add(entry.virtualPath);
 			skipped += 1;
 			recordSkip(entry, "parser-skipped");
@@ -443,28 +492,50 @@ async function syncWithRegistry(
 		const previousSkip = previous.skipped?.[entry.virtualPath];
 		if (previousSkip !== undefined && isSkipHonored(previousSkip, entry, parser, retryPass)) {
 			// Same source and parser: keep the record and do not read or parse the file again.
-			deleted += removePrevious(options.root, previous, entry.virtualPath);
-			handledPrevious.add(entry.virtualPath);
+			if (!preserveOnFailure(entry)) {
+				deleted += removePrevious(options.root, previous, entry.virtualPath, backend);
+				handledPrevious.add(entry.virtualPath);
+			}
 			skipped += 1;
 			nextSkipped[entry.virtualPath] = previousSkip;
 			diagnostics.push({
 				code: previousSkip.reason,
 				severity: "warning",
-				message: RETRYABLE_SKIP_MESSAGES[previousSkip.reason],
+				message: previousSkip.message ?? RETRYABLE_SKIP_MESSAGES[previousSkip.reason],
 				source: entry.virtualPath,
 			});
 			continue;
 		}
 
 		const previousEntry = previous.entries[entry.virtualPath];
-		const outputPath = parsedOutputPath(options.root, entry.virtualPath);
-		const unchanged =
+		let outputPath = parsedOutputPath(options.root, entry.virtualPath, backend);
+		let structureSha256 = previousEntry?.structureSha256;
+		let unchanged =
 			!options.force &&
 			previousEntry?.sourceMtimeNs === entry.mtimeNs &&
 			previousEntry.sourceSizeBytes === entry.sizeBytes &&
 			previousEntry.parserName === parser.name &&
 			previousEntry.parserVersion === parser.version &&
-			existsSync(outputPath);
+			previousEntry.outputPath === mirrorOutputPath(options.root, previousEntry, backend) &&
+			existsSync(previousEntry.outputPath);
+		if (unchanged && previousEntry) {
+			outputPath = previousEntry.outputPath;
+			if (parser instanceof DoclingParser) {
+				try {
+					const markdown = await readFile(outputPath, "utf8");
+					unchanged = Boolean(await readStructure(options.root, previousEntry, markdown, options.signal));
+				} catch (error) {
+					if (options.signal?.aborted) throw error;
+					unchanged = false;
+					diagnostics.push({
+						code: "parser-warning",
+						severity: "warning",
+						source: entry.virtualPath,
+						message: String(error),
+					});
+				}
+			}
+		}
 		const parseStarted = performance.now();
 		let sourceSha256 = previousEntry?.sourceSha256;
 		let outputSha256 = previousEntry?.outputSha256;
@@ -500,9 +571,11 @@ async function syncWithRegistry(
 				// but only after the size gate above.
 				const input = { virtualPath: entry.virtualPath, sourcePath: entry.sourcePath, bytes };
 				parsed =
-					isolated !== undefined && ISOLATED_PARSER_NAMES.has(parser.name)
-						? await isolated.parse(parser.name, input, options.signal)
-						: await parser.parse(input);
+					parser instanceof DoclingParser && docling
+						? await docling.parse(input, options.signal)
+						: isolated !== undefined && ISOLATED_PARSER_NAMES.has(parser.name)
+							? await isolated.parse(parser.name, input, options.signal)
+							: await parser.parse(input);
 			} catch (error) {
 				if (options.signal?.aborted) {
 					checkpoint();
@@ -553,8 +626,30 @@ async function syncWithRegistry(
 			try {
 				const markdown = normalizeMarkdown(parsed.markdown);
 				outputSha256 = createHash("sha256").update(markdown).digest("hex");
-				await withTransientRetry(() => writeFileAtomic(outputPath, markdown), transientRetries, transientBackoffMs);
+				options.signal?.throwIfAborted();
+				if (parsed.structure) {
+					({ outputPath, structureSha256 } = await withTransientRetry(
+						() =>
+							writeStructuredMirror(
+								options.root,
+								{ virtualPath: entry.virtualPath, parserVersion: parser.version, sourceSha256, outputSha256 },
+								markdown,
+								parsed.structure!,
+							),
+						transientRetries,
+						transientBackoffMs,
+					));
+				} else {
+					structureSha256 = undefined;
+					outputPath = mirrorOutputPath(options.root, { virtualPath: entry.virtualPath, outputSha256 }, backend);
+					await withTransientRetry(
+						() => writeFileAtomic(outputPath, markdown),
+						transientRetries,
+						transientBackoffMs,
+					);
+				}
 			} catch (error) {
+				if (options.signal?.aborted) throw error;
 				const code = errorCode(error);
 				if (code !== undefined && Object.hasOwn(WORKSPACE_ERROR_CODES, code)) {
 					// Keep what is already mirrored so the next run restarts incrementally.
@@ -597,6 +692,7 @@ async function syncWithRegistry(
 			updatedAt: unchanged ? (previousEntry?.updatedAt ?? new Date().toISOString()) : new Date().toISOString(),
 			...(sourceSha256 === undefined ? {} : { sourceSha256 }),
 			...(outputSha256 === undefined ? {} : { outputSha256 }),
+			...(structureSha256 === undefined ? {} : { structureSha256 }),
 		};
 		await options.onDocument?.({
 			...nextEntries[entry.virtualPath],
@@ -648,7 +744,7 @@ async function syncWithRegistry(
 		});
 	} else {
 		for (const virtualPath of staleCandidates) {
-			removeFile(parsedOutputPath(options.root, previous.entries[virtualPath]?.virtualPath ?? virtualPath));
+			removePrevious(options.root, previous, virtualPath, backend);
 			deleted += 1;
 			diagnostics.push({
 				code: "deleted-mirror",
@@ -661,7 +757,7 @@ async function syncWithRegistry(
 
 	options.onProgress?.({ processed: current.length, total: current.length, written, deleted, skipped });
 	const index: ParsedMirrorIndex = { version: 1, entries: nextEntries, skipped: nextSkipped };
-	saveMirrorIndex(options.root, index);
+	saveMirrorIndex(options.root, index, backend);
 	// A partial/unreliable scan preserves these sources; absence must never become an index deletion.
 	for (const [virtualPath, entry] of Object.entries(nextEntries)) {
 		if (!handledPrevious.has(virtualPath)) await options.onDocument?.(entry);
@@ -671,7 +767,7 @@ async function syncWithRegistry(
 		written,
 		deleted,
 		skipped,
-		indexPath: parsedMirrorIndexPath(options.root),
+		indexPath: parsedMirrorIndexPath(options.root, backend),
 		diagnostics,
 	};
 }
@@ -687,10 +783,11 @@ async function syncWithRegistry(
  * getRefreshStatus).
  */
 export async function detectMirrorStaleness(options: ParsedMirrorSyncOptions): Promise<ParsedMirrorDiagnostic[]> {
+	const backend = documentBackend(options.parserOptions);
 	const registry = options.registry ?? createDefaultParserRegistry(options.parserOptions);
 	const supportedExtensions = supportedExtensionSet(registry);
 	const current = (await listCurrentFiles(options.searchPaths, supportedExtensions, walkLimits(options))).entries;
-	const previous = loadMirrorIndex(options.root);
+	const previous = loadMirrorIndex(options.root, backend);
 	const diagnostics: ParsedMirrorDiagnostic[] = [];
 	for (const entry of current) {
 		if (
@@ -698,9 +795,15 @@ export async function detectMirrorStaleness(options: ParsedMirrorSyncOptions): P
 			isPathExcluded(entry.sourcePath, options.userExcludedSourcePaths)
 		)
 			continue;
-		if (!registry.getForVirtualPath(entry.virtualPath)) continue;
+		const parser = registry.getForVirtualPath(entry.virtualPath);
+		if (!parser) continue;
 		const prev = previous.entries[entry.virtualPath];
-		if (prev !== undefined && prev.sourceMtimeNs === entry.mtimeNs && prev.sourceSizeBytes === entry.sizeBytes)
+		if (
+			prev !== undefined &&
+			prev.sourceMtimeNs === entry.mtimeNs &&
+			prev.sourceSizeBytes === entry.sizeBytes &&
+			(backend !== "docling" || (prev.parserName === parser.name && prev.parserVersion === parser.version))
+		)
 			continue;
 		const prevSkip = previous.skipped?.[entry.virtualPath];
 		// A "user-excluded" skip only suppresses staleness while the path stays excluded;
@@ -712,7 +815,10 @@ export async function detectMirrorStaleness(options: ParsedMirrorSyncOptions): P
 		if (
 			honoredSkip !== undefined &&
 			honoredSkip.sourceMtimeNs === entry.mtimeNs &&
-			honoredSkip.sourceSizeBytes === entry.sizeBytes
+			honoredSkip.sourceSizeBytes === entry.sizeBytes &&
+			(backend !== "docling" ||
+				honoredSkip.reason === "parser-skipped" ||
+				isSkipHonored(honoredSkip, entry, parser, false))
 		)
 			continue;
 		const known = prev ?? honoredSkip;
@@ -1026,10 +1132,10 @@ async function collectFiles(state: WalkState, directory: string, depth: number):
 	}
 }
 
-function removePrevious(root: string, index: ParsedMirrorIndex, virtualPath: string): number {
+function removePrevious(root: string, index: ParsedMirrorIndex, virtualPath: string, backend: DocumentBackend): number {
 	const previous = index.entries[virtualPath];
 	if (!previous) return 0;
-	removeFile(parsedOutputPath(root, previous.virtualPath));
+	if (!previous.structureSha256 && backend === "kordoc") removeFile(parsedOutputPath(root, previous.virtualPath));
 	return 1;
 }
 

@@ -94,7 +94,7 @@ import {
 	syncParsedMirrors,
 } from "../mirror/sync.ts";
 import { AutoRAGRunLogger, assistantUsageEvent } from "../observability/run-log.ts";
-import { type DefaultParserRegistryOptions, resolveParserOptions } from "../parser/index.ts";
+import { type DefaultParserRegistryOptions, documentBackend, resolveParserOptions } from "../parser/index.ts";
 import { RetrievalEngine } from "../retrieval/engine.ts";
 import { ParallelRetriever, ResultMerger } from "../retrieval/merger.ts";
 import { RetrievalMethodRegistry } from "../retrieval/registry.ts";
@@ -1104,6 +1104,7 @@ export class AutoRAGAgent {
 		} = {
 			...options.localIndex,
 			root: this.workspaceProjectRoot,
+			parserBackend: documentBackend(this.parserOptions),
 			embedder:
 				this.embedder instanceof ProfileEmbedder
 					? this.embedder.forProfile(this.embedder.profileId)
@@ -3731,6 +3732,7 @@ export class AutoRAGAgent {
 						profile ? embeddingFingerprint(profile) : "injected",
 						this.searchPaths,
 						this.localIndexRevision,
+						this.parserOptions?.documentBackend,
 					]),
 				),
 			},
@@ -3816,7 +3818,18 @@ export class AutoRAGAgent {
 					}
 
 					if (candidate) {
-						const errors = result.diagnostics.filter((d) => d.severity === "error");
+						const errors = result.diagnostics.filter(
+							(d) =>
+								d.severity === "error" ||
+								(documentBackend(this.parserOptions) === "docling" &&
+									[
+										"parser-failed",
+										"parser-crashed",
+										"mirror-write-failed",
+										"source-unreadable",
+										"source-read-failed",
+									].includes(d.code)),
+						);
 						if (errors.length) throw new Error(errors.map((d) => d.message).join("\n"));
 						await candidate.index.activateCandidate(signal);
 						manager?.activate(id);

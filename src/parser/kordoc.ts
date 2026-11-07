@@ -139,12 +139,13 @@ export class KordocParser extends Parser {
 	readonly #parse: KordocParseFn;
 	readonly #ocr: KordocParserOptions["ocr"];
 
-	constructor(options: KordocParserOptions = {}) {
+	constructor(options: KordocParserOptions = {}, extensions?: readonly string[]) {
 		super();
 		this.#parse = options.parse ?? defaultParse;
 		this.#ocr = options.ocr;
 		this.extensions =
-			options.images === true ? [...KORDOC_EXTENSIONS, ...KORDOC_IMAGE_EXTENSIONS] : KORDOC_EXTENSIONS;
+			extensions ??
+			(options.images === true ? [...KORDOC_EXTENSIONS, ...KORDOC_IMAGE_EXTENSIONS] : KORDOC_EXTENSIONS);
 	}
 
 	async parse(input: ParseInput): Promise<ParseOutput> {

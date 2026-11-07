@@ -1,13 +1,17 @@
 import { join } from "node:path";
 import { DEFAULT_LANGUAGES, type LanguageTag } from "../language.ts";
+import { DOCLING_DOCUMENT_EXTENSIONS, DoclingParser } from "./docling.ts";
 import { EmlParser } from "./eml.ts";
-import { KordocParser, type KordocParserOptions } from "./kordoc.ts";
+import { KORDOC_EXTENSIONS, KordocParser, type KordocParserOptions } from "./kordoc.ts";
 import { BUILTIN_OCR_LANGUAGES, createTesseractOcrProvider, type OcrOptions } from "./ocr-engines.ts";
 import { PptxParser } from "./office.ts";
 import { PlainTextParser } from "./plain-text.ts";
 import { ParserRegistry } from "./registry.ts";
 
+export type DocumentBackend = "kordoc" | "docling";
+
 export interface DefaultParserRegistryOptions {
+	readonly documentBackend?: DocumentBackend;
 	readonly ocr?: OcrOptions;
 	readonly kordoc?: KordocParserOptions;
 	/** Global document languages; selects the OCR engine when OCR is enabled. */
@@ -39,10 +43,19 @@ export function resolveParserOptions(
 	workspacePath?: string,
 ): DefaultParserRegistryOptions {
 	const resolved = { ...parserOptions, languages: parserOptions?.languages ?? languages };
+	documentBackend(resolved);
 	if (workspacePath === undefined || parserOptions?.ocr === undefined || parserOptions.ocr.cachePath !== undefined) {
 		return resolved;
 	}
 	return { ...resolved, ocr: { ...parserOptions.ocr, cachePath: tesseractCachePathFor(workspacePath) } };
+}
+
+export function documentBackend(options?: DefaultParserRegistryOptions): DocumentBackend {
+	const backend = options?.documentBackend;
+	if (backend === undefined) return "kordoc";
+	if (backend !== "docling" && backend !== "kordoc")
+		throw new Error(`parserOptions.documentBackend must be kordoc or docling, received ${String(backend)}`);
+	return backend;
 }
 
 /**
@@ -57,6 +70,7 @@ export function resolveParserOptions(
 export function createDefaultParserRegistry(options: DefaultParserRegistryOptions = {}): ParserRegistry {
 	const languages = options.languages ?? DEFAULT_LANGUAGES;
 	const ocrEnabled = options.ocr?.enabled === true;
+	const docling = documentBackend(options) === "docling";
 	const builtinCovers = languages.every((language) => BUILTIN_OCR_LANGUAGES.has(language));
 	const kordocOptions: KordocParserOptions = {
 		...options.kordoc,
@@ -78,7 +92,17 @@ export function createDefaultParserRegistry(options: DefaultParserRegistryOption
 
 	return new ParserRegistry([
 		new PlainTextParser(),
-		new KordocParser(kordocOptions),
+		new KordocParser(
+			kordocOptions,
+			docling
+				? KORDOC_EXTENSIONS.filter(
+						(extension) => !(DOCLING_DOCUMENT_EXTENSIONS as readonly string[]).includes(extension),
+					)
+				: undefined,
+		),
+		...(docling
+			? [new DoclingParser({ ocr: ocrEnabled, languages, timeoutMs: options.fileTimeoutMs ?? 120_000 })]
+			: []),
 		new PptxParser(),
 		new EmlParser(),
 	]);

@@ -12,6 +12,7 @@ export const localReadHandleSchema = Type.Object(
 		bodySha256: sha256,
 		sourceSha256: sha256,
 		outputSha256: sha256,
+		structureSha256: Type.Optional(sha256),
 	},
 	{ additionalProperties: false },
 );

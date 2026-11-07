@@ -1022,7 +1022,14 @@ export function resolveConfig(input: ResolveConfigInput): CliConfig {
 	if (file.queryDecomposition !== undefined) {
 		config.queryDecomposition = normalizeQueryDecompositionConfig(file.queryDecomposition);
 	}
-	if (file.parserOptions) config.parserOptions = file.parserOptions;
+	if (file.parserOptions !== undefined) {
+		const raw = file.parserOptions;
+		if (!raw || typeof raw !== "object" || Array.isArray(raw))
+			throw new ConfigError("Config field 'parserOptions' must be an object");
+		if (raw.documentBackend !== undefined && raw.documentBackend !== "kordoc" && raw.documentBackend !== "docling")
+			throw new ConfigError("Config field 'parserOptions.documentBackend' must be kordoc or docling");
+		config.parserOptions = raw;
+	}
 	if (file.dupey !== undefined) {
 		if (typeof file.dupey !== "object" || file.dupey === null || Array.isArray(file.dupey)) {
 			throw new ConfigError("Config field 'dupey' must be an object");

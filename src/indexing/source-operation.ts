@@ -3,8 +3,9 @@ import { dirname, join, resolve } from "node:path";
 import { resolveConfig, updateConfigObject } from "../cli/config.ts";
 import { planSourceRoots, resolveVirtualSource, sourceIdentifier } from "../filesystem/source-paths.ts";
 import { writeFileAtomic } from "../mirror/atomic-write.ts";
-import { loadMirrorIndex, saveMirrorIndex } from "../mirror/index-store.ts";
+import { loadActiveMirrorIndex, loadMirrorIndex, saveMirrorIndex } from "../mirror/index-store.ts";
 import { parsedOutputPath } from "../mirror/paths.ts";
+import { mirrorOutputPath } from "../mirror/structured.ts";
 import { isPathExcluded } from "../mirror/sync.ts";
 import { contentHash } from "./chunker.ts";
 
@@ -41,10 +42,11 @@ export function prepareSourceOperation(
 	const prior: Receipt | undefined = existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : undefined;
 	if (prior && (prior.path !== path || prior.sourceId !== id || prior.configPath !== configPath))
 		throw new Error("Source identity or configuration changed since removal");
-	const mirror = loadMirrorIndex(root);
-	const entry = mirror.entries[id];
+	const active = loadActiveMirrorIndex(root);
+	const mirror = loadMirrorIndex(root, active.backend);
+	const entry = active.entries[id];
 	const output = parsedOutputPath(root, id);
-	if (entry && (entry.sourcePath !== path || entry.outputPath !== output))
+	if (entry && (entry.sourcePath !== path || entry.outputPath !== mirrorOutputPath(root, entry, active.backend)))
 		throw new Error("Source mirror identity mismatch");
 	if (mode === "remove" && (!entry || registered === false) && !prior)
 		throw new Error(`No indexed source matches ${id}`);
@@ -52,6 +54,8 @@ export function prepareSourceOperation(
 	let added = false;
 	updateConfigObject(configPath, (raw) => {
 		const cfg = resolveConfig({ flags: { config: configPath }, readOnly: true });
+		if ((cfg.parserOptions?.documentBackend ?? "kordoc") !== active.backend)
+			throw new Error("Switching document parsers requires /index build before a file operation");
 		if (
 			resolve(cfg.workspacePath) !== resolve(root) ||
 			!cfg.searchPaths.some((p) => realpathSync(p) === target.root.rootPath)
@@ -88,12 +92,12 @@ export function prepareSourceOperation(
 	// Delete only the canonical generated output. Restore must parse the original even on retry.
 	try {
 		if (existsSync(output) && realpathSync(output) !== output) throw new Error("Unexpected parsed mirror symlink");
-		rmSync(output, { force: true });
+		if (active.backend === "kordoc") rmSync(output, { force: true });
 		const entries = { ...mirror.entries };
 		const skipped = { ...mirror.skipped };
 		delete entries[id];
 		delete skipped[id];
-		saveMirrorIndex(root, { ...mirror, entries, skipped });
+		saveMirrorIndex(root, { ...mirror, entries, skipped }, active.backend);
 	} catch (error) {
 		throw new Error(`Exclusion updated for ${id}; mirror cleanup failed: ${String(error)}`);
 	}

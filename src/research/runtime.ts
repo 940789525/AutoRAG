@@ -8,7 +8,7 @@ import { AutoRAGLite } from "../core.ts";
 import { readEvidenceRevision } from "../indexing/evidence-reader.ts";
 import { LanceIndexStore } from "../indexing/lance-store.ts";
 import { LocalIndexMethod } from "../indexing/method.ts";
-import { loadMirrorIndex } from "../mirror/index-store.ts";
+import { loadActiveMirrorIndex } from "../mirror/index-store.ts";
 import { resolveSessionModel } from "../profiles/session-model.ts";
 import { within } from "./discovery.ts";
 import { evidenceId, noteSchema, structuredReading, validateNote } from "./reader.ts";
@@ -70,7 +70,7 @@ export async function createResearchRuntime(options: RuntimeOptions): Promise<Re
 	let store: LanceIndexStore | undefined;
 	const authorized = (path: string) => within(root, path);
 	const revision = async (asset: AssetRevision, signal?: AbortSignal) => {
-		const entry = loadMirrorIndex(workspace).entries[asset.sourceId];
+		const entry = loadActiveMirrorIndex(workspace).entries[asset.sourceId];
 		if (!entry) throw new Error(`Paper mirror is unavailable: ${asset.source}`);
 		const result = await readEvidenceRevision(workspace, entry, authorized, signal);
 		if (
@@ -109,7 +109,7 @@ export async function createResearchRuntime(options: RuntimeOptions): Promise<Re
 				};
 				store = await LanceIndexStore.openExisting(join(index.directory, ready.profile, "store"));
 			}
-			for (const entry of Object.values(loadMirrorIndex(workspace).entries)) {
+			for (const entry of Object.values(loadActiveMirrorIndex(workspace).entries)) {
 				if (entry.sourceSha256 !== sha256) continue;
 				const result = await readEvidenceRevision(workspace, entry, authorized);
 				if (result && (await store.hasSource(entry.virtualPath)))

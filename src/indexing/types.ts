@@ -1,4 +1,5 @@
 import type { Embedder, EmbeddingIdentity } from "../embedding/embedder.ts";
+import type { DocumentBackend } from "../parser/defaults.ts";
 
 export type IndexPhase = "prepare" | "parse" | "chunk" | "lexical" | "cache" | "embed" | "write" | "maintain" | "done";
 
@@ -38,6 +39,10 @@ export interface IndexDocument {
 	readonly outputPath: string;
 	readonly updatedAt: string;
 	readonly parseDurationMs?: number;
+	readonly parserVersion?: string;
+	readonly sourceSha256?: string;
+	readonly outputSha256?: string;
+	readonly structureSha256?: string;
 }
 
 export interface TokenCounter {
@@ -110,6 +115,7 @@ export interface LexicalAnalyzer {
 }
 
 export interface LocalIndexOptions {
+	readonly parserBackend?: DocumentBackend;
 	readonly embeddingProfile?: string;
 	readonly semanticFingerprint?: string;
 	readonly generation?: string;

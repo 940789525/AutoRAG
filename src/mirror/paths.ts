@@ -12,13 +12,18 @@ export function parsedMirrorRoot(root: string): string {
 	return join(root, PARSED_MIRROR_SUBDIR);
 }
 
-export function parsedMirrorIndexPath(root: string): string {
-	return join(parsedMirrorRoot(root), PARSED_INDEX_FILE);
+export function parsedMirrorIndexPath(root: string, backend?: "kordoc" | "docling"): string {
+	return join(parsedMirrorRoot(root), backend === "docling" ? "docling-index.json" : PARSED_INDEX_FILE);
 }
 
-export function parsedOutputPath(root: string, virtualPath: string): string {
+export function parsedOutputPath(root: string, virtualPath: string, backend?: "kordoc" | "docling"): string {
 	const digest = createHash("sha256").update(virtualPath).digest("hex");
-	return join(parsedMirrorRoot(root), PARSED_FILES_SUBDIR, `${digest}.md`);
+	return join(parsedMirrorRoot(root), backend === "docling" ? "docling-compat" : PARSED_FILES_SUBDIR, `${digest}.md`);
+}
+
+export function structuredOutputPath(root: string, virtualPath: string, revision: string): string {
+	const digest = createHash("sha256").update(virtualPath).update("\0").update(revision).digest("hex");
+	return join(parsedMirrorRoot(root), "structured", `${digest}.md`);
 }
 
 export function refreshReadinessPath(root: string): string {

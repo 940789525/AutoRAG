@@ -27,3 +27,7 @@ walk(root);
 for (const name of ["service.py", "qwen-model.json", "embedding-requirements.lock"]) {
 	copyFileSync(join("src", "embedding", name), join(root, name === "service.py" ? "embedding-service.py" : name));
 }
+
+for (const name of ["docling-worker.py", "docling-models.json"]) {
+	copyFileSync(join("src", "parser", name), join(root, "parser", name));
+}
