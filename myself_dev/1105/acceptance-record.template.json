@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "specVersion": "retrieval-admission-spec-v0.1",
+  "status": "NOT_RUN",
+  "mode": null,
+  "allowedModes": [
+    "fixture",
+    "replay",
+    "local-live",
+    "model-live"
+  ],
+  "implementationCommit": null,
+  "runId": null,
+  "startedAt": null,
+  "completedAt": null,
+  "environment": {
+    "provider": null,
+    "modelId": null,
+    "hardware": null,
+    "embeddingProfileFingerprint": null,
+    "indexGeneration": null,
+    "configHash": null,
+    "toolSchemaHash": null,
+    "systemPromptHash": null,
+    "qaRoot": null,
+    "realConfigHashBefore": null,
+    "realConfigHashAfter": null,
+    "remoteSyntheticFixtureAuthorization": null
+  },
+  "calibration": {
+    "policyVersion": null,
+    "artifactHash": null,
+    "corpusManifestHash": null,
+    "datasetSplitHash": null,
+    "supportedGroups": [],
+    "thresholds": null,
+    "holdoutWasUsedForTuning": null
+  },
+  "comparison": {
+    "arm": null,
+    "retrievalPolicy": null,
+    "filterMode": null,
+    "repetitions": null,
+    "samplingOrder": null,
+    "cacheCondition": null
+  },
+  "cases": [
+    {
+      "caseId": null,
+      "status": "NOT_RUN",
+      "reason": "Template only; no implementation or evaluation has run.",
+      "requirements": [],
+      "evidencePaths": [],
+      "metrics": {
+        "harnessPrefetchBeforeFirstRequest": null,
+        "retrievedCandidates": null,
+        "eligibleCandidates": null,
+        "rejectedCandidates": null,
+        "unsupportedCandidates": null,
+        "finalVisibleLocalBodies": null,
+        "historicalLocalBodies": null,
+        "newLocalBodyTokensEstimated": null,
+        "tokenEstimator": null,
+        "unrelatedLocalBodies": null,
+        "requiredEvidenceRecall": null,
+        "answerTaskSuccess": null,
+        "callsByScope": null,
+        "providerUsageRaw": null,
+        "normalizedUncachedInputTokens": null,
+        "cacheReadTokens": null,
+        "cacheWriteTokens": null,
+        "outputTokens": null,
+        "usageNormalizationRule": null,
+        "pricingSourceAndDate": null,
+        "totalCost": null,
+        "firstUsefulAnswerMs": null,
+        "totalLatencyMs": null,
+        "admissionCpuMs": null,
+        "commonPrefixTokens": null,
+        "prefixChangeReason": null
+      }
+    }
+  ],
+  "checks": [],
+  "cleanupReceipt": null,
+  "qualityDecision": null,
+  "costLatencyDecision": null,
+  "releaseDefaultDecision": null,
+  "reviewer": null
+}

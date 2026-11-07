@@ -1,0 +1,1970 @@
+{
+  "dataset": "2026-11-06-local-index-scenarios",
+  "code": "a34841f8",
+  "model": "deepseek/deepseek-flash",
+  "policy": "on-demand",
+  "client": "开发容器真实 Pi InteractiveMode；PTY 键入用户原话；隔离 HOME、配置和会话，permission-mode full；合成语料。",
+  "metricsDefinition": "wallSeconds 从送入用户输入至观察到搜索完成、路由澄清或索引任务终态；包含终端事件轮询。token 分未缓存输入、缓存读取、缓存写入、输出，按独立模型 scope 汇总。无报告的错误记为 null，不计作已报告用量。",
+  "rawRoots": {
+    "main": "/tmp/autorag-index-examples-mw4lnlu1",
+    "contrasts": "/tmp/autorag-index-contrast-mw4lqyp4"
+  },
+  "baseline": {
+    "sourceFiles": [
+      "会议记录.md",
+      "值班手册.md",
+      "新增纪要.md",
+      "青岚交接.md",
+      "项目计划.md"
+    ],
+    "members": [
+      "/docs/会议记录.md",
+      "/docs/值班手册.md",
+      "/docs/青岚交接.md",
+      "/docs/项目计划.md"
+    ],
+    "jobs": {
+      "5d39f234-59d6-42cc-bb44-bd7158ba4bb9": {
+        "mode": "build",
+        "state": "succeeded",
+        "embeddingProfile": "local-qwen3",
+        "startedAt": "2026-11-06T06:34:55.243Z",
+        "updatedAt": "2026-11-06T06:34:57.709Z",
+        "error": null,
+        "report": {
+          "documents": 4,
+          "unchanged": 0,
+          "embedded": 8,
+          "failures": []
+        }
+      }
+    },
+    "recordedUTC": "2026-11-06T06:34:58.130442+00:00",
+    "model": "deepseek-flash"
+  },
+  "contrastBaseline": {
+    "sourceFiles": [
+      "会议记录.md",
+      "值班手册.md",
+      "新增纪要.md",
+      "青岚交接.md",
+      "项目计划.md"
+    ],
+    "members": [
+      "/docs/会议记录.md",
+      "/docs/值班手册.md",
+      "/docs/青岚交接.md",
+      "/docs/项目计划.md"
+    ],
+    "jobs": {
+      "ba842468-3749-4b55-b04d-62f307041734": {
+        "mode": "build",
+        "state": "succeeded",
+        "embeddingProfile": "local-qwen3",
+        "startedAt": "2026-11-06T06:37:23.452Z",
+        "updatedAt": "2026-11-06T06:37:25.201Z",
+        "error": null,
+        "report": {
+          "documents": 4,
+          "unchanged": 0,
+          "embedded": 8,
+          "failures": []
+        }
+      }
+    },
+    "recordedUTC": "2026-11-06T06:37:26.407362+00:00",
+    "model": "deepseek-flash"
+  },
+  "turns": [
+    {
+      "id": "C1.1",
+      "input": "我的本地资料库里现在有几份资料？已经收录几份，还差几份？",
+      "submittedUTC": "2026-11-06T06:35:01.332938+00:00",
+      "wallSeconds": 3.24,
+      "terminalState": "answer_terminal",
+      "correctness": "PASS",
+      "reason": "答出共 5、已登记 4、缺 1。",
+      "finalAnswer": "**本地资料库共有 5 份资料，其中已收录索引 4 份，还差 1 份未收录。**\n\n- 资料库文件总数：**5 份**，清点完整，没有遗漏或扫描中断 [e1]。\n- 已注册进索引：**4 份**，包括 会议记录.md、值班手册.md、青岚交接.md、项目计划.md [e1]。\n- 未收录：**1 份**，即 **新增纪要.md**，目前尚未注册，语义检索暂时搜不到它 [e1]。\n- 当前生效索引使用的嵌入配置为 **local-qwen3**，构建任务状态为 succeeded [e1]。\n\n如果你的需要，我可以把这 1 份补进索引。",
+      "indexNotices": [],
+      "modelUsage": {
+        "index_intent": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        },
+        "answer_session": {
+          "calls": 2,
+          "stopReasons": [
+            "toolUse",
+            "stop"
+          ],
+          "reported": 2,
+          "inputTokens": 491,
+          "outputTokens": 293,
+          "cacheReadTokens": 27520,
+          "cacheWriteTokens": 0
+        },
+        "jev": {
+          "calls": 1,
+          "stopReasons": [
+            "error"
+          ],
+          "reported": 0,
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "cacheWriteTokens": null
+        },
+        "query_decomposition": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        }
+      },
+      "tools": [
+        {
+          "name": "manage_local_index",
+          "args": {
+            "operation": "status",
+            "includeFiles": true,
+            "i": "确认本地资料库的文件总数与索引收录情况"
+          },
+          "isError": false,
+          "coverage": {
+            "files": [
+              {
+                "id": "/docs/会议记录.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/值班手册.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/新增纪要.md",
+                "status": "unregistered"
+              },
+              {
+                "id": "/docs/青岚交接.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/项目计划.md",
+                "status": "registered"
+              }
+            ],
+            "total": 5,
+            "registered": 4,
+            "complete": true,
+            "diagnostics": []
+          },
+          "job": {
+            "jobId": "5d39f234-59d6-42cc-bb44-bd7158ba4bb9",
+            "state": "succeeded",
+            "mode": "build"
+          },
+          "activeIndex": {
+            "embeddingProfile": "local-qwen3",
+            "ready": true
+          }
+        }
+      ],
+      "registeredBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "registeredAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "jobsBefore": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "jobsAfter": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "changedJobs": {},
+      "sessionFile": [
+        "2026-11-06T06-35-01-155Z_01a1af91-5aa1-71f2-b66c-19c5e1d52073.jsonl"
+      ],
+      "answerRunIds": [
+        "34adbf15-ce5b-4e19-8ca9-75c4d87c5940"
+      ],
+      "rawRunSHA256": "ba4583592f4daee0301a70ef436923e43d6367d7050163c30c2cb1eea85adad1",
+      "rawSessionSHA256": "6bb7ee80354b7b789fd9fa679cfd512b0b4acfb06709b502d713df7fc2f03289",
+      "terminalSHA256": "fde5e53e93da39173ea340390043e7e39b3b4e89f8ff67414e71d9c90653fb0d"
+    },
+    {
+      "id": "C1.2",
+      "input": "那差的那份叫什么？",
+      "submittedUTC": "2026-11-06T06:35:04.879083+00:00",
+      "wallSeconds": 1.6,
+      "terminalState": "answer_terminal",
+      "correctness": "PASS",
+      "reason": "同会话指出新增纪要.md；没有再次调用工具。",
+      "finalAnswer": "**还差的那份叫 `新增纪要.md`。**\n\n- 它是本地资料库中唯一处于 **unregistered**（未注册）状态的文件，因此尚未收录进索引，语义检索目前搜不到它的内容 [e1]。",
+      "indexNotices": [],
+      "modelUsage": {
+        "index_intent": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        },
+        "answer_session": {
+          "calls": 1,
+          "stopReasons": [
+            "stop"
+          ],
+          "reported": 1,
+          "inputTokens": 143,
+          "outputTokens": 74,
+          "cacheReadTokens": 14208,
+          "cacheWriteTokens": 0
+        },
+        "jev": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        },
+        "query_decomposition": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        }
+      },
+      "tools": [],
+      "registeredBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "registeredAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "jobsBefore": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "jobsAfter": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "changedJobs": {},
+      "sessionFile": [
+        "2026-11-06T06-35-01-155Z_01a1af91-5aa1-71f2-b66c-19c5e1d52073.jsonl"
+      ],
+      "answerRunIds": [
+        "659459d5-dd7a-4088-ab01-444a25206e8c"
+      ],
+      "rawRunSHA256": "ba4583592f4daee0301a70ef436923e43d6367d7050163c30c2cb1eea85adad1",
+      "rawSessionSHA256": "6bb7ee80354b7b789fd9fa679cfd512b0b4acfb06709b502d713df7fc2f03289",
+      "terminalSHA256": "fde5e53e93da39173ea340390043e7e39b3b4e89f8ff67414e71d9c90653fb0d"
+    },
+    {
+      "id": "C2.1",
+      "input": "只告诉我哪些本地文件还没进库，已经进库的不用列。",
+      "submittedUTC": "2026-11-06T06:35:01.307798+00:00",
+      "wallSeconds": 3.2,
+      "terminalState": "answer_terminal",
+      "correctness": "PASS",
+      "reason": "仅列出新增纪要.md，提及其余已登记数量但没有列出它们。",
+      "finalAnswer": "还有 **1 个**本地文件尚未进入索引，其余 4 个已进库。\n\n- **/docs/新增纪要.md** — 状态为 `unregistered`，即尚未被索引收录。\n\n覆盖扫描已完成，没有扫描不完整或状态未知的情况。",
+      "indexNotices": [],
+      "modelUsage": {
+        "index_intent": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        },
+        "answer_session": {
+          "calls": 2,
+          "stopReasons": [
+            "toolUse",
+            "stop"
+          ],
+          "reported": 2,
+          "inputTokens": 594,
+          "outputTokens": 169,
+          "cacheReadTokens": 27392,
+          "cacheWriteTokens": 0
+        },
+        "jev": {
+          "calls": 1,
+          "stopReasons": [
+            "error"
+          ],
+          "reported": 0,
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "cacheWriteTokens": null
+        },
+        "query_decomposition": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        }
+      },
+      "tools": [
+        {
+          "name": "manage_local_index",
+          "args": {
+            "operation": "status",
+            "includeFiles": true,
+            "i": "로컬 파일 중 인덱스에 아직 등록되지 않은 파일만 확인"
+          },
+          "isError": false,
+          "coverage": {
+            "files": [
+              {
+                "id": "/docs/会议记录.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/值班手册.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/新增纪要.md",
+                "status": "unregistered"
+              },
+              {
+                "id": "/docs/青岚交接.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/项目计划.md",
+                "status": "registered"
+              }
+            ],
+            "total": 5,
+            "registered": 4,
+            "complete": true,
+            "diagnostics": []
+          },
+          "job": {
+            "jobId": "5d39f234-59d6-42cc-bb44-bd7158ba4bb9",
+            "state": "succeeded",
+            "mode": "build"
+          },
+          "activeIndex": {
+            "embeddingProfile": "local-qwen3",
+            "ready": true
+          }
+        }
+      ],
+      "registeredBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "registeredAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "jobsBefore": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "jobsAfter": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "changedJobs": {},
+      "sessionFile": [
+        "2026-11-06T06-35-01-135Z_01a1af91-5a8e-73b5-a78c-4a82067d1307.jsonl"
+      ],
+      "answerRunIds": [
+        "67a411b4-a08c-46c5-9841-d2bcd7fb7b76"
+      ],
+      "rawRunSHA256": "49b7d9f7b88351622433ecf4a74f5f8f9cdfb658414d8d5d5427773a1d1d034c",
+      "rawSessionSHA256": "521766b7e256d067e34e2b8eeadf5f017728d3545fc148bcc731c0fc486119d6",
+      "terminalSHA256": "439b9bfba999db328982cf8b9d738eca55f36e028e81cb62f447955f7a45391c"
+    },
+    {
+      "id": "C3.1",
+      "input": "会议记录.md 和 新增纪要.md 都已经建好索引了吗？请分别回答。",
+      "submittedUTC": "2026-11-06T06:35:01.335428+00:00",
+      "wallSeconds": 5.81,
+      "terminalState": "answer_terminal",
+      "correctness": "PASS",
+      "reason": "分别指出会议记录.md 已登记、新增纪要.md 未登记。",
+      "finalAnswer": "**会议记录.md 已建好索引，新增纪要.md 尚未建索引。**\n\n- **会议记录.md**:状态为 **registered**,已在当前活动索引(local-qwen3)中注册。\n- **新增纪要.md**:状态为 **unregistered**,文件存在但尚未登记进索引,需要刷新建索引后才能被检索到。\n- 索引扫描已完成(5 个文件中 4 个已注册),无异常诊断项。",
+      "indexNotices": [],
+      "modelUsage": {
+        "index_intent": {
+          "calls": 1,
+          "stopReasons": [
+            "stop"
+          ],
+          "reported": 1,
+          "inputTokens": 288,
+          "outputTokens": 105,
+          "cacheReadTokens": 128,
+          "cacheWriteTokens": 0
+        },
+        "answer_session": {
+          "calls": 2,
+          "stopReasons": [
+            "toolUse",
+            "stop"
+          ],
+          "reported": 2,
+          "inputTokens": 509,
+          "outputTokens": 239,
+          "cacheReadTokens": 27520,
+          "cacheWriteTokens": 0
+        },
+        "jev": {
+          "calls": 1,
+          "stopReasons": [
+            "error"
+          ],
+          "reported": 0,
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "cacheWriteTokens": null
+        },
+        "query_decomposition": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        }
+      },
+      "tools": [
+        {
+          "name": "manage_local_index",
+          "args": {
+            "operation": "status",
+            "includeFiles": true,
+            "i": "确认 会议记录.md 和 新增纪要.md 是否已在索引中注册"
+          },
+          "isError": false,
+          "coverage": {
+            "files": [
+              {
+                "id": "/docs/会议记录.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/值班手册.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/新增纪要.md",
+                "status": "unregistered"
+              },
+              {
+                "id": "/docs/青岚交接.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/项目计划.md",
+                "status": "registered"
+              }
+            ],
+            "total": 5,
+            "registered": 4,
+            "complete": true,
+            "diagnostics": []
+          },
+          "job": {
+            "jobId": "5d39f234-59d6-42cc-bb44-bd7158ba4bb9",
+            "state": "succeeded",
+            "mode": "build"
+          },
+          "activeIndex": {
+            "embeddingProfile": "local-qwen3",
+            "ready": true
+          }
+        }
+      ],
+      "registeredBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "registeredAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "jobsBefore": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "jobsAfter": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "changedJobs": {},
+      "sessionFile": [
+        "2026-11-06T06-35-01-156Z_01a1af91-5aa3-73f1-9a8a-09075b497b0c.jsonl"
+      ],
+      "answerRunIds": [
+        "7bdf1616-4cbd-4bf5-98c5-66f4f74c5944"
+      ],
+      "rawRunSHA256": "8b56071c0e4a514966d99b0495198de2aa46335142bdb0e79af0eba252bf74c2",
+      "rawSessionSHA256": "f680ad3ef8cf8ac5e034940cf767458d53b43de11a154be079dbcd049587ae3f",
+      "terminalSHA256": "eda96ca2b8f81a70e659c635fa1b47c01cde057c86f9d846ea9fabd3b1d9d506"
+    },
+    {
+      "id": "C4.1",
+      "input": "上一次索引任务明明显示成功，现在目录里的文件是不是就都收录了？",
+      "submittedUTC": "2026-11-06T06:35:07.983583+00:00",
+      "wallSeconds": 6.25,
+      "terminalState": "answer_terminal",
+      "correctness": "PASS",
+      "reason": "识别任务成功与当前目录全覆盖的区别，正确点出缺项。",
+      "finalAnswer": "**并非如此：目录里共 **5** 个文件，只有 **4** 个已收录；`新增纪要.md` 仍处于未登记状态，因此内容检索不到。**\n\n- 上次任务（jobId `5d39f234-…`，mode: build）的状态确实是 **succeeded**，当前活动索引也已就绪（embedding 配置 `local-qwen3`）。\n- 覆盖统计：**total 5 / registered 4**，未收录 1 个。\n- 未收录文件：**`新增纪要.md`**（状态 `unregistered`），它是在那次建索引之后才出现或被修改的文件。\n- 其余 **4** 个（`会议记录.md`、`值班手册.md`、`青岚交接.md`、`项目计划.md`）均为 `registered`，扫描本身完整、无诊断异常。\n- “任务成功”只说明那一次建索引在当时的文件集上跑完了，并不表示之后新增或改动的文件会自动进入索引；需要再做一次 refresh 或增量索引，才能把它补进来。\n\n如果你需要我立即重新索引把这份纪要补上，告诉我一声即可（索引写入需要你明确的索引指令）。",
+      "indexNotices": [],
+      "modelUsage": {
+        "index_intent": {
+          "calls": 1,
+          "stopReasons": [
+            "stop"
+          ],
+          "reported": 1,
+          "inputTokens": 285,
+          "outputTokens": 140,
+          "cacheReadTokens": 128,
+          "cacheWriteTokens": 0
+        },
+        "answer_session": {
+          "calls": 2,
+          "stopReasons": [
+            "toolUse",
+            "stop"
+          ],
+          "reported": 2,
+          "inputTokens": 487,
+          "outputTokens": 562,
+          "cacheReadTokens": 27520,
+          "cacheWriteTokens": 0
+        },
+        "jev": {
+          "calls": 1,
+          "stopReasons": [
+            "error"
+          ],
+          "reported": 0,
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "cacheWriteTokens": null
+        },
+        "query_decomposition": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        }
+      },
+      "tools": [
+        {
+          "name": "manage_local_index",
+          "args": {
+            "operation": "status",
+            "includeFiles": true,
+            "i": "检查索引覆盖情况，确认目录文件是否全部收录"
+          },
+          "isError": false,
+          "coverage": {
+            "files": [
+              {
+                "id": "/docs/会议记录.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/值班手册.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/新增纪要.md",
+                "status": "unregistered"
+              },
+              {
+                "id": "/docs/青岚交接.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/项目计划.md",
+                "status": "registered"
+              }
+            ],
+            "total": 5,
+            "registered": 4,
+            "complete": true,
+            "diagnostics": []
+          },
+          "job": {
+            "jobId": "5d39f234-59d6-42cc-bb44-bd7158ba4bb9",
+            "state": "succeeded",
+            "mode": "build"
+          },
+          "activeIndex": {
+            "embeddingProfile": "local-qwen3",
+            "ready": true
+          }
+        }
+      ],
+      "registeredBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "registeredAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "jobsBefore": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "jobsAfter": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "changedJobs": {},
+      "sessionFile": [
+        "2026-11-06T06-35-07-785Z_01a1af91-7487-77f4-960b-90677085ea53.jsonl"
+      ],
+      "answerRunIds": [
+        "3df79bec-0d66-46f1-aa12-4f6c12e880d3"
+      ],
+      "rawRunSHA256": "3016d534f82a8d9caf687d98d06648c44e674afcdea484d7f39f1e14c769bc1e",
+      "rawSessionSHA256": "93162917cf423b6ff4f2aba6992e3525c9c2c87d5666313ce0cc869c1a7938a8",
+      "terminalSHA256": "41ff33e648e1ab06a026d333ba4dc5ea0c0f0b2831fd452a456622993c968651"
+    },
+    {
+      "id": "C5.1",
+      "input": "我不是让你重新建立索引，只想确认一下：现在漏了哪份文件？",
+      "submittedUTC": "2026-11-06T06:35:10.420120+00:00",
+      "wallSeconds": 5.2,
+      "terminalState": "answer_terminal",
+      "correctness": "PASS",
+      "reason": "正确理解否定和查现状，没有执行索引操作。",
+      "finalAnswer": "**目前漏掉的文件只有一份：`新增纪要.md`。**\n\n- 在本次索引范围内，共有 **5** 份文件，其中 **4** 份已经注册，**1** 份未注册，也就是 `新增纪要.md` [e1]。\n- 其余 4 份都已注册，分别是：`会议记录.md`、`值班手册.md`、`青岚交接.md`、`项目计划.md`。\n- 本次扫描已经完整结束，没有报出任何异常，所以未注册的 `新增纪要.md` 就是唯一的遗漏项。\n\n索引本身仍处于可用状态。是否要把它补进索引，等你明确同意后再处理。",
+      "indexNotices": [],
+      "modelUsage": {
+        "index_intent": {
+          "calls": 1,
+          "stopReasons": [
+            "stop"
+          ],
+          "reported": 1,
+          "inputTokens": 285,
+          "outputTokens": 97,
+          "cacheReadTokens": 128,
+          "cacheWriteTokens": 0
+        },
+        "answer_session": {
+          "calls": 2,
+          "stopReasons": [
+            "toolUse",
+            "stop"
+          ],
+          "reported": 2,
+          "inputTokens": 561,
+          "outputTokens": 371,
+          "cacheReadTokens": 27520,
+          "cacheWriteTokens": 0
+        },
+        "jev": {
+          "calls": 1,
+          "stopReasons": [
+            "error"
+          ],
+          "reported": 0,
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "cacheWriteTokens": null
+        },
+        "query_decomposition": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        }
+      },
+      "tools": [
+        {
+          "name": "manage_local_index",
+          "args": {
+            "operation": "status",
+            "includeFiles": true,
+            "i": "인덱스 등록 현황과 누락 파일을 확인"
+          },
+          "isError": false,
+          "coverage": {
+            "files": [
+              {
+                "id": "/docs/会议记录.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/值班手册.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/新增纪要.md",
+                "status": "unregistered"
+              },
+              {
+                "id": "/docs/青岚交接.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/项目计划.md",
+                "status": "registered"
+              }
+            ],
+            "total": 5,
+            "registered": 4,
+            "complete": true,
+            "diagnostics": []
+          },
+          "job": {
+            "jobId": "5d39f234-59d6-42cc-bb44-bd7158ba4bb9",
+            "state": "succeeded",
+            "mode": "build"
+          },
+          "activeIndex": {
+            "embeddingProfile": "local-qwen3",
+            "ready": true
+          }
+        }
+      ],
+      "registeredBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "registeredAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "jobsBefore": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "jobsAfter": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "changedJobs": {},
+      "sessionFile": [
+        "2026-11-06T06-35-10-250Z_01a1af91-7e29-72ab-aeed-3bbe713d1eb3.jsonl"
+      ],
+      "answerRunIds": [
+        "7eb0a9d7-4f45-4907-b742-5af1d824eac5"
+      ],
+      "rawRunSHA256": "b1909fe9a87fc2bf5a3a473e25647ccdb45aa5df2f1244f762bde536696b97fa",
+      "rawSessionSHA256": "a3aa2b101796c777ab236d09c7287f3309a1a276d0f037f139fc3eca8f481339",
+      "terminalSHA256": "ab0de39863e8aca3fa8ca41348319ba9b63e81c278f81dca3faa04d22ff44c1a"
+    },
+    {
+      "id": "C6.1",
+      "input": "本地索引数据库现在是就绪的，还是还在构建？最近一次任务是什么状态？",
+      "submittedUTC": "2026-11-06T06:35:11.012074+00:00",
+      "wallSeconds": 6.43,
+      "terminalState": "answer_terminal",
+      "correctness": "PASS",
+      "reason": "索引 ready、最近 build succeeded；正文使用韩语，未跟随中文提问。",
+      "finalAnswer": "**로컬 인덱스는 이미 준비 완료 상태이고, 최근 작업도 성공(succeeded)으로 끝났습니다.**\n\n- 활성 인덱스는 임베딩 프로필 **local-qwen3**(Qwen/Qwen3-Embedding-0.6B)로 **ready: true** 입니다 [e1].\n- 최근 작업은 **build** 모드이며 상태 **succeeded**, 단계는 **done** 으로 종료됐습니다 [e1].\n- 실행 시각은 **2026-11-06 06:34:55Z 시작 → 06:34:57Z 종료**(약 **2.0초**)입니다 [e1].\n- 처리 결과는 문서 **4건**, 청크 **8개**(신규 임베딩 8, 재사용 0, 변경 없음 0, 삭제 0), **실패 없음**입니다 [e1].",
+      "indexNotices": [],
+      "modelUsage": {
+        "index_intent": {
+          "calls": 1,
+          "stopReasons": [
+            "stop"
+          ],
+          "reported": 1,
+          "inputTokens": 286,
+          "outputTokens": 100,
+          "cacheReadTokens": 128,
+          "cacheWriteTokens": 0
+        },
+        "answer_session": {
+          "calls": 2,
+          "stopReasons": [
+            "toolUse",
+            "stop"
+          ],
+          "reported": 2,
+          "inputTokens": 1131,
+          "outputTokens": 387,
+          "cacheReadTokens": 27392,
+          "cacheWriteTokens": 0
+        },
+        "jev": {
+          "calls": 1,
+          "stopReasons": [
+            "error"
+          ],
+          "reported": 0,
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "cacheWriteTokens": null
+        },
+        "query_decomposition": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        }
+      },
+      "tools": [
+        {
+          "name": "manage_local_index",
+          "args": {
+            "operation": "status",
+            "i": "로컬 인덱스가 준비 완료인지, 최근 작업 상태가 어떤지 확인"
+          },
+          "isError": false,
+          "coverage": null,
+          "job": {
+            "jobId": "5d39f234-59d6-42cc-bb44-bd7158ba4bb9",
+            "state": "succeeded",
+            "mode": "build"
+          },
+          "activeIndex": {
+            "embeddingProfile": "local-qwen3",
+            "ready": true
+          }
+        }
+      ],
+      "registeredBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "registeredAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "jobsBefore": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "jobsAfter": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "changedJobs": {},
+      "sessionFile": [
+        "2026-11-06T06-35-10-785Z_01a1af91-8040-7403-81a6-f1b33e04a569.jsonl"
+      ],
+      "answerRunIds": [
+        "080771df-d521-401a-94c0-2d6559213429"
+      ],
+      "rawRunSHA256": "e807116641641d83121dfdb4bb8628afdcec63005a5540e16285015865db0b74",
+      "rawSessionSHA256": "ca42e454f738c6ca09e50b9e8b37d0c7e38eb9c3d5125bebcd75d70ffa57a5bb",
+      "terminalSHA256": "2d67bd5c0b45bd6fc8526e8db9afe2f502e674a05b70614e83795ed9c14a8728"
+    },
+    {
+      "id": "C7.1",
+      "input": "预算草案.md 现在是什么情况：文件在目录里但没收录，还是目录里根本没有？",
+      "submittedUTC": "2026-11-06T06:35:21.114593+00:00",
+      "wallSeconds": 4.88,
+      "terminalState": "answer_terminal",
+      "correctness": "PASS",
+      "reason": "正确指出预算草案.md 在当前范围内不存在。额外做了一次文件名搜索。",
+      "finalAnswer": "**预算草案.md 在目录里根本不存在：当前授权目录下共 5 个文件，其中没有这个文件，因此它并不属于“文件存在但没被收录”的情况。**\n\n- 索引清点显示目录内实际文件为 **会议记录.md、值班手册.md、新增纪要.md、青岚交接.md、项目计划.md**，共 **5 个**，扫描完整（complete: true）[e1]。\n- 这 5 个文件中，**4 个已收录**（registered），只有 **新增纪要.md** 状态为未收录（unregistered）[e1]。\n- 文件名检索同样没有找到任何名为“预算草案”的文件，也就是说，它不在当前配置的搜索范围内。\n\n如果需要，我可以把这几个已存在的文件读出来，确认是否其中之一才是你要找的预算稿件（比如被命名成了别的名字）；另外，新增纪要.md 目前也没进索引，若需要收录需要走一次索引更新。\n\n当前答不完整之处：由于该文件本身不存在于目录中，无法判断它是否曾存在过或被改名过。",
+      "indexNotices": [],
+      "modelUsage": {
+        "index_intent": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        },
+        "answer_session": {
+          "calls": 2,
+          "stopReasons": [
+            "toolUse",
+            "stop"
+          ],
+          "reported": 2,
+          "inputTokens": 611,
+          "outputTokens": 564,
+          "cacheReadTokens": 27520,
+          "cacheWriteTokens": 0
+        },
+        "jev": {
+          "calls": 1,
+          "stopReasons": [
+            "error"
+          ],
+          "reported": 0,
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "cacheWriteTokens": null
+        },
+        "query_decomposition": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        }
+      },
+      "tools": [
+        {
+          "name": "manage_local_index",
+          "args": {
+            "operation": "status",
+            "includeFiles": true,
+            "i": "预算草案.md 的索引收录状态"
+          },
+          "isError": false,
+          "coverage": {
+            "files": [
+              {
+                "id": "/docs/会议记录.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/值班手册.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/新增纪要.md",
+                "status": "unregistered"
+              },
+              {
+                "id": "/docs/青岚交接.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/项目计划.md",
+                "status": "registered"
+              }
+            ],
+            "total": 5,
+            "registered": 4,
+            "complete": true,
+            "diagnostics": []
+          },
+          "job": {
+            "jobId": "5d39f234-59d6-42cc-bb44-bd7158ba4bb9",
+            "state": "succeeded",
+            "mode": "build"
+          },
+          "activeIndex": {
+            "embeddingProfile": "local-qwen3",
+            "ready": true
+          }
+        },
+        {
+          "name": "fsearch_search",
+          "args": {
+            "query": "预算草案",
+            "i": "查找名为预算草案的文件"
+          },
+          "isError": false,
+          "toolText": "FSearch slow filesystem walk (fsearch-cli unavailable) found no files or folders matching: 预算草案\nfsearch-cli is unavailable (fsearch-cli --version exit null: fsearch-cli: spawn fsearch-cli ENOENT); answered with a slow filesystem walk over the configured search folders."
+        }
+      ],
+      "registeredBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "registeredAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "jobsBefore": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "jobsAfter": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "changedJobs": {},
+      "sessionFile": [
+        "2026-11-06T06-35-20-943Z_01a1af91-a7ed-77aa-93f8-bf0962f4e314.jsonl"
+      ],
+      "answerRunIds": [
+        "dec3e190-1fb6-4d53-8cf6-4b052d86c792"
+      ],
+      "rawRunSHA256": "9a6469f55051c87603c42dff71eb9cab78a001148fabd8f3b0b7a98b22c4378b",
+      "rawSessionSHA256": "92aba56f9b6b23c70f69a07612075f58ad8d82aad3e78077694e1f550a46380c",
+      "terminalSHA256": "ce7f6cc3a3f411a3d998a71f5fe12ed422bf6c27e76297affed24589ead6e942"
+    },
+    {
+      "id": "compound.1",
+      "input": "当前本地资料库里有哪些文件，各自的索引状态怎么样？",
+      "submittedUTC": "2026-11-06T06:35:28.873279+00:00",
+      "wallSeconds": 4.83,
+      "terminalState": "answer_terminal",
+      "correctness": "PASS",
+      "reason": "列全 5 个文件，状态与活动索引逐项一致。",
+      "finalAnswer": "**本地资料库共有 5 个文件，其中 4 个已建立索引，1 个尚未收录进索引。**\n\n| 文件 | 索引状态 |\n|---|---|\n| 会议记录.md | 已注册（registered） |\n| 值班手册.md | 已注册（registered） |\n| 新增纪要.md | **未注册（unregistered）** |\n| 青岚交接.md | 已注册（registered） |\n| 项目计划.md | 已注册（registered） |\n\n- 当前启用的索引已完成构建，状态为 **succeeded**，嵌入配置为 **local-qwen3**，索引处于可用状态。\n- 本次共有 **5** 个文件参与清点，其中 **4** 个已登记，清点过程完整（complete），没有诊断异常。\n- 唯一遗漏的是 **新增纪要.md**，它尚未进入索引，因此暂时无法被检索到；如需让它可检索，需要执行一次索引刷新。",
+      "indexNotices": [],
+      "modelUsage": {
+        "index_intent": {
+          "calls": 1,
+          "stopReasons": [
+            "stop"
+          ],
+          "reported": 1,
+          "inputTokens": 280,
+          "outputTokens": 79,
+          "cacheReadTokens": 128,
+          "cacheWriteTokens": 0
+        },
+        "answer_session": {
+          "calls": 2,
+          "stopReasons": [
+            "toolUse",
+            "stop"
+          ],
+          "reported": 2,
+          "inputTokens": 583,
+          "outputTokens": 320,
+          "cacheReadTokens": 27392,
+          "cacheWriteTokens": 0
+        },
+        "jev": {
+          "calls": 1,
+          "stopReasons": [
+            "error"
+          ],
+          "reported": 0,
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "cacheWriteTokens": null
+        },
+        "query_decomposition": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        }
+      },
+      "tools": [
+        {
+          "name": "manage_local_index",
+          "args": {
+            "operation": "status",
+            "includeFiles": true,
+            "i": "查看本地索引整体状态与每个文件的注册情况"
+          },
+          "isError": false,
+          "coverage": {
+            "files": [
+              {
+                "id": "/docs/会议记录.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/值班手册.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/新增纪要.md",
+                "status": "unregistered"
+              },
+              {
+                "id": "/docs/青岚交接.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/项目计划.md",
+                "status": "registered"
+              }
+            ],
+            "total": 5,
+            "registered": 4,
+            "complete": true,
+            "diagnostics": []
+          },
+          "job": {
+            "jobId": "5d39f234-59d6-42cc-bb44-bd7158ba4bb9",
+            "state": "succeeded",
+            "mode": "build"
+          },
+          "activeIndex": {
+            "embeddingProfile": "local-qwen3",
+            "ready": true
+          }
+        }
+      ],
+      "registeredBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "registeredAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "jobsBefore": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "jobsAfter": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "changedJobs": {},
+      "sessionFile": [
+        "2026-11-06T06-35-28-672Z_01a1af91-c61f-71f4-9026-0989e4a0ecce.jsonl"
+      ],
+      "answerRunIds": [
+        "893d3ec4-6ae3-42ac-8885-bf140bcb3e0c"
+      ],
+      "rawRunSHA256": "84aa551c46e5191fdac687ac8ee54e205047f5d00eb4c633eb974183a8d91ff9",
+      "rawSessionSHA256": "79e3db16f6842dab9ca2a866bb5dc84bb18fc11db8b69e8722004aacb3016399",
+      "terminalSHA256": "4ba26c0177b21e91b00c282eca1b788bf302d18c70f58c350e76744238fb5a4d"
+    },
+    {
+      "id": "compound.2",
+      "input": "请把刚才漏掉的资料也建进本地索引，按当前配置做增量更新就好。",
+      "submittedUTC": "2026-11-06T06:35:34.006916+00:00",
+      "wallSeconds": 9.61,
+      "terminalState": "answer_terminal",
+      "correctness": "FAIL",
+      "reason": "如实报告失败，但请求的新文件未入库；本轮无新任务。",
+      "finalAnswer": "**索引写入未能执行：我这边发起的增量刷新被系统拒绝了，因为索引写入只能由你在 TUI 里用 `/index` 显式触发。**\n\n- 刷新请求返回了原话：`Index writes require an explicit TUI indexing request; use /index`，因此没有任何写入发生 [e1]。\n- 当前索引仍是原先的状态：配置 **local-qwen3**、可用，**5** 个文件中 **4** 个已登记 [e1]。\n- 唯一待补的仍是 **新增纪要.md（unregistered）**，其余 4 个（会议记录、值班手册、青岚交接、项目计划）已注册 [e1]。\n\n请你在 TUI 中输入 **`/index`** 发起增量索引；完成后我可以再帮你确认 `新增纪要.md` 是否转为 registered。",
+      "indexNotices": [
+        [
+          {
+            "type": "text",
+            "text": "Unexpected end of JSON input。索引意图识别失败，将原问题转入问答。"
+          }
+        ]
+      ],
+      "modelUsage": {
+        "index_intent": {
+          "calls": 1,
+          "stopReasons": [
+            "length"
+          ],
+          "reported": 1,
+          "inputTokens": 288,
+          "outputTokens": 512,
+          "cacheReadTokens": 128,
+          "cacheWriteTokens": 0
+        },
+        "answer_session": {
+          "calls": 3,
+          "stopReasons": [
+            "toolUse",
+            "toolUse",
+            "stop"
+          ],
+          "reported": 3,
+          "inputTokens": 638,
+          "outputTokens": 681,
+          "cacheReadTokens": 43648,
+          "cacheWriteTokens": 0
+        },
+        "jev": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        },
+        "query_decomposition": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        }
+      },
+      "tools": [
+        {
+          "name": "manage_local_index",
+          "args": {
+            "i": "按当前 local-qwen3 配置做增量刷新，补录新增纪要.md",
+            "operation": "refresh"
+          },
+          "isError": true,
+          "toolText": "Index writes require an explicit TUI indexing request; use /index"
+        },
+        {
+          "name": "manage_local_index",
+          "args": {
+            "i": "确认刷新未执行、新增纪要.md 仍未被索引",
+            "includeFiles": true,
+            "operation": "status"
+          },
+          "isError": false,
+          "coverage": {
+            "files": [
+              {
+                "id": "/docs/会议记录.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/值班手册.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/新增纪要.md",
+                "status": "unregistered"
+              },
+              {
+                "id": "/docs/青岚交接.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/项目计划.md",
+                "status": "registered"
+              }
+            ],
+            "total": 5,
+            "registered": 4,
+            "complete": true,
+            "diagnostics": []
+          },
+          "job": {
+            "jobId": "5d39f234-59d6-42cc-bb44-bd7158ba4bb9",
+            "state": "succeeded",
+            "mode": "build"
+          },
+          "activeIndex": {
+            "embeddingProfile": "local-qwen3",
+            "ready": true
+          }
+        }
+      ],
+      "registeredBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "registeredAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "jobsBefore": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "jobsAfter": [
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9"
+      ],
+      "changedJobs": {},
+      "sessionFile": [
+        "2026-11-06T06-35-28-672Z_01a1af91-c61f-71f4-9026-0989e4a0ecce.jsonl"
+      ],
+      "answerRunIds": [
+        "5f778a00-2b84-4ccc-a66b-cd55e2a5ce65"
+      ],
+      "rawRunSHA256": "84aa551c46e5191fdac687ac8ee54e205047f5d00eb4c633eb974183a8d91ff9",
+      "rawSessionSHA256": "79e3db16f6842dab9ca2a866bb5dc84bb18fc11db8b69e8722004aacb3016399",
+      "terminalSHA256": "4ba26c0177b21e91b00c282eca1b788bf302d18c70f58c350e76744238fb5a4d"
+    },
+    {
+      "id": "repeat.1",
+      "input": "当前本地资料库里有哪些文件，各自的索引状态怎么样？",
+      "submittedUTC": "2026-11-06T06:37:31.974246+00:00",
+      "wallSeconds": 4.72,
+      "terminalState": "answer_terminal",
+      "correctness": "PASS",
+      "reason": "在独立样本列全 5 个文件，正确识别唯一缺项。",
+      "finalAnswer": "**本地资料库共 5 个文件，其中 4 个已完成索引，1 个尚未注册：`/docs/新增纪要.md`。**\n\n- 当前生效的索引使用 **local-qwen3** 嵌入配置；索引已就绪，构建任务状态为 **succeeded（已成功）**，覆盖扫描是完整的，没有诊断告警。\n- 已注册索引的文件有 4 个：**会议记录.md、值班手册.md、青岚交接.md、项目计划.md**。\n- 未注册索引的文件有 1 个：**新增纪要.md**，它还没有进入索引，因此对它进行语义检索时看不到内容。\n\n如果想把这份文件也纳入检索，需要先重新刷新索引，之后它才会被检索到。",
+      "indexNotices": [],
+      "modelUsage": {
+        "index_intent": {
+          "calls": 1,
+          "stopReasons": [
+            "stop"
+          ],
+          "reported": 1,
+          "inputTokens": 152,
+          "outputTokens": 76,
+          "cacheReadTokens": 256,
+          "cacheWriteTokens": 0
+        },
+        "answer_session": {
+          "calls": 2,
+          "stopReasons": [
+            "toolUse",
+            "stop"
+          ],
+          "reported": 2,
+          "inputTokens": 469,
+          "outputTokens": 286,
+          "cacheReadTokens": 27517,
+          "cacheWriteTokens": 0
+        },
+        "jev": {
+          "calls": 1,
+          "stopReasons": [
+            "error"
+          ],
+          "reported": 0,
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "cacheWriteTokens": null
+        },
+        "query_decomposition": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        }
+      },
+      "tools": [
+        {
+          "name": "manage_local_index",
+          "args": {
+            "i": "로컬 자료 라이브러리 파일 목록과 각 파일의 인덱스 등록 상태를 확인",
+            "operation": "status",
+            "includeFiles": true
+          },
+          "isError": false,
+          "coverage": {
+            "files": [
+              {
+                "id": "/docs/会议记录.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/值班手册.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/新增纪要.md",
+                "status": "unregistered"
+              },
+              {
+                "id": "/docs/青岚交接.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/项目计划.md",
+                "status": "registered"
+              }
+            ],
+            "total": 5,
+            "registered": 4,
+            "complete": true,
+            "diagnostics": []
+          },
+          "job": {
+            "jobId": "ba842468-3749-4b55-b04d-62f307041734",
+            "state": "succeeded",
+            "mode": "build"
+          },
+          "activeIndex": {
+            "embeddingProfile": "local-qwen3",
+            "ready": true
+          }
+        }
+      ],
+      "registeredBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "registeredAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "jobsBefore": [
+        "ba842468-3749-4b55-b04d-62f307041734"
+      ],
+      "jobsAfter": [
+        "ba842468-3749-4b55-b04d-62f307041734"
+      ],
+      "changedJobs": {},
+      "sessionFile": [
+        "2026-11-06T06-37-31-736Z_01a1af93-a6d6-730d-932f-d9693568ab74.jsonl"
+      ],
+      "answerRunIds": [
+        "cc505956-f7d0-4517-b424-a66c9de49766"
+      ],
+      "rawRunSHA256": "204200e34aed1b36fe29f691022e7f0000b5a6ecfc528af40193568eb314c85b",
+      "rawSessionSHA256": "4c6e3aee512c02d4b8f400ea8c0bbce0de77a62f15b21b31a03a37c1869bc593",
+      "terminalSHA256": "21e53da4d5e5f9dd954bad068a6c9a724e6a6285c980af6af905b190257f611d"
+    },
+    {
+      "id": "repeat.2",
+      "input": "请把刚才漏掉的资料也建进本地索引，按当前配置做增量更新就好。",
+      "submittedUTC": "2026-11-06T06:37:36.998342+00:00",
+      "wallSeconds": 8.43,
+      "terminalState": "answer_terminal",
+      "correctness": "FAIL",
+      "reason": "同样的自然语言指代请求再次未能提交任务或补入文件。",
+      "finalAnswer": "**这次没能写入索引：索引写入必须由 TUI 侧的显式索引请求触发，我这一侧只读，无法代为建索引。**\n\n- 增量更新需要你在界面里执行 **`/index`** 命令，它才能写入索引；仅用命令行这边无法代为操作。\n- 我刚才的写入尝试被拒绝，随后复查的状态没有变化：仍是 **4/5 已注册**，**`/docs/新增纪要.md`** 依然为**未注册**。\n- 其余 4 个文件（**会议记录.md、值班手册.md、青岚交接.md、项目计划.md**）注册状态正常，生效的索引为 **local-qwen3**，构建任务 **succeeded**，覆盖完整、无诊断告警。\n\n执行 `/index` 后，这份纪要会按当前配置增量补入索引；需要的话我再帮你核对一次注册结果。",
+      "indexNotices": [
+        [
+          {
+            "type": "text",
+            "text": "Unexpected end of JSON input。索引意图识别失败，将原问题转入问答。"
+          }
+        ]
+      ],
+      "modelUsage": {
+        "index_intent": {
+          "calls": 1,
+          "stopReasons": [
+            "length"
+          ],
+          "reported": 1,
+          "inputTokens": 160,
+          "outputTokens": 512,
+          "cacheReadTokens": 256,
+          "cacheWriteTokens": 0
+        },
+        "answer_session": {
+          "calls": 3,
+          "stopReasons": [
+            "toolUse",
+            "toolUse",
+            "stop"
+          ],
+          "reported": 3,
+          "inputTokens": 588,
+          "outputTokens": 528,
+          "cacheReadTokens": 43264,
+          "cacheWriteTokens": 0
+        },
+        "jev": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        },
+        "query_decomposition": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        }
+      },
+      "tools": [
+        {
+          "name": "manage_local_index",
+          "args": {
+            "i": "미등록된 /docs/新增纪要.md를 포함해 현재 설정(local-qwen3)으로 증분 인덱싱 갱신 요청",
+            "operation": "refresh"
+          },
+          "isError": true,
+          "toolText": "Index writes require an explicit TUI indexing request; use /index"
+        },
+        {
+          "name": "manage_local_index",
+          "args": {
+            "i": "쓰기 요청이 거부된 뒤 인덱스 상태가 그대로인지 확인",
+            "operation": "status",
+            "includeFiles": true
+          },
+          "isError": false,
+          "coverage": {
+            "files": [
+              {
+                "id": "/docs/会议记录.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/值班手册.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/新增纪要.md",
+                "status": "unregistered"
+              },
+              {
+                "id": "/docs/青岚交接.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/项目计划.md",
+                "status": "registered"
+              }
+            ],
+            "total": 5,
+            "registered": 4,
+            "complete": true,
+            "diagnostics": []
+          },
+          "job": {
+            "jobId": "ba842468-3749-4b55-b04d-62f307041734",
+            "state": "succeeded",
+            "mode": "build"
+          },
+          "activeIndex": {
+            "embeddingProfile": "local-qwen3",
+            "ready": true
+          }
+        }
+      ],
+      "registeredBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "registeredAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "jobsBefore": [
+        "ba842468-3749-4b55-b04d-62f307041734"
+      ],
+      "jobsAfter": [
+        "ba842468-3749-4b55-b04d-62f307041734"
+      ],
+      "changedJobs": {},
+      "sessionFile": [
+        "2026-11-06T06-37-31-736Z_01a1af93-a6d6-730d-932f-d9693568ab74.jsonl"
+      ],
+      "answerRunIds": [
+        "35c76448-9fc7-41f3-80b9-4febf81c6582"
+      ],
+      "rawRunSHA256": "204200e34aed1b36fe29f691022e7f0000b5a6ecfc528af40193568eb314c85b",
+      "rawSessionSHA256": "4c6e3aee512c02d4b8f400ea8c0bbce0de77a62f15b21b31a03a37c1869bc593",
+      "terminalSHA256": "21e53da4d5e5f9dd954bad068a6c9a724e6a6285c980af6af905b190257f611d"
+    },
+    {
+      "id": "direct.1",
+      "input": "当前本地资料库里有哪些文件，各自的索引状态怎么样？",
+      "submittedUTC": "2026-11-06T06:37:32.089180+00:00",
+      "wallSeconds": 4.66,
+      "terminalState": "answer_terminal",
+      "correctness": "PASS",
+      "reason": "在独立样本正确指出 4/5 及新增纪要.md。",
+      "finalAnswer": "**本地资料库现在有 5 个文件，其中 4 个已经注册到索引，1 个还没有注册。**\n\n- 已注册：**会议记录.md**、**值班手册.md**、**青岚交接.md**、**项目计划.md**。\n- 未注册：**新增纪要.md**。这份文件没有被索引覆盖，所以按内容检索时拿不到它。\n- 当前使用的索引是 **local-qwen3** 向量配置，且状态为正常（ready），本次文件扫描已经完成，没有出现诊断异常。\n\n这几份文件共有 5 个，扫描覆盖完整，但注册状态只表示文件已经登记到索引，并不代表它们的内容是最新的。",
+      "indexNotices": [],
+      "modelUsage": {
+        "index_intent": {
+          "calls": 1,
+          "stopReasons": [
+            "stop"
+          ],
+          "reported": 1,
+          "inputTokens": 152,
+          "outputTokens": 68,
+          "cacheReadTokens": 256,
+          "cacheWriteTokens": 0
+        },
+        "answer_session": {
+          "calls": 2,
+          "stopReasons": [
+            "toolUse",
+            "stop"
+          ],
+          "reported": 2,
+          "inputTokens": 455,
+          "outputTokens": 258,
+          "cacheReadTokens": 27517,
+          "cacheWriteTokens": 0
+        },
+        "jev": {
+          "calls": 1,
+          "stopReasons": [
+            "error"
+          ],
+          "reported": 0,
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "cacheWriteTokens": null
+        },
+        "query_decomposition": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        }
+      },
+      "tools": [
+        {
+          "name": "manage_local_index",
+          "args": {
+            "operation": "status",
+            "includeFiles": true,
+            "i": "查看本地索引状态与文件注册情况，回答资料库文件清单"
+          },
+          "isError": false,
+          "coverage": {
+            "files": [
+              {
+                "id": "/docs/会议记录.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/值班手册.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/新增纪要.md",
+                "status": "unregistered"
+              },
+              {
+                "id": "/docs/青岚交接.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/项目计划.md",
+                "status": "registered"
+              }
+            ],
+            "total": 5,
+            "registered": 4,
+            "complete": true,
+            "diagnostics": []
+          },
+          "job": {
+            "jobId": "ba842468-3749-4b55-b04d-62f307041734",
+            "state": "succeeded",
+            "mode": "build"
+          },
+          "activeIndex": {
+            "embeddingProfile": "local-qwen3",
+            "ready": true
+          }
+        }
+      ],
+      "registeredBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "registeredAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "jobsBefore": [
+        "ba842468-3749-4b55-b04d-62f307041734"
+      ],
+      "jobsAfter": [
+        "ba842468-3749-4b55-b04d-62f307041734"
+      ],
+      "changedJobs": {},
+      "sessionFile": [
+        "2026-11-06T06-37-31-873Z_01a1af93-a75f-767c-8861-f6578ae18a87.jsonl"
+      ],
+      "answerRunIds": [
+        "ee5f514c-c498-4512-ade5-4e8925bbdcef"
+      ],
+      "rawRunSHA256": "09c191a5892c9dc7eee610d81748b35dc7563b581ce583cfcfe8bcd8b74d8e12",
+      "rawSessionSHA256": "47419bfc1897b732b90ffe68767b30b7092ef7f4030f846331f6953e79b91cf3",
+      "terminalSHA256": "24b01e79a54e8aae7f8b7896c83d6182a788cf95f6524a091e1ef8bdbc5769e4"
+    },
+    {
+      "id": "direct.2",
+      "input": "帮我建立索引",
+      "submittedUTC": "2026-11-06T06:37:37.048786+00:00",
+      "wallSeconds": 1.33,
+      "terminalState": "job_terminal",
+      "correctness": "PASS",
+      "reason": "真正发起一次 refresh 并成功，登记由 4 变为 5。",
+      "finalAnswer": null,
+      "indexNotices": [
+        [
+          {
+            "type": "text",
+            "text": "{\"operation\":\"refresh\",\"scope\":\"全部已配置本地目录\",\"job\":{\"version\":1,\"jobId\":\"122ad25d-e77d-485b-b779-8cb1bab9997e\",\"requestId\":\"e4f04f7e-d3b7-407d-983d-3a15749139a1\",\"configurationFingerprint\":\"bb1e23894cdca0b708d4cf8554dde8e8df1020eab712e20e7064cd97a7e8c900\",\"owner\":\"c953ba2e-6af9-4fc7-a653-f3473736ac5c\",\"pid\":738,\"birth\":\"ab90dd7c-7380-44c4-a26b-8a8a11494cc1:124391\",\"mode\":\"refresh\",\"embeddingProfile\":\"local-qwen3\",\"state\":\"queued\",\"startedAt\":\"2026-11-06T06:37:37.176Z\",\"updatedAt\":\"2026-11-06T06:37:37.176Z\"},\"activeIndex\":{\"embeddingProfile\":\"local-qwen3\",\"ready\":true}}"
+          }
+        ]
+      ],
+      "modelUsage": {
+        "index_intent": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        },
+        "answer_session": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        },
+        "jev": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        },
+        "query_decomposition": {
+          "calls": 0,
+          "stopReasons": [],
+          "reported": 0,
+          "inputTokens": 0,
+          "outputTokens": 0,
+          "cacheReadTokens": 0,
+          "cacheWriteTokens": 0
+        }
+      },
+      "tools": [],
+      "registeredBefore": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "registeredAfter": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/新增纪要.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "jobsBefore": [
+        "ba842468-3749-4b55-b04d-62f307041734"
+      ],
+      "jobsAfter": [
+        "ba842468-3749-4b55-b04d-62f307041734",
+        "122ad25d-e77d-485b-b779-8cb1bab9997e"
+      ],
+      "changedJobs": {
+        "122ad25d-e77d-485b-b779-8cb1bab9997e": {
+          "mode": "refresh",
+          "state": "succeeded",
+          "embeddingProfile": "local-qwen3",
+          "startedAt": "2026-11-06T06:37:37.176Z",
+          "updatedAt": "2026-11-06T06:37:38.378Z",
+          "error": null,
+          "report": {
+            "documents": 5,
+            "unchanged": 0,
+            "embedded": 2,
+            "failures": []
+          }
+        }
+      },
+      "sessionFile": [
+        "2026-11-06T06-37-31-873Z_01a1af93-a75f-767c-8861-f6578ae18a87.jsonl"
+      ],
+      "answerRunIds": [],
+      "rawRunSHA256": "09c191a5892c9dc7eee610d81748b35dc7563b581ce583cfcfe8bcd8b74d8e12",
+      "rawSessionSHA256": "47419bfc1897b732b90ffe68767b30b7092ef7f4030f846331f6953e79b91cf3",
+      "terminalSHA256": "24b01e79a54e8aae7f8b7896c83d6182a788cf95f6524a091e1ef8bdbc5769e4"
+    }
+  ],
+  "finalMembership": {
+    "main": {
+      "members": [
+        "/docs/会议记录.md",
+        "/docs/值班手册.md",
+        "/docs/青岚交接.md",
+        "/docs/项目计划.md"
+      ],
+      "jobs": {
+        "5d39f234-59d6-42cc-bb44-bd7158ba4bb9": {
+          "mode": "build",
+          "state": "succeeded",
+          "embeddingProfile": "local-qwen3",
+          "startedAt": "2026-11-06T06:34:55.243Z",
+          "updatedAt": "2026-11-06T06:34:57.709Z",
+          "error": null,
+          "report": {
+            "documents": 4,
+            "unchanged": 0,
+            "embedded": 8,
+            "failures": []
+          }
+        }
+      },
+      "sourceContentsUnchanged": true
+    },
+    "controls": {
+      "controls": {
+        "repeat": {
+          "turnCount": 2,
+          "members": [
+            "/docs/会议记录.md",
+            "/docs/值班手册.md",
+            "/docs/青岚交接.md",
+            "/docs/项目计划.md"
+          ],
+          "jobs": {
+            "ba842468-3749-4b55-b04d-62f307041734": {
+              "mode": "build",
+              "state": "succeeded",
+              "embeddingProfile": "local-qwen3",
+              "startedAt": "2026-11-06T06:37:23.452Z",
+              "updatedAt": "2026-11-06T06:37:25.201Z",
+              "error": null,
+              "report": {
+                "documents": 4,
+                "unchanged": 0,
+                "embedded": 8,
+                "failures": []
+              }
+            }
+          }
+        },
+        "direct": {
+          "turnCount": 2,
+          "members": [
+            "/docs/会议记录.md",
+            "/docs/值班手册.md",
+            "/docs/新增纪要.md",
+            "/docs/青岚交接.md",
+            "/docs/项目计划.md"
+          ],
+          "jobs": {
+            "ba842468-3749-4b55-b04d-62f307041734": {
+              "mode": "build",
+              "state": "succeeded",
+              "embeddingProfile": "local-qwen3",
+              "startedAt": "2026-11-06T06:37:23.452Z",
+              "updatedAt": "2026-11-06T06:37:25.201Z",
+              "error": null,
+              "report": {
+                "documents": 4,
+                "unchanged": 0,
+                "embedded": 8,
+                "failures": []
+              }
+            },
+            "122ad25d-e77d-485b-b779-8cb1bab9997e": {
+              "mode": "refresh",
+              "state": "succeeded",
+              "embeddingProfile": "local-qwen3",
+              "startedAt": "2026-11-06T06:37:37.176Z",
+              "updatedAt": "2026-11-06T06:37:38.378Z",
+              "error": null,
+              "report": {
+                "documents": 5,
+                "unchanged": 0,
+                "embedded": 2,
+                "failures": []
+              }
+            }
+          }
+        }
+      },
+      "sourceContentsUnchanged": true
+    }
+  },
+  "isolation": {
+    "main": {
+      "before": {
+        "config.json": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+        "config.fastembed.json": "716c12831b43095e4919bde13d079272106a28ffa0c25ccb1a4af32fddd91327"
+      },
+      "after": {
+        "config.json": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+        "config.fastembed.json": "716c12831b43095e4919bde13d079272106a28ffa0c25ccb1a4af32fddd91327"
+      },
+      "unchanged": true
+    },
+    "controls": {
+      "before": {
+        "config.json": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+        "config.fastembed.json": "716c12831b43095e4919bde13d079272106a28ffa0c25ccb1a4af32fddd91327"
+      },
+      "after": {
+        "config.json": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+        "config.fastembed.json": "716c12831b43095e4919bde13d079272106a28ffa0c25ccb1a4af32fddd91327"
+      },
+      "unchanged": true
+    }
+  }
+}

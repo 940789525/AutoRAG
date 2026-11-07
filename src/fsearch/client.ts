@@ -271,7 +271,6 @@ export class FSearchClient {
 	private readonly launch: FSearchLauncher;
 	private readonly isAlive: (pid: number) => boolean;
 	private readonly kill: (pid: number) => void;
-	private readonly isExcludedPath: (path: string) => boolean;
 	private readonly stateDir: string;
 	private readonly dbPath: string;
 	private readonly pidPath: string;
@@ -285,7 +284,6 @@ export class FSearchClient {
 		this.launch = options.launch ?? launchDetached;
 		this.isAlive = options.isProcessAlive ?? defaultIsProcessAlive;
 		this.kill = options.killProcess ?? ((pid) => process.kill(pid, "SIGTERM"));
-		this.isExcludedPath = createPathExclusionMatcher(options.excludeFolders ?? []);
 		this.stateDir = join(options.root, ".autorag", "fsearch");
 		this.dbPath = join(this.stateDir, "fsearch.db");
 		this.pidPath = join(this.stateDir, "watch.pid");
@@ -344,7 +342,7 @@ export class FSearchClient {
 			}
 			let entries = parsed.entries;
 			if (hasExclusions) {
-				const isExcluded = this.isExcludedPath;
+				const isExcluded = createPathExclusionMatcher(this.options.excludeFolders ?? []);
 				entries = entries.filter((entry) => !isExcluded(entry.path));
 			}
 			if (request.path !== undefined) {

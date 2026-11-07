@@ -1,6 +1,40 @@
 import { check, pick, type Question, type Verdict } from "jev-use";
 import type { JevJudge } from "./jev-extension.ts";
 
+export type RetrievalPolicy = "legacy" | "on-demand";
+
+export function normalizeRetrievalPolicy(value: unknown): RetrievalPolicy {
+	if (value === undefined || value === "legacy") return "legacy";
+	if (value === "on-demand") return value;
+	throw new Error("retrievalPolicy must be 'legacy' or 'on-demand'");
+}
+
+/** No calibrated relevance filter is available. Reject active modes rather than silently sending raw bodies. */
+export interface LocalEvidenceFilterConfig {
+	readonly mode?: "off";
+	readonly calibrationPath?: string;
+}
+export function normalizeLocalEvidenceFilter(value: unknown): LocalEvidenceFilterConfig | undefined {
+	if (value === undefined) return undefined;
+	if (!value || typeof value !== "object" || Array.isArray(value))
+		throw new Error("localEvidenceFilter must be an object");
+	const config = value as Record<string, unknown>;
+	for (const key of Object.keys(config)) {
+		if (key !== "mode" && key !== "calibrationPath") throw new Error(`Unknown localEvidenceFilter.${key}`);
+	}
+	if (config.mode !== undefined && config.mode !== "off")
+		throw new Error("localEvidenceFilter.mode must be 'off': local cosine admission has not passed calibration");
+	if (
+		config.calibrationPath !== undefined &&
+		(typeof config.calibrationPath !== "string" || !config.calibrationPath.trim())
+	)
+		throw new Error("localEvidenceFilter.calibrationPath must be a nonempty string");
+	return {
+		mode: "off",
+		...(typeof config.calibrationPath === "string" ? { calibrationPath: config.calibrationPath } : {}),
+	};
+}
+
 /**
  * Where a user question is answered from:
  * - `local`: anything needing information beyond the model's own knowledge —
@@ -104,7 +138,7 @@ const BASE_ROUTE_OPTIONS: Record<Exclude<QueryRoute, "config">, string> = {
 };
 
 const CONFIG_ROUTE_OPTION =
-	"The user asks to view, change, or test the settings of this AutoRAG agent itself: its model, model providers, API-key environment variables, Jev routing, search roots, or datasource setup (config.json). It also covers everything about the assistant's file-triggered automations (자동화, 폴더 감시, 파일 기반 규칙): creating, listing, showing status or the last run of, editing, testing, deleting, or turning on or off the automation rules and the background daemon that run a command or an AutoRAG task by themselves whenever files in a folder are created, changed, or deleted (for example 'when a PDF lands in Downloads, summarize it', '새 파일이 생기면 자동으로 ... 해줘', 'watch this folder', 'show my automations', 'turn the folder-watch daemon off'). It is about configuring the assistant and its background rules, not about the content of the user's documents.";
+	"The user asks to view, change, or test the settings of this AutoRAG agent itself: its model, model providers, API-key environment variables, Jev routing, search roots, or datasource setup (config.json). It also covers everything about the assistant's file-triggered automations (자동화, 폴더 감시, 파일 기반 규칙): creating, listing, showing status or the last run of, editing, testing, deleting, or turning on or off the automation rules and the background daemon that run a command or an AutoRAG task by themselves whenever files in a folder are created, changed, or deleted (for example 'when a PDF lands in Downloads, summarize it', '새 파일이 생기면 자동으로 ... 해줘', 'watch this folder', 'show my automations', 'turn the folder-watch daemon off'). Building or refreshing the current local index is a librarian task, outside the config route. It is about configuring the assistant and its background rules, not about the content of the user's documents.";
 
 const BASE_ROUTE_QUESTION = pick(
 	"Can the assistant answer this user question reliably from its intrinsic knowledge alone, or does it need additional information?",
@@ -158,6 +192,8 @@ function mostProbableRoute(
 export interface RouteQueryOptions {
 	/** Offer the `config` branch: the agent may change its own settings. */
 	readonly selfConfig?: boolean;
+	readonly checkDecomposition?: boolean;
+	readonly signal?: AbortSignal;
 }
 
 /**
@@ -175,17 +211,34 @@ export async function routeQuery(
 	const selfConfig = options.selfConfig === true;
 	const questions: Question[] = [
 		{ ...(selfConfig ? SELF_CONFIG_ROUTE_QUESTION : BASE_ROUTE_QUESTION), id: QUERY_ROUTE_QUESTION_ID },
-		{ ...DECOMPOSE_QUESTION, id: DECOMPOSE_QUESTION_ID },
 	];
+	if (options.checkDecomposition !== false) questions.push({ ...DECOMPOSE_QUESTION, id: DECOMPOSE_QUESTION_ID });
 	let verdicts: readonly Verdict[];
+	const signal = options.signal;
+	let cancel: (() => void) | undefined;
 	try {
-		verdicts = (await judge(`User question: ${query}`, questions)).verdicts;
+		signal?.throwIfAborted();
+		const pending = judge(`User question: ${query}`, questions);
+		// The Jev client has no cancellation hook. A late verdict must not reroute a finished turn.
+		const result = signal
+			? await Promise.race([
+					pending,
+					new Promise<never>((_, reject) => {
+						cancel = () => reject(signal.reason);
+						signal.addEventListener("abort", cancel, { once: true });
+						if (signal.aborted) cancel();
+					}),
+				])
+			: await pending;
+		verdicts = result.verdicts;
 	} catch (error) {
 		return {
 			route: FALLBACK_QUERY_ROUTE,
 			decompose: false,
 			fallbackReason: error instanceof Error ? error.message : String(error),
 		};
+	} finally {
+		if (cancel) signal?.removeEventListener("abort", cancel);
 	}
 	const routeVerdict = verdicts.find((verdict) => verdict.id === QUERY_ROUTE_QUESTION_ID);
 	const best = mostProbableRoute(routeVerdict, selfConfig);

@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseFrontmatter } from "@earendil-works/pi-coding-agent";
 import { describe, expect, it } from "vitest";
 import type { SearchDocumentsResponse } from "../../src/agent/search-documents.ts";
 import { normalizeIndexingConfig } from "../../src/cli/config.ts";
@@ -9,7 +10,14 @@ import { BUILTIN_DATASOURCE_SKILL_NAMES } from "../../src/datasource/skills/fact
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
-const SKILL_NAMES = ["autorag", "autorag-setup", "autorag-lite-setup", "autorag-doctor"] as const;
+const SKILL_NAMES = [
+	"autorag",
+	"autorag-setup",
+	"autorag-lite-setup",
+	"autorag-doctor",
+	"autorag-index",
+	"github-pr-analysis",
+] as const;
 
 type SkillName = (typeof SKILL_NAMES)[number];
 
@@ -23,18 +31,6 @@ function skillFolders(): string[] {
 		.filter((entry) => entry.isDirectory())
 		.map((entry) => entry.name)
 		.sort();
-}
-
-/** Parse the leading YAML frontmatter block of a SKILL.md into flat string fields. */
-function parseFrontmatter(markdown: string): Record<string, string> | undefined {
-	const match = /^---\n([\s\S]*?)\n---\n/.exec(markdown);
-	if (!match) return undefined;
-	const fields: Record<string, string> = {};
-	for (const line of match[1].split("\n")) {
-		const pair = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line);
-		if (pair) fields[pair[1]] = pair[2].trim();
-	}
-	return fields;
 }
 
 /** The real CLI surface, parsed from the shipped dispatcher rather than restated here. */
@@ -205,7 +201,7 @@ describe("parent-agent skill docs", () => {
 		const folders = skillFolders();
 		expect(folders).toEqual([...SKILL_NAMES].sort());
 		for (const folder of folders) {
-			const fields = parseFrontmatter(readSkill(folder));
+			const { frontmatter: fields } = parseFrontmatter<{ name: string; description: string }>(readSkill(folder));
 			expect(fields, `${folder}: missing frontmatter`).toBeDefined();
 			expect(fields?.name).toBe(folder);
 			expect(folder).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);

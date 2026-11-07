@@ -18,6 +18,7 @@ export interface IndexEvent {
 export interface IndexReport {
 	readonly runId: string;
 	readonly backend: "autorag";
+	readonly sourceResult?: { id: string; registered: boolean; chunks: number; previousChunks?: number };
 	readonly ok: boolean;
 	readonly durationMs: number;
 	readonly timings: Readonly<Partial<Record<IndexPhase, number>>>;

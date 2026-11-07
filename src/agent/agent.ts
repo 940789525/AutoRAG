@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { existsSync, watch as fsWatch, mkdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
@@ -6,6 +7,7 @@ import type { Api, CredentialStore, ImageContent, Model, TextContent } from "@ea
 import { clampThinkingLevel } from "@earendil-works/pi-ai/compat";
 import type { ExtensionAPI, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { getAgentDir, keyText } from "@earendil-works/pi-coding-agent";
+import { persistedExclusions } from "../cli/config.ts";
 import { resolveAutoRAGHome } from "../config/home.ts";
 import {
 	convertAndRelate,
@@ -46,6 +48,7 @@ import { contentHash } from "../indexing/chunker.ts";
 import { type IndexJobRequest, IndexJobs } from "../indexing/jobs.ts";
 import { acquireIndexLease } from "../indexing/lease.ts";
 import { LocalIndexMethod } from "../indexing/method.ts";
+import { completeSourceRestore, prepareSourceOperation } from "../indexing/source-operation.ts";
 import type { IndexDocument, IndexEvent, IndexReport, LocalIndexOptions } from "../indexing/types.ts";
 import { jikjiFindDiagnostic, jikjiPrepareDiagnostic } from "../jikji/diagnostics.ts";
 import {
@@ -84,12 +87,13 @@ import { PARSED_MIRROR_SUBDIR, refreshReadinessPath } from "../mirror/paths.ts";
 import {
 	detectMirrorStaleness,
 	isPathExcluded,
+	listLocalInventory,
 	type ParsedMirrorDiagnostic,
 	type ParsedMirrorSyncOptions,
 	type ParsedMirrorSyncResult,
 	syncParsedMirrors,
 } from "../mirror/sync.ts";
-import { AutoRAGRunLogger } from "../observability/run-log.ts";
+import { AutoRAGRunLogger, assistantUsageEvent } from "../observability/run-log.ts";
 import { type DefaultParserRegistryOptions, resolveParserOptions } from "../parser/index.ts";
 import { RetrievalEngine } from "../retrieval/engine.ts";
 import { ParallelRetriever, ResultMerger } from "../retrieval/merger.ts";
@@ -151,8 +155,8 @@ import { EvidenceLedger } from "./evidence-ledger.ts";
 import { EvidenceOriginIndex } from "./evidence-origins.ts";
 import { createEvidencePersistence } from "./evidence-persistence.ts";
 import { createFSearchSearchTool, FSEARCH_SEARCH_TOOL_NAME } from "./fsearch-search-tool.ts";
-import { createIndexControls, createIndexTool, INDEX_TOOL_NAME } from "./index-controls.ts";
-import { IndexIntentRouter } from "./index-intent.ts";
+import { createGitHubMcpEvidence } from "./github-mcp-evidence.ts";
+import { createIndexControls, createIndexTool, INDEX_TOOL_NAME, requireIndexSkill } from "./index-controls.ts";
 import { intentOfMessage } from "./intent-tracing.ts";
 import {
 	createJevExtension,
@@ -169,6 +173,7 @@ import {
 	type MergedJikjiPolicy,
 } from "./jikji-find-tool.ts";
 import { loadLocalAutoRAGModel } from "./local-model.ts";
+import { packagedSkillPath } from "./packaged-skill.ts";
 import { createPermissionGate, PermissionController, type PermissionMode } from "./permission-gate.ts";
 import type { AutoRAGPiSessionOptions, RequestContextInfo } from "./pi-session.ts";
 import {
@@ -185,9 +190,13 @@ import { createModelDecompositionCompleter, type DecompositionModel, decomposeQu
 import {
 	type DatasourceCandidate,
 	FALLBACK_QUERY_ROUTE,
+	type LocalEvidenceFilterConfig,
 	needsFollowUp,
+	normalizeLocalEvidenceFilter,
+	normalizeRetrievalPolicy,
 	type PastSearchHint,
 	type QueryRoute,
+	type RetrievalPolicy,
 	routeQuery,
 	selectDatasources,
 } from "./query-routing.ts";
@@ -452,6 +461,8 @@ export interface AutoRAGRefreshProgress {
 }
 
 export interface AutoRAGRefreshOptions {
+	/** Local preparation under the same writer lease as the ensuing refresh. */
+	readonly beforeSync?: () => void;
 	/** Detailed native indexing spans. Also persisted locally under .autorag/local-index/runs. */
 	readonly onIndexEvent?: (event: IndexEvent) => void;
 	/** Restrict refresh to specific methods. Defaults to all when undefined. */
@@ -595,6 +606,9 @@ export interface AutoRAGThinkingOptions {
 
 export interface AutoRAGAgentOptions {
 	embedding?: EmbeddingConfig;
+	/** Let the tool-enabled answer model decide which sources it needs, without first-turn prefetch. */
+	retrievalPolicy?: RetrievalPolicy;
+	localEvidenceFilter?: LocalEvidenceFilterConfig;
 	contextSelection?: ContextSelectionConfig;
 	/** One complete answer by default; `progressive` explicitly opts into the legacy fast-answer/verification flow. */
 	answerMode?: "single" | "progressive";
@@ -699,6 +713,7 @@ export interface AutoRAGAgentOptions {
 	queryDecomposition?: { readonly model?: Model<Api>; readonly apiKey?: string };
 	excludeExactDuplicates?: boolean;
 	excludePaths?: readonly string[];
+	indexConfigPath?: string;
 	/**
 	 * Hard caps on retrieval, baseline prefetch, and model-facing candidate
 	 * lists. Omitted fields keep their shipped defaults — see
@@ -786,6 +801,12 @@ export interface RerankAgentOptions {
 	timeoutMs?: number;
 }
 
+interface InteractiveQuery {
+	readonly text: string;
+	readonly sessionId?: string;
+	readonly requestId?: string;
+}
+
 export interface AutoRAGSearchSession {
 	readonly agent: Agent;
 	readonly piSession?: AutoRAGPiSession["session"];
@@ -843,7 +864,7 @@ export class AutoRAGAgent {
 		/** The detached TUI search in flight, if any. */
 		run: Promise<void> | undefined;
 		/** Queries asked in order once the running search answers: Alt+Enter follow-ups, unanswered steers. */
-		readonly followUps: string[];
+		readonly followUps: InteractiveQuery[];
 		/** Steers this run received; any steer forces verification and is restated to it. */
 		readonly steers: string[];
 		/**
@@ -851,7 +872,7 @@ export class AutoRAGAgent {
 		 * taken yet; the next request drains them. A TUI turns any left when the search
 		 * ends into follow-up queries instead of letting them leak into the next prompt.
 		 */
-		readonly queuedSteers: string[];
+		readonly queuedSteers: InteractiveQuery[];
 		/** Steers that arrived before the run's pi session existed; queued on it once it does. */
 		readonly preSessionSteers: AgentMessage[];
 		/** The run still takes steers: false once its last model request settled. */
@@ -911,6 +932,7 @@ export class AutoRAGAgent {
 	private readonly fastThinkingLevel: AutoRAGThinkingLevel;
 	private readonly finalThinkingLevel: AutoRAGThinkingLevel;
 	private readonly answerMode: "single" | "progressive";
+	private readonly retrievalPolicy: RetrievalPolicy;
 	private autoRefreshTimer: NodeJS.Timeout | undefined;
 	private refreshing = false;
 	private refreshState: RefreshState = {
@@ -941,7 +963,8 @@ export class AutoRAGAgent {
 	private readonly localIndexOptions: LocalIndexOptions;
 	private readonly localIndexRevision?: string;
 	readonly indexJobs: IndexJobs;
-	private indexIntentRouter?: IndexIntentRouter;
+	private interactiveQuery?: InteractiveQuery;
+	private readonly indexPrompt = new AsyncLocalStorage<InteractiveQuery | undefined>();
 	private localIndexJobId?: string;
 	private readonly minSyncEmbedderConfig: MinSyncEmbedderConfig | undefined;
 	private readonly jikjiClient: JikjiClient | undefined;
@@ -969,7 +992,8 @@ export class AutoRAGAgent {
 	/** Routing diagnostics for the in-flight search; reset per run. */
 	private routingDiagnostics: SearchDocumentDiagnostic[] = [];
 	private readonly excludeExactDuplicates: boolean;
-	private readonly excludePaths: readonly string[];
+	private readonly excludePaths: string[];
+	private readonly indexConfigPath?: string;
 	private readonly baseSystemPromptConfig: SystemPromptConfig;
 	private readonly droppedCallerToolNames: readonly string[];
 	private readonly piAgentDir: string | undefined;
@@ -1008,6 +1032,8 @@ export class AutoRAGAgent {
 		this.fastThinkingLevel = options.thinking?.fast ?? "minimal";
 		this.finalThinkingLevel = options.thinking?.final ?? "high";
 		this.answerMode = options.answerMode ?? "single";
+		this.retrievalPolicy = normalizeRetrievalPolicy(options.retrievalPolicy);
+		normalizeLocalEvidenceFilter(options.localEvidenceFilter);
 		if (this.answerMode !== "single" && this.answerMode !== "progressive") {
 			throw new Error("answerMode must be 'single' or 'progressive'");
 		}
@@ -1044,6 +1070,7 @@ export class AutoRAGAgent {
 		this.dupeyOptions = options.dupey ?? {};
 		this.fileeOptions = options.filee ?? {};
 		this.excludeExactDuplicates = options.excludeExactDuplicates ?? true;
+		this.indexConfigPath = options.indexConfigPath;
 		this.excludePaths = (options.excludePaths ?? []).map(pinExcludedPath);
 		this.limits = resolveRetrievalLimits(options.limits);
 		this.refreshLimits = validateRefreshLimits(options.refresh);
@@ -1201,10 +1228,43 @@ export class AutoRAGAgent {
 		const convertFilesTool = this.fileeOptions === false ? undefined : createConvertFilesTool(this);
 		const listFileConversionsTool = this.fileeOptions === false ? undefined : createListFileConversionsTool(this);
 		const manageAutomationsTool = createManageAutomationsTool();
-		this.jevJudge =
+		const judge =
 			options.jev === undefined || options.jev === false
 				? undefined
 				: createJevJudge({ ...options.jev, agentDir: options.piAgentDir });
+		this.jevJudge =
+			judge === undefined
+				? undefined
+				: async (...args) => {
+						const sessionId = this.lastSessionId ?? "unbound";
+						const started = performance.now();
+						let result: Awaited<ReturnType<JevJudge>> | undefined;
+						try {
+							result = await judge(...args);
+							return result;
+						} finally {
+							const input = result?.usage?.inputTokens;
+							const output = result?.usage?.outputTokens;
+							const valid = (value: number | undefined): value is number =>
+								Number.isFinite(value) && value! >= 0;
+							this.runLogger.write({
+								event: "model_usage",
+								timestamp: new Date().toISOString(),
+								sessionId,
+								scope: "jev",
+								model: result?.model ?? "jev",
+								stopReason: result === undefined ? "error" : "stop",
+								usageReported: valid(input) && valid(output),
+								inputTokens: valid(input) ? input : null,
+								outputTokens: valid(output) ? output : null,
+								totalTokens: valid(input) && valid(output) ? input + output : null,
+								cacheReadTokens: null,
+								cacheWriteTokens: null,
+								cost: null,
+								latencyMs: performance.now() - started,
+							});
+						}
+					};
 		this.jevExtension = this.jevJudge === undefined ? undefined : createJevExtension(this.jevJudge);
 		this.selfConfig = this.jevJudge === undefined ? undefined : options.selfConfig;
 		this.permissions = options.permissionController ?? new PermissionController(options.permissionMode ?? "full");
@@ -1391,7 +1451,7 @@ export class AutoRAGAgent {
 	}
 
 	private async withMemoryContext(messages: AgentMessage[]): Promise<AgentMessage[]> {
-		if (this.lastQuery === undefined) return messages;
+		if (this.lastQuery === undefined || this.retrievalPolicy === "on-demand") return messages;
 		const context = await this.loadMemoryContextFor(this.lastQuery);
 		if (this.contextSelection.adaptive) {
 			this.contextSelection.setMemoryContext(context.empty ? "" : context.text);
@@ -1617,10 +1677,22 @@ export class AutoRAGAgent {
 	): Promise<AutoRAGSearchSession> {
 		if (this.boundPiRuntime !== undefined) {
 			const session = this.boundPiRuntime.session;
+			let originalInput = this.indexPrompt.getStore();
 			return {
 				agent: session.agent,
 				piSession: session,
-				prompt: async (prompt) => session.prompt(prompt, { source: "extension" }),
+				prompt: async (prompt) => {
+					// Only the first prompt answering this input owns it. Verification/continuation prompts are independent.
+					const input = originalInput;
+					originalInput = undefined;
+					const send = () =>
+						session.prompt(prompt, {
+							source: "extension",
+							// Pi dispatches slash commands before input hooks. Never reinterpret a bridged or generated prompt as a command.
+							expandPromptTemplates: Boolean(input?.requestId && input.text === prompt),
+						});
+					return this.indexPrompt.run(input, send);
+				},
 				abort: async () => session.abort(),
 				dispose: () => {},
 			};
@@ -1639,7 +1711,11 @@ export class AutoRAGAgent {
 			// The model sees each steer framed as a correction of the running search.
 			contextTransform: (messages, info) => this.transformRequestContext(messages, info),
 			...this.contextRequestLifecycle(),
-			extensionFactories: [this.permissionGate, ...(this.jevExtension !== undefined ? [this.jevExtension] : [])],
+			extensionFactories: [
+				this.permissionGate,
+				createGitHubMcpEvidence(this.evidenceLedger),
+				...(this.jevExtension !== undefined ? [this.jevExtension] : []),
+			],
 			extensionToolNames: this.jevExtension !== undefined ? [JEV_TOOL_NAME] : [],
 		});
 		const agent = piSession.session.agent;
@@ -1688,32 +1764,21 @@ export class AutoRAGAgent {
 			onContextSettled: (success) => this.contextSelection.settle(success),
 			onContextReset: (reason) => this.contextSelection.invalidate(reason),
 			onModelUsage: (message, scope, timing) => {
-				const usage = message.usage;
-				const usageReported = [usage?.input, usage?.output, usage?.cacheRead, usage?.cacheWrite].some(
-					(value) => Number.isFinite(value) && value > 0,
-				);
-				this.runLogger.write({
-					event: "model_usage",
-					timestamp: new Date().toISOString(),
-					sessionId: this.lastSessionId ?? "unbound",
-					scope,
-					model: message.model,
-					usageReported,
-					stopReason: message.stopReason,
-					inputTokens: usageReported && Number.isFinite(usage?.input) ? usage.input : null,
-					outputTokens: usageReported && Number.isFinite(usage?.output) ? usage.output : null,
-					cacheReadTokens: usageReported && Number.isFinite(usage?.cacheRead) ? usage.cacheRead : null,
-					cacheWriteTokens: usageReported && Number.isFinite(usage?.cacheWrite) ? usage.cacheWrite : null,
-					totalTokens: usageReported && Number.isFinite(usage?.totalTokens) ? usage.totalTokens : null,
-					cost: usageReported && Number.isFinite(usage?.cost?.total) ? usage.cost.total : null,
-					latencyMs: timing.latencyMs,
-					firstTokenMs: timing.firstTokenMs ?? null,
-				});
+				this.runLogger.write(assistantUsageEvent(message, scope, this.lastSessionId ?? "unbound", timing));
 			},
 		};
 	}
 
 	private recordSearchToolEvent(event: AgentEvent): void {
+		if (event.type === "tool_execution_start" && this.lastSessionId) {
+			this.runLogger.write({
+				event: "retrieval_step",
+				timestamp: new Date().toISOString(),
+				sessionId: this.lastSessionId,
+				action: "tool_call",
+				tool: event.toolName,
+			});
+		}
 		if (
 			event.type === "tool_execution_end" &&
 			(this.searchToolNames.has(event.toolName) || event.toolName === READ_LOCAL_EVIDENCE_TOOL_NAME)
@@ -1766,7 +1831,8 @@ export class AutoRAGAgent {
 	private currentSystemPromptConfig(models: Partial<SystemPromptConfig> = {}): SystemPromptConfig {
 		return {
 			...this.baseSystemPromptConfig,
-			answerMode: this.answerMode,
+			answerMode: this.retrievalPolicy === "on-demand" ? "single" : this.answerMode,
+			retrievalPolicy: this.retrievalPolicy,
 			...models,
 		};
 	}
@@ -1827,6 +1893,7 @@ export class AutoRAGAgent {
 				createIndexControls(this.indexOperations()),
 				...(options.extensionFactories ?? []),
 				createUserRequestPersistence(this.userRequests),
+				createGitHubMcpEvidence(this.evidenceLedger),
 				createEvidencePersistence(this.evidenceLedger, this.citationNumbers, this.conversationQueries),
 				createCitationLinks(this.evidenceLedger),
 				createSearchProgressExtension(this.searchProgress, () => keyText("app.interrupt")),
@@ -1856,8 +1923,7 @@ export class AutoRAGAgent {
 		return {
 			...runtime,
 			dispose: async () => {
-				this.indexIntentRouter?.reset();
-				this.indexIntentRouter = undefined;
+				this.interactiveQuery = undefined;
 				this.localIndexJobId = undefined;
 				await this.indexJobs.close();
 				await this.embedder.close();
@@ -1884,10 +1950,10 @@ export class AutoRAGAgent {
 				const state = this.interactive;
 				if (state.run === undefined) {
 					this.userRequests.record(text);
-					this.startInteractiveQuery(text, pi);
+					this.startInteractiveQuery({ text }, pi);
 				} else if (!this.steer(text)) {
 					this.userRequests.record(text);
-					state.followUps.push(text);
+					state.followUps.push({ text });
 				}
 			},
 			isRunning: () => this.interactive.run !== undefined,
@@ -2000,121 +2066,30 @@ export class AutoRAGAgent {
 	 * user is correcting a search that is going wrong) and Alt+Enter queues a
 	 * follow-up question that runs once this search answers.
 	 */
-	private routeInteractiveInput(
-		input: AutoRAGInteractiveInput,
-		pi: ExtensionAPI,
-	): AutoRAGInputDisposition | Promise<AutoRAGInputDisposition> {
-		if (input.source === "extension") return this.routeOrdinaryInput(input, pi);
-		this.indexIntentRouter ??= new IndexIntentRouter({
-			observe: (data) =>
-				this.routingDiagnostics.push({
-					code: "index-intent",
-					severity: "info",
-					source: "agent",
-					message: JSON.stringify(data),
-				}),
-			snapshot: () => {
-				const manager = this.embedder instanceof ProfileEmbedder ? this.embedder : undefined;
-				return {
-					profiles: manager
-						? Object.entries(manager.config.profiles).map(([id, p]) => ({ id, kind: p.kind, model: p.model }))
-						: [{ id: "injected", kind: "local-http", model: "injected" }],
-					activeProfile: manager?.profileId ?? "injected",
-					defaultProfile: manager?.config.defaultProfile ?? "injected",
-					ready: this.minSyncMethod.index.isReady(),
-					localJobId: this.localIndexJobId,
-				};
-			},
-			complete: async (prompt, signal) => {
-				if (!this.boundPiRuntime?.session.model)
-					throw new Error("Natural-language indexing needs a conversation model");
-				const resolved = await this.resolveSessionModel();
-				signal.throwIfAborted();
-				return createModelDecompositionCompleter(resolved, signal, 512, (message) => {
-					this.routingDiagnostics.push({
-						code: "index-intent",
-						severity: "info",
-						source: "agent",
-						message: JSON.stringify({
-							model: message.model,
-							inputTokens: message.usage?.input ?? null,
-							outputTokens: message.usage?.output ?? null,
-							cost: message.usage?.cost?.total ?? null,
-						}),
-					});
-				})(prompt);
-			},
-			notify: (text) =>
-				pi.sendMessage(
-					{ customType: "autorag.index", content: [{ type: "text", text }], display: true },
-					{ triggerTurn: false },
-				),
-			execute: (plan, requestId) => {
-				const ops = this.indexOperations();
-				const job =
-					plan.operation === "status"
-						? ops.jobs.status(plan.jobId)
-						: plan.operation === "cancel"
-							? ops.jobs.cancel(plan.jobId ?? "")
-							: ops.start({
-									mode: plan.operation,
-									embeddingProfile: "embeddingProfile" in plan ? plan.embeddingProfile : undefined,
-									requestId,
-								});
-				pi.sendMessage(
-					{
-						customType: "autorag.index",
-						content: [
-							{
-								type: "text",
-								text: JSON.stringify({
-									operation: plan.operation,
-									scope: "全部已配置本地目录",
-									job: job ?? null,
-									activeIndex: ops.activeIndex(),
-								}),
-							},
-						],
-						display: true,
-					},
-					{ triggerTurn: false },
-				);
-			},
-		});
-		const router = this.indexIntentRouter;
-		const gate = router.gate(input.text);
-		if (gate.kind === "ordinary") {
-			router.reset();
-			return this.routeOrdinaryInput(input, pi);
-		}
-		this.userRequests.record(input.text);
-		return router
-			.handle(input.text, gate)
-			.then((handled) => (handled ? { kind: "handled" } : this.routeOrdinaryInput(input, pi, true)));
-	}
-
-	private routeOrdinaryInput(
-		input: AutoRAGInteractiveInput,
-		pi: ExtensionAPI,
-		recorded = false,
-	): AutoRAGInputDisposition {
+	private routeInteractiveInput(input: AutoRAGInteractiveInput, pi: ExtensionAPI): AutoRAGInputDisposition {
+		const query: InteractiveQuery = {
+			text: input.text,
+			sessionId: this.boundPiRuntime?.session.sessionId,
+			requestId: input.source === "interactive" && input.text !== "/skill:autorag-index" ? randomUUID() : undefined,
+		};
 		const state = this.interactive;
 		const followUp = input.streamingBehavior === "followUp" || state.nextSubmitIsFollowUp;
 		state.nextSubmitIsFollowUp = false;
 		if (state.run === undefined) {
-			if (!recorded) this.userRequests.record(input.text);
-			this.startInteractiveQuery(input.text, pi);
+			this.userRequests.record(input.text);
+			this.startInteractiveQuery(query, pi);
 			return { kind: "handled" };
 		}
 		if (followUp) {
-			if (!recorded) this.userRequests.record(input.text);
-			state.followUps.push(input.text);
+			this.userRequests.record(input.text);
+			state.followUps.push(query);
 			return { kind: "handled" };
 		}
+		this.interactiveQuery = undefined;
 		if (input.streamingBehavior === "steer") {
 			// A turn is streaming: pi queues the user's text as steering for that turn.
 			state.steers.push(input.text);
-			if (!recorded) this.userRequests.record(input.text, "steer");
+			this.userRequests.record(input.text, "steer");
 			state.steerTexts.add(input.text);
 			this.conversationQueries.add(input.text);
 			// Cut any in-flight retrieval short so the steer reaches the model promptly.
@@ -2124,9 +2099,9 @@ export class AutoRAGAgent {
 		// Between phases no turn streams, so pi would start a new prompt. Queue the
 		// steer on the search instead: the next phase's model request takes it. A
 		// search past its last request (or between queued queries) answers it next.
-		if (!this.steer(input.text, input.images)) {
-			if (!recorded) this.userRequests.record(input.text);
-			state.followUps.push(input.text);
+		if (!this.steerQuery(query, input.images)) {
+			this.userRequests.record(input.text);
+			state.followUps.push(query);
 		}
 		return { kind: "handled" };
 	}
@@ -2137,10 +2112,7 @@ export class AutoRAGAgent {
 	 * Alt+Enter like Enter, so AutoRAG acts on them there.
 	 */
 	private handleInteractiveKey(key: AutoRAGInteractiveKey): boolean {
-		if (key === "interrupt" && this.indexIntentRouter?.recognizing) {
-			this.indexIntentRouter.reset();
-			return true;
-		}
+		if (key === "interrupt") this.interactiveQuery = undefined;
 		const state = this.interactive;
 		if (state.run === undefined || this.boundPiRuntime?.session.isStreaming === true) return false;
 		if (key === "followUp") {
@@ -2154,13 +2126,17 @@ export class AutoRAGAgent {
 	}
 
 	/** Runs one TUI query detached from pi's input loop, then any follow-ups queued behind it. */
-	private startInteractiveQuery(query: string, pi: ExtensionAPI): void {
+	private startInteractiveQuery(query: InteractiveQuery, pi: ExtensionAPI): void {
 		const state = this.interactive;
 		const run = (async () => {
-			let next: string | undefined = query;
+			let next: InteractiveQuery | undefined = query;
 			while (next !== undefined) {
 				try {
-					await this.runInteractivePiQuery(next, pi);
+					if (next.sessionId === undefined || next.sessionId === this.boundPiRuntime?.session.sessionId) {
+						this.interactiveQuery = next;
+						const input = next;
+						await this.indexPrompt.run(input, () => this.runInteractivePiQuery(input.text, pi));
+					}
 				} catch (error) {
 					pi.sendMessage(
 						{
@@ -2171,6 +2147,7 @@ export class AutoRAGAgent {
 						{ triggerTurn: false },
 					);
 				}
+				this.interactiveQuery = undefined;
 				next = state.followUps.shift();
 			}
 		})().finally(() => {
@@ -2235,8 +2212,14 @@ export class AutoRAGAgent {
 	 * the text as a new question.
 	 */
 	steer(text: string, images: readonly ImageContent[] = []): boolean {
+		return this.steerQuery({ text }, images);
+	}
+
+	private steerQuery(query: InteractiveQuery, images: readonly ImageContent[] = []): boolean {
+		const { text } = query;
 		const state = this.interactive;
 		if (!this.activeRun || !state.acceptingSteers || state.userAborted || text.trim() === "") return false;
+		this.interactiveQuery = undefined;
 		state.steers.push(text);
 		this.userRequests.record(text, "steer");
 		state.steerTexts.add(text);
@@ -2248,7 +2231,7 @@ export class AutoRAGAgent {
 		const agent = this.activeSession?.agent;
 		if (agent === undefined) state.preSessionSteers.push(message);
 		else agent.steer(message);
-		state.queuedSteers.push(text);
+		state.queuedSteers.push(query);
 		return true;
 	}
 
@@ -2325,8 +2308,8 @@ export class AutoRAGAgent {
 
 		// A later turn of an interactive conversation is a plain agent turn: the
 		// user's message reaches the model as typed, and the model answers from
-		// the conversation or searches by tool call. Only the first turn runs the
-		// Jev gate and the baseline pipeline.
+		// the conversation or searches by tool call. The legacy first turn may prefetch;
+		// an on-demand first turn uses that same tool loop after any self-config decision.
 		const conversational = this.isConversationTurn();
 		this.activeRun = true;
 		this.searchProgress.begin(trimmedQuery);
@@ -2419,7 +2402,9 @@ export class AutoRAGAgent {
 				timestamp: new Date().toISOString(),
 				sessionId,
 				queryLength: trimmedQuery.length,
+				retrievalPolicy: this.retrievalPolicy,
 				model: resolved.model.id,
+				usageVersion: 1,
 			});
 			searchStarted = true;
 			session = await this.createSearchSession(
@@ -2446,9 +2431,18 @@ export class AutoRAGAgent {
 					if (sessionAgent !== undefined) sessionAgent.setThinkingLevel(clamped);
 					else activeSession.agent.state.thinkingLevel = clamped;
 				};
-				if (conversational) {
+				const explicitSkill = this.indexPrompt.getStore()?.text.startsWith("/skill:autorag-index ");
+				const plan =
+					conversational || explicitSkill
+						? undefined
+						: await this.planQuery(trimmedQuery, resolved, planAbort.signal);
+				if (!plan || (this.retrievalPolicy === "on-demand" && plan.route !== "config")) {
+					if (this.interactive.userAborted || planAbort.signal.aborted) return;
+					const limit = options.topK === undefined ? "" : ` Cite at most ${options.topK} sources.`;
+					const scope = options.scope ? ` Restrict search to virtual path scope ${options.scope}.` : "";
+					const prompt = this.retrievalPolicy === "on-demand" ? trimmedQuery + limit + scope : trimmedQuery;
 					setThinking(this.finalThinkingLevel);
-					await this.searchProgress.step("answer", "Answering", () => activeSession.prompt(trimmedQuery));
+					await this.searchProgress.step("answer", "Answering", () => activeSession.prompt(prompt));
 					// A steer typed after the turn's last model request is still owed an answer.
 					while (
 						!this.interactive.userAborted &&
@@ -2458,12 +2452,11 @@ export class AutoRAGAgent {
 						await activeSession.prompt(buildSteerContinuationPrompt(this.interactive.steers));
 					}
 					steering.acceptingSteers = false;
-					if (this.interactive.userAborted) return;
+					if (this.interactive.userAborted || planAbort.signal.aborted) return;
 					const turnText = finalAnswerText(transcript());
 					if (turnText !== undefined) captured = await this.deriveAnswer(turnText);
 					return;
 				}
-				const plan = await this.planQuery(trimmedQuery, resolved, planAbort.signal);
 				if (plan.route === "config" && plan.selfConfigSkill !== undefined && this.selfConfig !== undefined) {
 					// Self-configuration: no retrieval and no fast answer. The model
 					// gets the full setup skill and edits the config itself, then
@@ -3004,18 +2997,25 @@ export class AutoRAGAgent {
 		readonly selfConfigSkill?: string;
 	}> {
 		const judge = this.jevJudge;
-		if (judge === undefined) return { route: FALLBACK_QUERY_ROUTE, queries: [query], datasources: [] };
+		const onDemand = this.retrievalPolicy === "on-demand";
+		if (judge === undefined || (onDemand && !this.selfConfig))
+			return { route: FALLBACK_QUERY_ROUTE, queries: [query], datasources: [] };
 		const decision = await this.searchProgress.step(
 			"route",
 			"Routing the question",
-			() => routeQuery(judge, query, { selfConfig: this.selfConfig !== undefined }),
+			() =>
+				routeQuery(judge, query, {
+					selfConfig: this.selfConfig !== undefined,
+					checkDecomposition: !onDemand,
+					signal: onDemand ? AbortSignal.any([signal, AbortSignal.timeout(15_000)]) : undefined,
+				}),
 			(routed) => routed.route,
 		);
 		if (decision.fallbackReason !== undefined) {
 			this.routingDiagnostics.push({
 				code: "query-route-fallback",
 				severity: "warning",
-				message: `Jev query routing fell back to local search. ${decision.fallbackReason}`,
+				message: `Jev query routing fell back to ${onDemand ? "the tool-enabled answer model" : "local search"}. ${decision.fallbackReason}`,
 				source: "jev",
 			});
 			return { route: FALLBACK_QUERY_ROUTE, queries: [query], datasources: [] };
@@ -3029,11 +3029,20 @@ export class AutoRAGAgent {
 				this.routingDiagnostics.push({
 					code: "self-config-unavailable",
 					severity: "warning",
-					message: `Jev routed the question to AutoRAG configuration, but the setup skill could not be loaded; searching local sources instead. ${error instanceof Error ? error.message : String(error)}`,
+					message: `Jev routed the question to AutoRAG configuration, but the setup skill could not be loaded; ${onDemand ? "continuing with the tool-enabled answer model" : "searching local sources instead"}. ${error instanceof Error ? error.message : String(error)}`,
 					source: "self-config",
 				});
 				route = FALLBACK_QUERY_ROUTE;
 			}
+		}
+		if (onDemand && route !== "config") {
+			this.routingDiagnostics.push({
+				code: "query-routed",
+				severity: "info",
+				source: "jev",
+				message: "Jev did not select self-configuration; the answer model will choose sources on demand.",
+			});
+			return { route, queries: [query], datasources: [] };
 		}
 		const datasourcesPromise =
 			route === "local"
@@ -3045,18 +3054,30 @@ export class AutoRAGAgent {
 					)
 				: Promise.resolve([]);
 		let queries: readonly string[] = [query];
-		if (decision.decompose && route !== "direct") {
+		if (!onDemand && decision.decompose && route !== "direct") {
 			const target = this.queryDecompositionModel ?? {
 				model: resolved.model,
 				...((resolved.apiKey ?? resolved.providerApiKeys?.[resolved.model.provider]) !== undefined
 					? { apiKey: resolved.apiKey ?? resolved.providerApiKeys?.[resolved.model.provider] }
 					: {}),
 			};
+			const started = performance.now();
+			const sessionId = this.lastSessionId ?? "unbound";
 			try {
 				queries = await this.searchProgress.step(
 					"decompose",
 					"Splitting the question into search queries",
-					() => decomposeQuery(createModelDecompositionCompleter(target, signal), query),
+					() =>
+						decomposeQuery(
+							createModelDecompositionCompleter(target, signal, 2048, (message) => {
+								this.runLogger.write(
+									assistantUsageEvent(message, "query_decomposition", sessionId, {
+										latencyMs: performance.now() - started,
+									}),
+								);
+							}),
+							query,
+						),
 					(list) => `${list.length} ${list.length === 1 ? "query" : "queries"}`,
 				);
 			} catch (error) {
@@ -3164,6 +3185,12 @@ export class AutoRAGAgent {
 		options: RetrievalOptions,
 		datasources: readonly string[] = [],
 	): Promise<string> {
+		this.runLogger.write({
+			event: "retrieval_step",
+			timestamp: new Date().toISOString(),
+			sessionId: this.lastSessionId ?? "unbound",
+			action: "baseline_prefetch",
+		});
 		// A steer typed during the prefetch stops it: the fast phase then starts with
 		// whatever already returned plus the steer, instead of waiting on a slow source.
 		const signal = this.interactive.steerInterrupt.signal;
@@ -3450,7 +3477,7 @@ export class AutoRAGAgent {
 		return (
 			`Answer this query directly from your own general knowledge: ${query}\n\n` +
 			`It needs no search: it is general knowledge, simple reasoning, or conversation. Do NOT call any search, retrieval, web, or file-reading tools. ` +
-			`Reply naturally and concisely; for small talk, just respond conversationally. Do not cite sources or mention retrieval.`
+			`If the actual user request matches an available Skill, read and apply that Skill instead. Reply naturally and concisely; for small talk, just respond conversationally. Do not cite sources or mention retrieval.`
 		);
 	}
 
@@ -3573,12 +3600,25 @@ export class AutoRAGAgent {
 	private indexOperations() {
 		return {
 			jobs: this.indexJobs,
-			onCommand: () => this.indexIntentRouter?.reset(),
+			fileCoverage: (offset: number, signal?: AbortSignal) => this.localFileCoverage(offset, signal),
+			onSessionEnd: () => {
+				this.interactiveQuery = undefined;
+				this.localIndexJobId = undefined;
+			},
 			activeIndex: () => ({
 				embeddingProfile: this.embedder instanceof ProfileEmbedder ? this.embedder.profileId : "injected",
+				defaultProfile: this.embedder instanceof ProfileEmbedder ? this.embedder.config.defaultProfile : "injected",
 				ready: this.minSyncMethod.index.isReady(),
 			}),
 			start: (request: IndexJobRequest) => {
+				const run = this.activeRetrievalOptions;
+				if (
+					request.sourceId &&
+					(!matchesVirtualPathScope(request.sourceId, run?.scope) ||
+						(run?.sourceIds && !run.sourceIds.includes(request.sourceId)) ||
+						(run?.filters && Object.keys(run.filters).length))
+				)
+					throw new Error("Index target outside the current scope");
 				const job = this.startIndexJob(request);
 				this.localIndexJobId = job.jobId;
 				return job;
@@ -3586,14 +3626,86 @@ export class AutoRAGAgent {
 			profiles: () =>
 				this.embedder instanceof ProfileEmbedder
 					? Object.entries(this.embedder.config.profiles).map(([id, p]) => ({ id, kind: p.kind, model: p.model }))
-					: [],
-			canWriteFromModel: () => false,
+					: [{ id: "injected", kind: "local-http", model: "injected" }],
+			authorizeWrite: () => {
+				const input = this.indexPrompt.getStore();
+				const session = this.boundPiRuntime?.session;
+				if (
+					!input?.requestId ||
+					input !== this.interactiveQuery ||
+					!session ||
+					session.sessionId !== input.sessionId ||
+					this.interactive.userAborted ||
+					this.activeRunAbort?.signal.aborted
+				) {
+					throw new Error("Index writes require a current explicit TUI indexing request; use /index");
+				}
+				const skill = session.resourceLoader.getSkills().skills.find((s) => s.name === "autorag-index");
+				if (!skill || skill.filePath !== packagedSkillPath("autorag-index"))
+					throw new Error("The packaged autorag-index Skill is unavailable in this TUI session");
+				requireIndexSkill(session.messages, skill.filePath, input.text.startsWith("/skill:autorag-index "));
+				return { requestId: input.requestId, ownedJobId: this.localIndexJobId };
+			},
+		};
+	}
+
+	private async localFileCoverage(offset: number, signal?: AbortSignal) {
+		if (this.telegram || this.discordRemote)
+			throw new Error("Local file inventory is unavailable in remote sessions");
+		const run = this.activeRetrievalOptions;
+		if (run?.filters && Object.keys(run.filters).length)
+			throw new Error("Local file inventory cannot apply these retrieval filters");
+		const allowed = run?.sourceIds && new Set(run.sourceIds);
+		const visible = (id: string) => matchesVirtualPathScope(id, run?.scope) && (!allowed || allowed.has(id));
+		const abort = signal && run?.signal ? AbortSignal.any([signal, run.signal]) : (signal ?? run?.signal);
+		const listing = await listLocalInventory(this.searchPaths, this.refreshLimits, {
+			excluded: new Set(this.excludePaths),
+			signal: abort,
+			verifyRoot: (root) => {
+				if (
+					realpathSync(this.configuredSearchPaths[this.searchPaths.indexOf(root)]) !== root ||
+					realpathSync(root) !== root
+				)
+					throw new Error(`Configured search root changed: ${root}`);
+			},
+		});
+		abort?.throwIfAborted();
+		const ids = listing.ids.filter(visible);
+		const diagnostics = listing.diagnostics.filter((d) => visible(d.source)).map((d) => `${d.source}: ${d.message}`);
+		if (diagnostics.length < listing.diagnostics.length)
+			diagnostics.push("Directory scan incomplete outside the disclosed file list");
+		let registered: Set<string> | undefined;
+		try {
+			registered = this.minSyncMethod.index.registeredSources(ids);
+		} catch (error) {
+			diagnostics.push(error instanceof Error ? error.message : String(error));
+		}
+		const end = offset + 100;
+		const files = ids.slice(offset, end).map((id) => ({
+			id,
+			status: !registered
+				? ("unknown" as const)
+				: registered.has(id)
+					? ("registered" as const)
+					: ("unregistered" as const),
+		}));
+		return {
+			files,
+			total: ids.length,
+			registered: registered?.size ?? null,
+			complete: diagnostics.length === 0,
+			diagnostics,
+			...(end < ids.length ? { nextOffset: end } : {}),
 		};
 	}
 
 	startIndexJob(request: IndexJobRequest) {
-		if (request.mode !== "build" && request.mode !== "refresh")
-			throw new Error("Index mode must be build or refresh");
+		const fileMode = request.mode === "remove" || request.mode === "restore" ? request.mode : undefined;
+		if (!fileMode && request.mode !== "build" && request.mode !== "refresh")
+			throw new Error("Unknown index operation");
+		if (!!fileMode !== !!request.sourceId) throw new Error("Single-file tasks require one source ID");
+		if (fileMode && (!this.indexConfigPath || this.telegram || this.discordRemote))
+			throw new Error("File indexing requires a local persisted configuration");
 		if (request.scopeIds !== undefined) {
 			const known = this.searchPaths.map((p) => `local-${contentHash(p).slice(0, 12)}`).sort();
 			if (JSON.stringify([...new Set(request.scopeIds)].sort()) !== JSON.stringify(known))
@@ -3604,7 +3716,7 @@ export class AutoRAGAgent {
 			request.embeddingProfile ??
 			(request.mode === "build" ? manager?.config.defaultProfile : manager?.profileId) ??
 			"injected";
-		if (request.mode === "refresh" && id !== (manager?.profileId ?? "injected"))
+		if (request.mode !== "build" && id !== (manager?.profileId ?? "injected"))
 			throw new Error("Switching embedding profiles requires build, not refresh");
 		const profile = manager?.profile(id);
 		const target = manager?.forProfile(id) ?? this.embedder;
@@ -3635,8 +3747,35 @@ export class AutoRAGAgent {
 					await target.start?.(signal, (detail) =>
 						onIndexEvent({ runId: "prepare", phase: "prepare", state: "start", elapsedMs: 0, detail }),
 					);
-					if (request.mode === "refresh" && this.minSyncMethod.index.readinessError())
+					if (request.mode !== "build" && this.minSyncMethod.index.readinessError())
 						throw new Error("Active index is not ready; run /index build before refresh");
+					signal.throwIfAborted();
+					const previousChunks =
+						fileMode && request.sourceId
+							? await this.minSyncMethod.index.sourceChunkCount(request.sourceId)
+							: undefined;
+					if (fileMode && request.sourceId) {
+						try {
+							prepareSourceOperation(
+								fileMode,
+								this.workspaceProjectRoot,
+								this.searchPaths,
+								this.indexConfigPath!,
+								request.sourceId,
+								this.minSyncMethod.index.registeredSources([request.sourceId]).has(request.sourceId),
+							);
+						} finally {
+							this.reloadIndexExclusions();
+						}
+						onIndexEvent({
+							runId: "source",
+							phase: "write",
+							state: "end",
+							source: request.sourceId,
+							detail: "Exclusion updated and parsed mirror cleared",
+							elapsedMs: 0,
+						});
+					}
 					const candidate =
 						request.mode === "build"
 							? new LocalIndexMethod({
@@ -3663,6 +3802,19 @@ export class AutoRAGAgent {
 					const report = result.minsync?.report;
 					if (!report) throw new Error("Index run did not produce a report");
 					if (!report.ok) return report;
+					if (fileMode && request.sourceId) {
+						const registered = this.minSyncMethod.index
+							.registeredSources([request.sourceId])
+							.has(request.sourceId);
+						const chunks = await this.minSyncMethod.index.sourceChunkCount(request.sourceId);
+						if (registered !== (fileMode === "restore") || (fileMode === "remove" && chunks !== 0))
+							throw new Error(
+								`File operation incomplete: ${request.sourceId}, registered=${registered}, chunks=${chunks}`,
+							);
+						if (fileMode === "restore") completeSourceRestore(this.workspaceProjectRoot, request.sourceId);
+						return { ...report, sourceResult: { id: request.sourceId, registered, chunks, previousChunks } };
+					}
+
 					if (candidate) {
 						const errors = result.diagnostics.filter((d) => d.severity === "error");
 						if (errors.length) throw new Error(errors.map((d) => d.message).join("\n"));
@@ -3690,10 +3842,20 @@ export class AutoRAGAgent {
 	async refresh(force = false, opts?: AutoRAGRefreshOptions): Promise<AutoRAGRefreshResult> {
 		const release = acquireIndexLease(join(this.workspaceProjectRoot, ".autorag", "refresh-writer"));
 		try {
+			opts?.beforeSync?.();
 			return await this.refreshUnlocked(force, opts);
 		} finally {
 			release();
 		}
+	}
+
+	private reloadIndexExclusions() {
+		if (this.indexConfigPath && existsSync(this.indexConfigPath))
+			this.excludePaths.splice(
+				0,
+				this.excludePaths.length,
+				...persistedExclusions(this.indexConfigPath).map(pinExcludedPath),
+			);
 	}
 
 	private async refreshUnlocked(
@@ -3701,6 +3863,7 @@ export class AutoRAGAgent {
 		opts?: AutoRAGRefreshOptions,
 		candidate?: LocalIndexMethod,
 	): Promise<AutoRAGRefreshResult> {
+		this.reloadIndexExclusions();
 		const indexAbort = new AbortController();
 		const signal = opts?.signal ? AbortSignal.any([opts.signal, indexAbort.signal]) : indexAbort.signal;
 		signal?.throwIfAborted();
@@ -4529,11 +4692,14 @@ export class AutoRAGAgent {
 		query: string,
 		options: { readonly topK?: number; readonly scope?: string; readonly signal?: AbortSignal } = {},
 	): Promise<{ results: RetrievalResult[]; diagnostics: RetrievalDiagnostic[] }> {
-		return this.retrieveWithDiagnostics(query, {
-			topK: options.topK,
-			scope: options.scope,
-			...(options.signal === undefined ? {} : { signal: options.signal }),
-		});
+		return this.retrieveWithDiagnostics(
+			query,
+			this.boundToolOptions({
+				topK: options.topK,
+				scope: options.scope,
+				...(options.signal === undefined ? {} : { signal: options.signal }),
+			}),
+		);
 	}
 
 	/**
@@ -4551,12 +4717,12 @@ export class AutoRAGAgent {
 		query: string,
 		options: { readonly topK?: number; readonly scope?: string; readonly signal?: AbortSignal } = {},
 	): Promise<{ results: RetrievalResult[]; diagnostics: RetrievalDiagnostic[] }> {
-		const retrievalOptions: RetrievalOptions = {
+		const retrievalOptions: RetrievalOptions = this.boundToolOptions({
 			...this.activeRetrievalOptions,
 			topK: options.topK,
 			scope: options.scope,
 			...(options.signal === undefined ? {} : { signal: options.signal }),
-		};
+		});
 		const methods = this.methodRegistry.list().filter((method) => {
 			const descriptor = method.describe();
 			return descriptor.datasourceId === datasourceId;
@@ -4567,9 +4733,9 @@ export class AutoRAGAgent {
 			query,
 			retrievalOptions,
 		);
-		const filteredByMethod = filterDatasourceScope(byMethod, methods, options.scope);
+		const filteredByMethod = filterDatasourceScope(byMethod, methods, retrievalOptions.scope);
 		const merged = this.merger.merge(filteredByMethod, {
-			topK: options.topK ?? this.limits.singleDatasourceTopK,
+			topK: retrievalOptions.topK ?? this.limits.singleDatasourceTopK,
 			dedup: true,
 		});
 		// Single-datasource retrieval is intentionally NOT model-reranked: the
@@ -4654,7 +4820,7 @@ export class AutoRAGAgent {
 			get: (target, property, receiver) => {
 				if (property !== "retrieve") return Reflect.get(target, property, receiver);
 				return async (query: string, options: RetrievalOptions) => {
-					const effective = { ...this.activeRetrievalOptions, ...options };
+					const effective = this.boundToolOptions({ ...this.activeRetrievalOptions, ...options });
 					return target.retrieve.call(target, query, effective);
 				};
 			},
@@ -4668,6 +4834,23 @@ export class AutoRAGAgent {
 			return rest;
 		}
 		return { ...options, scope };
+	}
+
+	/** An on-demand tool call can narrow the caller's scope, never drop it by omitting its own scope. */
+	private boundToolOptions(options: RetrievalOptions): RetrievalOptions {
+		const run = this.activeRetrievalOptions;
+		if (this.retrievalPolicy !== "on-demand" || !run) return options;
+		const requested = this.resolveRetrievalScope(options.scope);
+		const boundary = run.scope;
+		if (boundary && requested && boundary !== requested) {
+			const parent = boundary.replace(/\/\*\*$/u, "");
+			if (parent.includes("*") || !matchesVirtualPathScope(requested, parent))
+				throw new Error(
+					`Tool scope ${requested} is outside or cannot be proven to narrow the requested scope ${boundary}`,
+				);
+		}
+		const topK = options.topK === undefined ? run.topK : Math.min(options.topK, run.topK ?? options.topK);
+		return { ...run, ...options, scope: requested ?? boundary, topK };
 	}
 
 	private resolveRetrievalScope(scope: string | undefined): string | undefined {

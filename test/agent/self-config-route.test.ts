@@ -141,42 +141,72 @@ async function collect(agent: AutoRAGAgent, query: string): Promise<SearchDocume
 }
 
 describe("Jev config branch: the agent configures itself", () => {
-	it("loads the full setup skill and reports through the final message", async () => {
+	it("keeps tools available and does not prefetch when Jev cannot route an on-demand first question", async () => {
 		const seen: Seen = { prompts: [], toolNames: [] };
-		const model = fauxModel(capture(configReport("- Default model is now `new/model`."), seen));
+		const asked: string[] = [];
+		const backend: JevBackend = {
+			name: "offline-fixture",
+			async judge(request) {
+				asked.push(...request.questions.map((q) => q.id));
+				throw new Error("routing offline in fixture");
+			},
+		};
 		const agent = agentWith({
-			model,
-			jev: { backend: jevRouting("config") },
+			model: fauxModel(capture(configReport("No current source."), seen)),
+			retrievalPolicy: "on-demand",
+			jev: { backend },
 			selfConfig: { configPath, skillPath },
 		});
-		const minSync = recordingMinSync();
-		// minSyncMethod is the private seam the sibling Jev pipeline tests inject through.
-		Object.assign(agent, { minSyncMethod: minSync.method });
-
-		const events = await collect(agent, "change the default model to new/model");
-
-		expect(seen.prompts).toHaveLength(1);
-		expect(seen.prompts[0]).toContain(SKILL_MARKER);
-		expect(seen.prompts[0]).toContain("Second paragraph of the skill.");
-		expect(seen.prompts[0]).not.toContain("description: test");
-		expect(seen.prompts[0]).toContain(configPath);
-		expect(seen.prompts[0]).toContain("change the default model to new/model");
-		// The emit tools are gone: no tool the model sees is an emit tool.
-		expect(seen.toolNames[0]?.some((name) => name.includes("emit"))).toBe(false);
-		expect(seen.toolNames[0]).toEqual(expect.arrayContaining(["bash", "read", "edit", "write"]));
-		expect(minSync.queries).toEqual([]);
-		expect(events.some((event) => event.type === "preliminary")).toBe(false);
-		const complete = events.find((event) => event.type === "complete");
-		if (complete?.type !== "complete") throw new Error("expected a complete event");
-		expect(complete.response.answer).toBe("- Default model is now `new/model`.");
-		expect(complete.response.results).toEqual([]);
-		expect(complete.response.diagnostics?.some((diagnostic) => diagnostic.code === "no-final-answer")).toBe(false);
-		expect(
-			complete.response.diagnostics?.some(
-				(diagnostic) => diagnostic.code === "query-routed" && diagnostic.message.includes("config"),
-			),
-		).toBe(true);
+		const method = recordingMinSync();
+		Object.assign(agent, { minSyncMethod: method.method });
+		const answer = await agent.searchDocuments("厦门银行目前的校招岗位？");
+		expect(asked).toContain(QUERY_ROUTE_QUESTION_ID);
+		expect(asked).not.toContain(DECOMPOSE_QUESTION_ID);
+		expect(method.queries).toEqual([]);
+		expect(seen.prompts).toEqual(["厦门银行目前的校招岗位？"]);
+		expect(seen.toolNames[0]).toContain("search_all_documents");
+		expect(answer.diagnostics?.some((d) => d.code === "query-route-fallback")).toBe(true);
 	});
+	it.each(["legacy", "on-demand"] as const)(
+		"loads the full setup skill and reports through the final message in %s",
+		async (retrievalPolicy) => {
+			const seen: Seen = { prompts: [], toolNames: [] };
+			const model = fauxModel(capture(configReport("- Default model is now `new/model`."), seen));
+			const agent = agentWith({
+				model,
+				retrievalPolicy,
+				jev: { backend: jevRouting("config") },
+				selfConfig: { configPath, skillPath },
+			});
+			const minSync = recordingMinSync();
+			// minSyncMethod is the private seam the sibling Jev pipeline tests inject through.
+			Object.assign(agent, { minSyncMethod: minSync.method });
+
+			const events = await collect(agent, "change the default model to new/model");
+
+			expect(seen.prompts).toHaveLength(1);
+			expect(seen.prompts[0]).toContain(SKILL_MARKER);
+			expect(seen.prompts[0]).toContain("Second paragraph of the skill.");
+			expect(seen.prompts[0]).not.toContain("description: test");
+			expect(seen.prompts[0]).toContain(configPath);
+			expect(seen.prompts[0]).toContain("change the default model to new/model");
+			// The emit tools are gone: no tool the model sees is an emit tool.
+			expect(seen.toolNames[0]?.some((name) => name.includes("emit"))).toBe(false);
+			expect(seen.toolNames[0]).toEqual(expect.arrayContaining(["bash", "read", "edit", "write"]));
+			expect(minSync.queries).toEqual([]);
+			expect(events.some((event) => event.type === "preliminary")).toBe(false);
+			const complete = events.find((event) => event.type === "complete");
+			if (complete?.type !== "complete") throw new Error("expected a complete event");
+			expect(complete.response.answer).toBe("- Default model is now `new/model`.");
+			expect(complete.response.results).toEqual([]);
+			expect(complete.response.diagnostics?.some((diagnostic) => diagnostic.code === "no-final-answer")).toBe(false);
+			expect(
+				complete.response.diagnostics?.some(
+					(diagnostic) => diagnostic.code === "query-routed" && diagnostic.message.includes("config"),
+				),
+			).toBe(true);
+		},
+	);
 
 	it("makes bash usable when the configured workspace directory does not exist yet", async () => {
 		const workspace = join(root, "not-created-yet");

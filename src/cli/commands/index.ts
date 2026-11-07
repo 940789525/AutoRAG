@@ -4,10 +4,11 @@ import { join, resolve, sep } from "node:path";
 import { AutoRAGAgent, type AutoRAGRefreshResult, type RefreshMethod } from "../../agent/agent.ts";
 import { removeRefreshProgress } from "../../agent/refresh-progress.ts";
 import { chunkMarkdown } from "../../indexing/chunker.ts";
+import { prepareSourceOperation } from "../../indexing/source-operation.ts";
 import { loadIndexTokenizer } from "../../indexing/tokenizer.ts";
-import { loadMirrorIndex, type ParsedMirrorEntry, saveMirrorIndex } from "../../mirror/index-store.ts";
+import { loadMirrorIndex, type ParsedMirrorEntry } from "../../mirror/index-store.ts";
 import { PARSED_MIRROR_SUBDIR, refreshReadinessPath } from "../../mirror/paths.ts";
-import { buildAgentOptions, type CliConfig, readRawConfigObject, resolveConfig, writeConfigObject } from "../config.ts";
+import { buildAgentOptions, type CliConfig, resolveConfig } from "../config.ts";
 import { createIndexProgress } from "../index-progress.ts";
 import { renderError, renderIndex } from "../output.ts";
 import { parseMethodFlag } from "./refresh.ts";
@@ -278,20 +279,28 @@ async function runIndexRemove(ctx: CommandContext, initial: CliConfig): Promise<
 		}
 	}
 
-	// Persist the exclusion first, so a config write failure aborts before anything is deleted.
-	const excluded = excludeSourcePath(initial, entry.sourcePath);
-	removeMirrorEntry(initial.workspacePath, entry);
-	// MinSync drops staged mirrors it no longer sees; keep that staging area in step with the mirror index.
-
+	let excluded = false;
+	let prepared = false;
 	let rebuilt: AutoRAGRefreshResult;
 	try {
-		// Re-resolve so the refresh runs with the exclusion just persisted.
-		const config = resolveConfig({ flags: ctx.flags, cwd: ctx.cwd });
-		const agent = new AutoRAGAgent(buildAgentOptions(config));
-		rebuilt = await agent.refresh(false, { methods: ["parsed", "minsync"] });
+		const agent = new AutoRAGAgent(buildAgentOptions(initial));
+		rebuilt = await agent.refresh(false, {
+			methods: ["parsed", "minsync"],
+			beforeSync: () => {
+				if (!initial.configPath) throw new Error("No resolved config path");
+				excluded = prepareSourceOperation(
+					"remove",
+					initial.workspacePath,
+					initial.searchPaths,
+					initial.configPath,
+					entry.virtualPath,
+				);
+				prepared = true;
+			},
+		});
 	} catch (error) {
 		ctx.stderr(renderError(error, { json: ctx.json, debug: ctx.debug }));
-		if (!ctx.json) {
+		if (prepared && !ctx.json) {
 			ctx.stderr(
 				`note: the parsed index entry for ${entry.virtualPath} was already removed; run "autorag refresh" to retry the semantic cleanup.`,
 			);
@@ -316,32 +325,4 @@ function findMirroredSource(workspacePath: string, requested: string, cwd: strin
 		entries.find((entry) => entry.virtualPath === requested || entry.sourcePath === requested) ??
 		entries.find((entry) => entry.sourcePath === absolute)
 	);
-}
-
-/** Drop one entry from the parsed-mirror index, including any skip record, and delete its `.md` mirror. */
-function removeMirrorEntry(workspacePath: string, entry: ParsedMirrorEntry): void {
-	const index = loadMirrorIndex(workspacePath);
-	const entries = { ...index.entries };
-	delete entries[entry.virtualPath];
-	const skipped = { ...index.skipped };
-	delete skipped[entry.virtualPath];
-	saveMirrorIndex(workspacePath, { version: 1, entries, skipped });
-	rmSync(entry.outputPath, { force: true });
-}
-
-/**
- * Append the source to the persisted `excludePaths` so the next refresh treats it as
- * deliberately un-indexed instead of re-parsing it. Returns whether the config changed
- * (`false` when the source was already excluded).
- */
-function excludeSourcePath(config: CliConfig, sourcePath: string): boolean {
-	if ((config.excludePaths ?? []).includes(sourcePath)) return false;
-	const configPath = config.configPath;
-	if (configPath === undefined) throw new Error("Cannot persist the exclusion: no config file path was resolved.");
-	const raw = existsSync(configPath) ? readRawConfigObject(configPath) : {};
-	const existing = Array.isArray(raw.excludePaths)
-		? raw.excludePaths.filter((value): value is string => typeof value === "string")
-		: [];
-	writeConfigObject(configPath, { ...raw, excludePaths: [...existing, sourcePath] });
-	return true;
 }

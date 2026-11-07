@@ -32,3 +32,36 @@ describe("answer delivery mode", () => {
 		expect(() => resolve(mode)).toThrow(/answerMode/);
 	});
 });
+
+describe("retrieval policy", () => {
+	it.each(["observe", "enforce", "unrecognized"])(
+		"does not silently accept an unavailable local filter: %s",
+		(mode) => {
+			const path = join(root, "config.json");
+			writeFileSync(path, JSON.stringify({ retrievalPolicy: "on-demand", localEvidenceFilter: { mode } }));
+			expect(() => resolveConfig({ flags: { config: path }, cwd: root })).toThrow(/has not passed calibration/);
+		},
+	);
+	it("accepts an explicit rollback without reading the inactive calibration path", () => {
+		const path = join(root, "config.json");
+		writeFileSync(path, JSON.stringify({ localEvidenceFilter: { mode: "off", calibrationPath: "absent" } }));
+		expect(buildAgentOptions(resolveConfig({ flags: { config: path }, cwd: root })).localEvidenceFilter?.mode).toBe(
+			"off",
+		);
+	});
+	it.each([undefined, "legacy", "on-demand"])("passes %s from trusted config to the agent", (policy) => {
+		const path = join(root, "config.json");
+		writeFileSync(path, JSON.stringify({ retrievalPolicy: policy }));
+		const conf = resolveConfig({
+			flags: { config: path, "retrieval-policy": "on-demand" },
+			env: { HOME: root },
+			cwd: root,
+		});
+		expect(buildAgentOptions(conf).retrievalPolicy).toBe(policy ?? "legacy");
+	});
+	it.each(["auto", false, null])("rejects invalid retrieval policy %j", (value) => {
+		const path = join(root, "config.json");
+		writeFileSync(path, JSON.stringify({ retrievalPolicy: value }));
+		expect(() => resolveConfig({ flags: { config: path }, cwd: root })).toThrow(/retrievalPolicy/);
+	});
+});

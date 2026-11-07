@@ -257,7 +257,6 @@ export class EverythingClient {
 	private readonly run: EverythingRunner;
 	private readonly launch: EverythingLauncher;
 	private readonly stateDir: string;
-	private readonly isExcludedPath: (path: string) => boolean;
 	private binaries: EnsureEverythingBinariesResult | undefined;
 	private operation: Promise<unknown> = Promise.resolve();
 
@@ -268,7 +267,6 @@ export class EverythingClient {
 		this.run = options.run ?? runProcess;
 		this.launch = options.launch ?? launchDetached;
 		this.stateDir = join(options.root, ".autorag", "everything");
-		this.isExcludedPath = createPathExclusionMatcher(options.excludeFolders ?? [], "win32");
 	}
 
 	isSupported(): boolean {
@@ -321,6 +319,7 @@ export class EverythingClient {
 		const maxResults = request.maxResults ?? DEFAULT_MAX_RESULTS;
 		const results: EverythingEntry[] = [];
 		let skipped = 0;
+		const isExcluded = createPathExclusionMatcher(this.options.excludeFolders ?? [], "win32");
 		let nativeOffset = 0;
 		const timedOut = (): EverythingFailure => ({
 			ok: false,
@@ -345,7 +344,7 @@ export class EverythingClient {
 				return { ok: false, reason: "search-failed", message: (error as Error).message };
 			}
 			for (const entry of entries) {
-				if (this.isExcludedPath(entry.path)) continue;
+				if (isExcluded(entry.path)) continue;
 				if (skipped < offset) {
 					skipped += 1;
 					continue;

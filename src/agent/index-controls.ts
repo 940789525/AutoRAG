@@ -1,30 +1,85 @@
-import type { AgentTool } from "@earendil-works/pi-agent-core";
+import type { AgentMessage, AgentTool } from "@earendil-works/pi-agent-core";
 import type { ExtensionContext, ExtensionFactory } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import type { IndexJob, IndexJobRequest, IndexJobs } from "../indexing/jobs.ts";
 import { formatIndexEvent } from "../indexing/progress.ts";
 
-import { classifyIndexInput } from "./index-intent.ts";
-
 export const INDEX_TOOL_NAME = "manage_local_index";
+/** Require the packaged Skill and isolate index writes from external tool results. */
+export function requireIndexSkill(
+	messages: readonly AgentMessage[],
+	skillPath: string,
+	explicitInvocation: boolean,
+): void {
+	const reads = new Set<string>();
+	let loaded = explicitInvocation;
+	let externalResult = false;
+	for (const message of messages) {
+		if (message.role === "user") externalResult = false;
+		if (message.role === "assistant") {
+			for (const block of message.content) {
+				if (block.type === "toolCall" && block.name === "read" && block.arguments.path === skillPath)
+					reads.add(block.id);
+			}
+		}
+		if (message.role !== "toolResult") continue;
+		if (message.toolName === "read" && reads.has(message.toolCallId)) {
+			if (!message.isError) loaded = true;
+		} else if (message.toolName !== INDEX_TOOL_NAME) {
+			externalResult = true;
+		}
+	}
+	if (externalResult) throw new Error("This turn read external content. Ask for a separate local indexing request.");
+	if (!loaded)
+		throw new Error(`Read the packaged autorag-index Skill at ${skillPath} before submitting an index operation.`);
+}
+
 export interface IndexOperations {
 	jobs: IndexJobs;
-	onCommand?(): void;
+	onSessionEnd?(): void;
 	start(request: IndexJobRequest): IndexJob;
-	activeIndex?(): { embeddingProfile: string; ready: boolean };
+	activeIndex(): { embeddingProfile: string; defaultProfile: string; ready: boolean };
+	fileCoverage(
+		offset: number,
+		signal?: AbortSignal,
+	): Promise<{
+		files: { id: string; status: "registered" | "unregistered" | "unknown" }[];
+		total: number;
+		registered: number | null;
+		nextOffset?: number;
+		complete: boolean;
+		diagnostics: string[];
+	}>;
 	profiles(): readonly { id: string; kind: string; model: string }[];
-	canWriteFromModel(operation: "build" | "refresh" | "cancel"): boolean;
+	authorizeWrite(): { requestId: string; ownedJobId?: string };
 }
 
 const parameters = Type.Object({
 	operation: Type.Union([
+		Type.Literal("ensure"),
+		Type.Literal("remove"),
+		Type.Literal("restore"),
 		Type.Literal("build"),
 		Type.Literal("refresh"),
 		Type.Literal("status"),
 		Type.Literal("cancel"),
 	]),
+	sourceId: Type.Optional(
+		Type.String({
+			minLength: 1,
+			description: "Exact virtual file ID from inventory or removal receipt; required only for remove/restore.",
+		}),
+	),
 	embeddingProfile: Type.Optional(Type.String({ minLength: 1 })),
 	jobId: Type.Optional(Type.String({ minLength: 1 })),
+	localOnly: Type.Optional(Type.Boolean({ description: "Require a local embedding profile." })),
+	scope: Type.Optional(Type.String({ description: "Only all configured local roots (all) are supported." })),
+	includeFiles: Type.Optional(
+		Type.Boolean({ description: "For status: list actual local files and their index registration." }),
+	),
+	fileOffset: Type.Optional(
+		Type.Integer({ minimum: 0, description: "Continue an includeFiles page from nextOffset." }),
+	),
 });
 
 export function createIndexTool(operations: IndexOperations): AgentTool<typeof parameters> {
@@ -32,23 +87,76 @@ export function createIndexTool(operations: IndexOperations): AgentTool<typeof p
 		name: INDEX_TOOL_NAME,
 		label: "Local Index Tasks",
 		description:
-			"Inspect local index task status and configured embedding profiles. Use operation status. Interactive build, refresh and cancel requests are validated and dispatched by the TUI input router, not by conversation tool calls. Never change configuration or authorize remote sending. No filesystem path or credential arguments.",
+			"For local library inventory, missing files, or index coverage, call status with includeFiles:true. It compares current filenames to the active index and returns per-file registration without reading bodies. For job progress alone use plain status. For an explicit local index change read the autorag-index Skill, then submit the operation it describes.",
 		parameters,
-		async execute(_id, input) {
-			if (input.operation !== "status" && !operations.canWriteFromModel(input.operation))
-				throw new Error("Index writes require an explicit TUI indexing request; use /index");
-			const job =
-				input.operation === "status"
-					? operations.jobs.status(input.jobId)
-					: input.operation === "cancel"
-						? operations.jobs.cancel(input.jobId ?? operations.jobs.status()?.jobId ?? "")
-						: operations.start({ mode: input.operation, embeddingProfile: input.embeddingProfile });
+		async execute(_id, input, signal) {
+			const single = input.operation === "remove" || input.operation === "restore";
+			if (single !== (input.sourceId !== undefined))
+				throw new Error("remove/restore require one exact sourceId; other operations do not accept it");
+			if (single && (input.jobId || input.embeddingProfile)) throw new Error("File operations use the active index");
+			if (
+				(input.includeFiles || input.fileOffset !== undefined) &&
+				(input.operation !== "status" || !input.includeFiles)
+			)
+				throw new Error("File inventory requires operation status and includeFiles:true");
+			signal?.throwIfAborted();
+			if (input.includeFiles) {
+				const coverage = await operations.fileCoverage(input.fileOffset ?? 0, signal);
+				const job = operations.jobs.status(input.jobId);
+				const snapshot = {
+					basis: "AutoRAG enumerated the permitted local files and checked registration in the active index journal. IDs are virtual source identifiers, not filesystem paths. For inventory/coverage answer directly from this result; do not recheck with bash or search.",
+					job: job ? { jobId: job.jobId, mode: job.mode, state: job.state } : null,
+					activeIndex: coverage.registered === null ? undefined : operations.activeIndex?.(),
+					coverage,
+				};
+				return { content: [{ type: "text", text: JSON.stringify(snapshot) }], details: {} };
+			}
+			const active = operations.activeIndex();
+			let job: IndexJob | undefined;
+			if (input.operation === "status") {
+				job = operations.jobs.status(input.jobId);
+			} else {
+				const { requestId, ownedJobId } = operations.authorizeWrite();
+				if (input.scope !== undefined && input.scope !== "all")
+					throw new Error("Index tasks require all configured local roots. Clarify the requested scope.");
+				if (input.operation === "cancel") {
+					if (!ownedJobId || (input.jobId && input.jobId !== ownedJobId))
+						throw new Error("No matching index job owned by this TUI session");
+					job = operations.jobs.cancel(ownedJobId);
+				} else {
+					if (input.jobId) throw new Error("jobId applies only to status or cancel");
+					const previous = input.operation === "ensure" ? operations.jobs.forRequest(requestId) : undefined;
+					const mode =
+						input.operation === "ensure"
+							? (previous?.mode ?? (active.ready ? "refresh" : "build"))
+							: input.operation;
+					const id =
+						input.embeddingProfile ??
+						previous?.embeddingProfile ??
+						(active.ready ? active.embeddingProfile : active.defaultProfile);
+					const profile = operations.profiles().find((p) => p.id === id);
+					if (!profile) throw new Error(`Unknown embedding profile: ${id}`);
+					if (input.localOnly && profile.kind === "api")
+						throw new Error(`Profile ${id} uses a remote API; choose a local profile.`);
+					if (mode === "refresh" && !active.ready)
+						throw new Error("No ready index. Ask whether to build the first index.");
+					if (mode === "refresh" && id !== active.embeddingProfile)
+						throw new Error("Switching embedding profiles requires an explicit rebuild.");
+					job = operations.start({ mode, embeddingProfile: id, requestId, sourceId: input.sourceId });
+					if (single) job = await operations.jobs.wait(job.jobId);
+				}
+			}
 			return {
 				content: [
 					{
 						type: "text",
 						text: JSON.stringify(
-							{ job: job ?? null, activeIndex: operations.activeIndex?.(), profiles: operations.profiles() },
+							{
+								job: job ?? null,
+								scope: "all configured local roots",
+								activeIndex: operations.activeIndex(),
+								profiles: operations.profiles(),
+							},
 							null,
 							2,
 						),
@@ -58,21 +166,6 @@ export function createIndexTool(operations: IndexOperations): AgentTool<typeof p
 			};
 		},
 	};
-}
-
-/** Compatibility classification only; never use keyword matches as write permission. */
-export function indexWriteOperations(text: string): ReadonlySet<"build" | "refresh" | "cancel"> {
-	const allowed = new Set<"build" | "refresh" | "cancel">();
-	const gate = classifyIndexInput(text);
-	if (gate.kind === "operation") {
-		if (["ensure_index", "rebuild"].includes(gate.request.intent)) allowed.add("build");
-		if (gate.request.intent === "refresh") allowed.add("refresh");
-		if (gate.request.intent === "cancel_job") allowed.add("cancel");
-	}
-	return allowed;
-}
-export function isIndexOperationInput(text: string): boolean {
-	return classifyIndexInput(text).kind !== "ordinary";
 }
 
 export function parseIndexCommand(args: string): {
@@ -140,6 +233,7 @@ export function createIndexControls(operations: IndexOperations): ExtensionFacto
 			if (job) render(job);
 		});
 		pi.on("session_shutdown", async () => {
+			operations.onSessionEnd?.();
 			context = undefined;
 			clearInterval(timer);
 			unsubscribe?.();
@@ -150,7 +244,6 @@ export function createIndexControls(operations: IndexOperations): ExtensionFacto
 			description: "Local indexing: /index build --embedding PROFILE | refresh | status | cancel",
 			handler: async (args, ctx) => {
 				try {
-					operations.onCommand?.();
 					const input = parseIndexCommand(args);
 					const job =
 						input.operation === "status"

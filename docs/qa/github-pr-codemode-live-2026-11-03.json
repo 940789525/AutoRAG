@@ -1,0 +1,326 @@
+{
+  "version": 1,
+  "date": "2026-11-03T13:45:56.978674+00:00",
+  "branch": "codex/github-pr-analysis-local-index",
+  "code": "52da4df6e307f92eaefd72b2e8ddb72210dd6d0c",
+  "implementationSha256": {
+    "src/agent/agent.ts": "547e72c1c1d0ed5a81d05d245abf4b04fdb5858ea32d7899eac142800f4b5d74",
+    "src/agent/mcp-client.ts": "75af33a7c6522eb6488a79dd25ae0835be0ac291654d323cdd22c7e745e49296",
+    "src/agent/pi-session.ts": "a5bc2c5ffe6acbf0b89e500ef9fea1a8d5fa7d4a493a9b73de85a00e27002a89",
+    "src/agent/intent-tracing.ts": "19ebd8d5fbebf0f27209e19f663ef0038607c9efbb94300d4741fbe6ae5a59cf",
+    "src/agent/github-mcp-evidence.ts": "2060972a71f4e3a7307a50bc26735861a41ec902a89ca884672dff57142becee",
+    "skills/github-pr-analysis/SKILL.md": "a79abdaa738f0be094703eb4a3e9a9e2afde8ef66284d00a78f5e7aa83dc49b9",
+    "scripts/manual-qa/github-mcp-trace.ts": "aefb73e9a01e8d7239fb9f5aad9900adb5b86f217851472f09c1df4852deb7e6",
+    "scripts/manual-qa/github-mcp-acceptance.ts": "07cfa04ab72fa99bfec4251f97efa3cb29a033486957d78b45b7fc77f428875d",
+    "scripts/manual-qa/run-qa-github-mcp.mts": "4a149897d058bf0aa12799cab04a31fb78f0e793ccf54c2e493d6f3c7696fdff",
+    "test/agent/github-mcp-evidence.test.ts": "f5e795785d91fe52a1aeb966a036de9d8bca8214a3118292d0aede7321810f4e",
+    "test/agent/github-mcp-workflow.test.ts": "88e4ee5d959836ed5b48dc2b6de572a911bb0dd18a655edbb7ba2084227b71dd",
+    "test/agent/intent-tracing.test.ts": "a7355fb929cbc3f4a0778980fe2018613bb446d200bf3c7c138594bec825eaa0",
+    "test/helpers/github-mcp-server.ts": "e03aa61bb4d48c6abfb1c4ab24e8f1243e941a4ae9112ef797660a531aca8439",
+    "test/manual-qa/github-mcp-qa.test.ts": "77d42296d8e9565b3a7a63d6d100661621fdef2ffa764f3f1eb26ff379f43260",
+    "test/manual-qa/github-mcp-acceptance.test.ts": "dcbf3dca5469802fba9ce0e68f0ca5e40756e18c48e38f799c6ca78e96eb5763"
+  },
+  "fix": {
+    "file": "src/agent/intent-tracing.ts",
+    "problem": "Adding required intent field i to grammar-constrained codemode invalidated the provider input schema before the model request was sent.",
+    "change": "Leave grammar tool declarations unchanged; continue intent metadata for JSON-schema tools.",
+    "regressionBefore": {
+      "codemodeFailed": 2,
+      "directPassed": 2
+    },
+    "providerValidation": "Uses the installed resolveGrammarConstrainedSampling on actual headless/TUI tool declarations."
+  },
+  "checks": [
+    {
+      "command": [
+        "bun",
+        "run",
+        "check"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 2280.468593,
+      "logPath": "/workspace/.omo/evidence/github-pr-codemode-fix-2026-11-03.json.0.log"
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "lint"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 1218.914429,
+      "logPath": "/workspace/.omo/evidence/github-pr-codemode-fix-2026-11-03.json.1.log"
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "typecheck"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 3326.739724,
+      "logPath": "/workspace/.omo/evidence/github-pr-codemode-fix-2026-11-03.json.2.log"
+    },
+    {
+      "command": [
+        "/usr/local/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "test/agent/github-mcp-evidence.test.ts",
+        "test/agent/github-mcp-workflow.test.ts",
+        "test/agent/intent-tracing.test.ts",
+        "test/agent/mcp-client.test.ts",
+        "test/agent/answer-citations.test.ts",
+        "test/agent/citation-links.test.ts",
+        "test/agent/citation-numbers.test.ts",
+        "test/agent/evidence-ledger.test.ts",
+        "test/agent/evidence-refs-e2e.test.ts",
+        "test/agent/pi-session.test.ts",
+        "test/manual-qa/github-mcp-qa.test.ts",
+        "test/manual-qa/github-mcp-acceptance.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 6551.533615,
+      "logPath": "/workspace/.omo/evidence/github-pr-codemode-fix-2026-11-03.json.3.log"
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "build"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 2238.7838250000004,
+      "logPath": "/workspace/.omo/evidence/github-pr-codemode-fix-2026-11-03.json.4.log"
+    }
+  ],
+  "tests": {
+    "files": 12,
+    "passed": 149,
+    "fullSuite": "NOT_RUN"
+  },
+  "executionBoundary": {
+    "environment": "isolated Docker using existing QA image",
+    "dependenciesInstalled": false,
+    "hostHomeMounted": false,
+    "projectContainerModified": false
+  },
+  "service": {
+    "status": "PASS",
+    "scope": "Controlled SDK service validation; not a model business-case pass",
+    "date": "2026-11-03T12:34:05.993Z",
+    "server": {
+      "name": "github-mcp-server",
+      "version": "github-mcp-server/remote-82d750d02776001b4e1c2ce2463d2a51868c9f74"
+    },
+    "negotiatedProtocol": "2025-11-25",
+    "toolCatalogDigest": "ec5342a0eab546745c1f010f9e99983a640be6c810f410df907bf27eb44fc7f0",
+    "readOnlyTools": [
+      "actions_get",
+      "actions_list",
+      "get_job_logs",
+      "issue_read",
+      "pull_request_read"
+    ],
+    "publicSamples": [
+      {
+        "url": "https://github.com/Marker-Inc-Korea/AutoRAG/pull/2023",
+        "headSha": "0cd5e150fe272d7312e36404430fcaab212ec61b",
+        "title": "fix(github-gist): exclude stale vectors after content changes"
+      },
+      {
+        "url": "https://github.com/Marker-Inc-Korea/AutoRAG/pull/2034",
+        "headSha": "1832963d64d8ef2927eae62ca5c27aeb2c6a1339",
+        "title": "feat(agent): load optional IDENTITY.md user context"
+      }
+    ]
+  },
+  "dockerAuthentication": {
+    "status": "PASS",
+    "date": "2026-11-03T13:35:30.260Z",
+    "requests": [
+      {
+        "host": "api.github.com",
+        "method": "GET",
+        "authorizationMatches": true,
+        "status": 200
+      },
+      {
+        "host": "api.githubcopilot.com",
+        "method": "POST",
+        "rpc": "initialize",
+        "authorizationMatches": true,
+        "status": 200
+      },
+      {
+        "host": "api.githubcopilot.com",
+        "method": "POST",
+        "rpc": "notifications/initialized",
+        "authorizationMatches": true,
+        "status": 202
+      },
+      {
+        "host": "api.githubcopilot.com",
+        "method": "GET",
+        "authorizationMatches": true,
+        "status": 405,
+        "errorBody": "Method Not Allowed\n"
+      },
+      {
+        "host": "api.githubcopilot.com",
+        "method": "POST",
+        "rpc": "tools/list",
+        "authorizationMatches": true,
+        "status": 200
+      }
+    ],
+    "earlierFailure": "One Pi initialized-notification request returned 401 after initialize returned 200. Subsequent authenticated GitHub /user, SDK catalog and Pi catalog checks passed with the same token; the earlier failure cause remains unconfirmed."
+  },
+  "minimalModelCase": {
+    "status": "PASS",
+    "scope": "Explicit cold discovery plus one PR identity read only; no complete PR/CI acceptance or performance conclusion",
+    "date": "2026-11-03T13:41:18.397Z",
+    "provider": "openai-codex",
+    "model": "gpt-6.1-sol",
+    "readinessMs": 3546.9518050000006,
+    "durationMs": 23512.840268,
+    "loadedSkills": [
+      "github-pr-analysis"
+    ],
+    "query": "请先通过 codemode 发现 GitHub PR 读取工具并输出发现结果，再读取 https://github.com/Marker-Inc-Korea/AutoRAG/pull/2023 的标题和 head SHA。只做这一项读取，用实际证据引用回答；不要用 bash、网页搜索或本地索引代替 MCP。",
+    "calls": [
+      {
+        "tool": "codemode",
+        "status": "error",
+        "toolCallId": "call_9beca9dde1874e4ab3c0594665c4aa21|ctc_0b6ff56cb0fbd96e016ae9e4866524819194e6855a0ae3e534",
+        "parameters": {
+          "code": "const r = await tools.tool_search({i:\"发现用于读取指定 PR 标题与 head SHA 的 GitHub MCP 工具\",query:\"+mcp__github pull request read\",limit:2}); text(r);\ntext(await tools.read({i:\"读取 GitHub PR 工具使用要求\",path:\"/workspace/skills/github-pr-analysis/SKILL.md\",offset:null,limit:null}));\n"
+        },
+        "durationMs": 132
+      },
+      {
+        "tool": "codemode",
+        "status": "success",
+        "toolCallId": "call_1bc59aea1fa74544896c78d102b7f3e0|ctc_0b6ff56cb0fbd96e016ae9e48b8c5c819185506eb4dcdd5b1a",
+        "parameters": {
+          "code": "const found = await searchTools(\"github pull request read\", {limit:2}); text(found);\ntext(await tools.read({i:\"读取 GitHub PR 工具使用要求\",path:\"/workspace/skills/github-pr-analysis/SKILL.md\",offset:null,limit:null}));\n"
+        },
+        "durationMs": 97
+      },
+      {
+        "tool": "read",
+        "status": "success",
+        "toolCallId": "call_1bc59aea1fa74544896c78d102b7f3e0|ctc_0b6ff56cb0fbd96e016ae9e48b8c5c819185506eb4dcdd5b1a/1",
+        "parentToolCallId": "call_1bc59aea1fa74544896c78d102b7f3e0|ctc_0b6ff56cb0fbd96e016ae9e48b8c5c819185506eb4dcdd5b1a",
+        "parameters": {},
+        "durationMs": 2
+      },
+      {
+        "tool": "codemode",
+        "status": "success",
+        "toolCallId": "call_0885127e8b3848c5bc29a2aad7ef146e|ctc_0b6ff56cb0fbd96e016ae9e48e95748191acc51f71d5aab8f3",
+        "parameters": {
+          "code": "const r = await tools.mcp__github__pull_request_read({method:\"get\",owner:\"Marker-Inc-Korea\",repo:\"AutoRAG\",pullNumber:2023}); text(r);\n"
+        },
+        "durationMs": 2039
+      },
+      {
+        "tool": "mcp__github__pull_request_read",
+        "status": "success",
+        "toolCallId": "call_0885127e8b3848c5bc29a2aad7ef146e|ctc_0b6ff56cb0fbd96e016ae9e48e95748191acc51f71d5aab8f3/1",
+        "parentToolCallId": "call_0885127e8b3848c5bc29a2aad7ef146e|ctc_0b6ff56cb0fbd96e016ae9e48e95748191acc51f71d5aab8f3",
+        "parameters": {
+          "method": "get",
+          "owner": "Marker-Inc-Korea",
+          "repo": "AutoRAG",
+          "pullNumber": 2023
+        },
+        "durationMs": 1946
+      }
+    ],
+    "modelRequestCount": 4,
+    "answer": "**已通过发现的 GitHub MCP 工具读取 PR #2023。**\n\n- 发现结果：`mcp__github__pull_request_read`，使用 `method: \"get\"`。\n- 标题：**fix(github-gist): exclude stale vectors after content changes**。[1]\n- Head SHA：**0cd5e150fe272d7312e36404430fcaab212ec61b**。[1]",
+    "results": [
+      {
+        "number": 1,
+        "title": "2023",
+        "summary": "标题：**fix(github-gist): exclude stale vectors after content changes**。",
+        "evidence": [
+          {
+            "excerpt": "chars 0-1700/6889 {\"number\":2023,\"title\":\"fix(github-gist): exclude stale vectors after content changes\",\"body\":\"## Summary\\n\\nAfter a Gist changes, a failed re-embedding leaves its previous vector cached. Semantic retrieval currently ranks that vector and attaches the updated text, so the score describes different content from the result.\\n\\nValidate each vector's existing content hash against th"
+          },
+          {
+            "excerpt": "chars 5100-6800/6889 et personally reviewed/edited this patch and description or confirmed understanding. This PR is a **draft** pending that confirmation under AI_POLICY.md; agent-run tests are not represented as personally run by the human. No third-party code was pasted into the patch.\\n\\n## Checklist\\n\\n- [x] The diff stays inside the linked issue's documented freshness finding.\\n- [x] Existin"
+          }
+        ],
+        "source": "https://github.com/Marker-Inc-Korea/AutoRAG/pull/2023"
+      }
+    ],
+    "diagnostics": [
+      {
+        "code": "evidence-judgment-fallback",
+        "severity": "info",
+        "message": "Jev is disabled, so this answer's evidence was not judged and nothing was added to memory.",
+        "source": "memory"
+      }
+    ],
+    "assertions": {
+      "actualNestedGitHubCall": true,
+      "titleMatchesService": true,
+      "headShaMatchesService": true,
+      "citationSourceMatchesService": true,
+      "implementationHashesMatch": true
+    },
+    "recovery": "The model first called unavailable tools.tool_search inside codemode, then corrected to searchTools and completed the real read. The failed parent script is retained in calls."
+  },
+  "businessModelCase": {
+    "status": "TIMEOUT",
+    "scope": "Normal PR analysis with current-commit CI",
+    "url": "https://github.com/Marker-Inc-Korea/AutoRAG/pull/2034",
+    "provider": "openai-codex",
+    "model": "gpt-6.1-sol",
+    "outerDeadlineMs": 75000,
+    "mcpReadyMs": 3168,
+    "modelRequestCountBeforeStop": 10,
+    "finalAnswerAvailable": false,
+    "partialToolTraceAvailable": false,
+    "reason": "Outer wrapper reached 75 seconds and removed only its own container. The harness had not persisted a final report. No claims about completed business reads, CI logs or citations can be made.",
+    "retriesAfterDeadline": 0
+  },
+  "isolation": {
+    "realConfigBefore": "ABSENT",
+    "realConfigAfter": "ABSENT",
+    "minimalDailyAuthAndConfigUnchanged": true,
+    "businessDailyAuthAndConfigUnchanged": true,
+    "minimalCleanup": {
+      "onlyOwnContainer": true,
+      "removedOrAlreadyAbsent": true
+    },
+    "businessCleanup": {
+      "onlyOwnContainer": true,
+      "removedOrAlreadyAbsent": true
+    }
+  },
+  "comparison": {
+    "status": "NOT_RUN",
+    "eligiblePairs": 0,
+    "wholeRunTokenCost": null,
+    "reason": "No completed comparable direct/codemode business pair and no human review."
+  },
+  "remaining": [
+    "Full normal PR/CI business acceptance, including real failure logs",
+    "Direct/codemode cold/warm paired evaluation",
+    "Human factual and citation review",
+    "Full-suite/live-E2E acceptance beyond the scoped GitHub tests"
+  ],
+  "completion": {
+    "committed": false,
+    "pushed": false,
+    "reason": "Work remains; Git author identity is not configured. No branch creation, switch, synchronization or remote write was performed."
+  }
+}

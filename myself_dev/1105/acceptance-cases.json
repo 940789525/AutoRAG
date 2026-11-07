@@ -1,0 +1,475 @@
+{
+  "schemaVersion": 1,
+  "specVersion": "retrieval-admission-spec-v0.1",
+  "status": "NOT_RUN",
+  "description": "Synthetic seed cases and expected behavior, not measured results or a complete calibration corpus.",
+  "defaults": {
+    "retrievalPolicy": "on-demand",
+    "scope": "QA-owned synthetic corpus only",
+    "realModelRequiredForSemanticClaims": true
+  },
+  "cases": [
+    {
+      "id": "AC-01",
+      "group": "direct",
+      "input": "你好，解释一下二分查找。",
+      "requirements": [
+        "FR-01"
+      ],
+      "expected": [
+        "no_harness_prefetch",
+        "no_automatic_local_body",
+        "direct_answer_allowed"
+      ]
+    },
+    {
+      "id": "AC-02",
+      "group": "public_web",
+      "inputs": [
+        "今天合肥的天气如何？",
+        "当前吉利校招的 Agent 或后端岗位还在招聘吗？",
+        "厦门银行当前校招还有计算机相关岗位吗？"
+      ],
+      "requirements": [
+        "FR-01",
+        "FR-02"
+      ],
+      "expected": [
+        "no_harness_prefetch",
+        "zero_new_unrelated_local_bodies",
+        "public_evidence_for_changing_facts"
+      ]
+    },
+    {
+      "id": "AC-03",
+      "group": "unavailable_index",
+      "input": "查一下今天的天气。",
+      "setup": "No ready index; embedding service unavailable; web tool fixture available.",
+      "requirements": [
+        "FR-01",
+        "NFR-01"
+      ],
+      "expected": [
+        "no_index_access_before_model",
+        "no_installer_or_service_start",
+        "web_tool_remains_usable"
+      ]
+    },
+    {
+      "id": "AC-04",
+      "group": "local",
+      "input": "总结我保存的实验报告里模型 A 的失败案例。",
+      "requirements": [
+        "FR-02",
+        "NFR-07"
+      ],
+      "expected": [
+        "retrieve_or_read_local_evidence",
+        "retain_required_evidence",
+        "grounded_citations"
+      ]
+    },
+    {
+      "id": "AC-05",
+      "group": "mixed",
+      "input": "结合我的简历，判断当前这两个公开招聘岗位哪个更适合我。",
+      "requirements": [
+        "FR-02",
+        "NFR-07"
+      ],
+      "expected": [
+        "local_resume_and_public_job_sources",
+        "neither_subtask_silently_omitted"
+      ]
+    },
+    {
+      "id": "AC-06",
+      "group": "local_only",
+      "input": "只用本地资料回答今年是否还有这个岗位，不要联网。",
+      "setup": "Synthetic local corpus has no current hiring information.",
+      "requirements": [
+        "FR-02",
+        "FR-18"
+      ],
+      "expected": [
+        "no_web_calls",
+        "state_evidence_insufficiency",
+        "no_fabricated_current_status"
+      ]
+    },
+    {
+      "id": "AC-07",
+      "group": "jev_off",
+      "input": "解释递归是什么。",
+      "setup": "Jev absent or disabled.",
+      "requirements": [
+        "FR-03"
+      ],
+      "expected": [
+        "no_harness_prefetch",
+        "tool_capable_agent"
+      ]
+    },
+    {
+      "id": "AC-08",
+      "group": "jev_failure",
+      "input": "找一下我保存的合同。",
+      "setup": "Existing Jev call times out or returns an unusable verdict.",
+      "requirements": [
+        "FR-03"
+      ],
+      "expected": [
+        "verbatim_diagnostic",
+        "no_forced_baseline",
+        "agent_can_request_local_tools"
+      ]
+    },
+    {
+      "id": "AC-09",
+      "group": "configuration_matrix",
+      "requirements": [
+        "FR-06",
+        "FR-16"
+      ],
+      "expected": [
+        "off_and_observe_preserve_bodies",
+        "enforce_applies_decisions",
+        "context_selection_combinations_tested"
+      ]
+    },
+    {
+      "id": "AC-10",
+      "group": "memory",
+      "input": "今天合肥会下雨吗？",
+      "setup": "New session with old judged paper evidence in isolated memory.",
+      "requirements": [
+        "FR-05"
+      ],
+      "expected": [
+        "no_automatic_memory_body",
+        "explicit_check_memory_available"
+      ]
+    },
+    {
+      "id": "AC-11",
+      "group": "all_rejected",
+      "setup": "All trusted local candidates below the fixture calibration threshold.",
+      "requirements": [
+        "FR-06",
+        "FR-08"
+      ],
+      "expected": [
+        "zero_visible_candidate_bodies",
+        "candidate_count_preserved",
+        "valid_tool_result"
+      ]
+    },
+    {
+      "id": "AC-12",
+      "group": "no_resurrection",
+      "setup": "All candidates rejected; exercise rerank fallback and budget exceptions.",
+      "requirements": [
+        "FR-06",
+        "FR-08",
+        "FR-10"
+      ],
+      "expected": [
+        "no_rejected_body_readded",
+        "empty_admission_not_rerank_error"
+      ]
+    },
+    {
+      "id": "AC-13",
+      "group": "threshold_boundary",
+      "requirements": [
+        "FR-07",
+        "NFR-02"
+      ],
+      "expected": [
+        "inclusive_threshold_boundary",
+        "nonfinite_scores_unsupported",
+        "deterministic_retry"
+      ]
+    },
+    {
+      "id": "AC-14",
+      "group": "unsupported_scores",
+      "setup": "Missing profile/cosine; BM25-only and fused-score candidates.",
+      "requirements": [
+        "FR-07",
+        "FR-09"
+      ],
+      "expected": [
+        "no_fake_cosine",
+        "unsupported_is_reported",
+        "existing_budget_policy_retained"
+      ]
+    },
+    {
+      "id": "AC-15",
+      "group": "coverage",
+      "inputs": [
+        "统计全部例外并比较去年和今年的变化。",
+        "列出所有仍有效的退款条件。"
+      ],
+      "requirements": [
+        "FR-09",
+        "FR-18",
+        "NFR-02",
+        "NFR-07"
+      ],
+      "expected": [
+        "coverage_group_validated_or_unsupported",
+        "no_silent_required_evidence_loss"
+      ]
+    },
+    {
+      "id": "AC-16",
+      "group": "entry_and_output",
+      "setup": "Standalone API, CLI and TUI; single and progressive.",
+      "requirements": [
+        "FR-17"
+      ],
+      "expected": [
+        "no_evidenceless_forced_draft",
+        "one_complete_final_delivery",
+        "valid_stream_and_citations"
+      ]
+    },
+    {
+      "id": "AC-17",
+      "group": "control_paths",
+      "inputs": [
+        "查看 AutoRAG 当前配置。",
+        "更新已配置目录的索引。"
+      ],
+      "requirements": [
+        "FR-04"
+      ],
+      "expected": [
+        "existing_config_and_index_paths_preserved",
+        "no_new_write_authority"
+      ]
+    },
+    {
+      "id": "AC-18",
+      "group": "steering",
+      "input": "改查去年那份报告。",
+      "setup": "Search running, then steer and queued follow-up.",
+      "requirements": [
+        "FR-04"
+      ],
+      "expected": [
+        "user_request_not_lost_or_duplicated",
+        "query_score_partition_preserved"
+      ]
+    },
+    {
+      "id": "AC-19",
+      "group": "dispatch",
+      "requirements": [
+        "FR-11",
+        "FR-15",
+        "NFR-03"
+      ],
+      "expected": [
+        "raw_api_ledger_transcript_unchanged",
+        "final_dispatch_has_no_rejected_body_copy",
+        "distinct_candidate_and_visible_counts"
+      ]
+    },
+    {
+      "id": "AC-20",
+      "group": "explicit_read",
+      "input": "请打开刚才那条被省略的原文。",
+      "requirements": [
+        "FR-12"
+      ],
+      "expected": [
+        "authorized_exact_read_restores_body",
+        "version_and_scope_verified",
+        "no_immediate_rejection_again"
+      ]
+    },
+    {
+      "id": "AC-21",
+      "group": "capacity",
+      "setup": "Final context limit removes a body anchor.",
+      "requirements": [
+        "FR-12",
+        "FR-14",
+        "NFR-04"
+      ],
+      "expected": [
+        "no_dangling_reference",
+        "bounded_repair_or_explicit_omission"
+      ]
+    },
+    {
+      "id": "AC-22",
+      "group": "cancel_retry",
+      "requirements": [
+        "FR-04",
+        "FR-14"
+      ],
+      "expected": [
+        "failed_or_cancelled_view_not_committed",
+        "retry_deterministic",
+        "next_run_not_contaminated"
+      ]
+    },
+    {
+      "id": "AC-23",
+      "group": "topic_change",
+      "inputs": [
+        "总结这份本地论文。",
+        "今天合肥天气如何？"
+      ],
+      "requirements": [
+        "FR-13",
+        "NFR-04"
+      ],
+      "expected": [
+        "no_new_automatic_paper_fetch",
+        "historical_bodies_reported_separately",
+        "stable_prefix_when_valid"
+      ]
+    },
+    {
+      "id": "AC-24",
+      "group": "session_lifecycle",
+      "requirements": [
+        "FR-11",
+        "FR-13",
+        "FR-14",
+        "NFR-04"
+      ],
+      "expected": [
+        "resume_fork_new_validated",
+        "new_session_has_no_old_body",
+        "permission_or_model_change_invalidates_view"
+      ]
+    },
+    {
+      "id": "AC-25",
+      "group": "usage",
+      "requirements": [
+        "FR-15",
+        "NFR-01",
+        "NFR-03"
+      ],
+      "expected": [
+        "all_call_scopes_counted",
+        "unknown_usage_is_null",
+        "no_new_cloud_filter_call"
+      ]
+    },
+    {
+      "id": "AC-26",
+      "group": "tool_failure",
+      "requirements": [
+        "FR-10"
+      ],
+      "expected": [
+        "original_error_preserved",
+        "error_not_misclassified_as_irrelevant"
+      ]
+    },
+    {
+      "id": "AC-27",
+      "group": "native_and_isolation",
+      "requirements": [
+        "FR-04",
+        "NFR-05"
+      ],
+      "expected": [
+        "native_source_identity_unchanged",
+        "other_processes_and_stores_untouched",
+        "real_config_hash_unchanged"
+      ]
+    },
+    {
+      "id": "AC-28",
+      "group": "calibration",
+      "inputs": [
+        "不是去年的额度，今年的报销上限是多少？",
+        "Find the exception in the Chinese policy, not the standard allowance."
+      ],
+      "requirements": [
+        "FR-07",
+        "FR-09",
+        "NFR-02",
+        "NFR-07"
+      ],
+      "expected": [
+        "no_cross_profile_threshold",
+        "negation_and_cross_language_coverage_reported",
+        "no_holdout_tuning"
+      ]
+    },
+    {
+      "id": "AC-29",
+      "group": "cache",
+      "requirements": [
+        "FR-15",
+        "NFR-03",
+        "NFR-04"
+      ],
+      "expected": [
+        "cold_warm_usage_separate",
+        "prefix_and_provider_hit_not_conflated",
+        "complete_cost_accounting"
+      ]
+    },
+    {
+      "id": "AC-30",
+      "group": "rollback",
+      "requirements": [
+        "FR-16"
+      ],
+      "expected": [
+        "old_config_legacy_off",
+        "rollback_preserves_sources_index_and_raw_session"
+      ]
+    },
+    {
+      "id": "AC-31",
+      "group": "invalid_calibration",
+      "requirements": [
+        "FR-16",
+        "NFR-02"
+      ],
+      "expected": [
+        "enforce_configuration_error",
+        "no_silent_effective_filter_claim",
+        "no_model_download"
+      ]
+    },
+    {
+      "id": "AC-32",
+      "group": "scope_and_remote",
+      "requirements": [
+        "FR-18",
+        "NFR-05"
+      ],
+      "expected": [
+        "no_scope_expansion",
+        "no_unapproved_remote_corpus_transfer",
+        "synthetic_live_fixture_only"
+      ]
+    },
+    {
+      "id": "AC-33",
+      "group": "quality_gates",
+      "requirements": [
+        "NFR-06"
+      ],
+      "expected": [
+        "required_checks_and_relevant_tests_pass",
+        "live_e2e_impact_reviewed",
+        "affected_evidence_regenerated",
+        "skip_not_pass"
+      ]
+    }
+  ]
+}

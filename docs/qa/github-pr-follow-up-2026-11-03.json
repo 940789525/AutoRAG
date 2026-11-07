@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "runId": "368c5673-2735-4487-93d1-c4db772327f6",
+  "date": "2026-11-03T10:20:36.440Z",
+  "code": "52da4df6e307f92eaefd72b2e8ddb72210dd6d0c",
+  "implementationSha256": {
+    "src/agent/agent.ts": "547e72c1c1d0ed5a81d05d245abf4b04fdb5858ea32d7899eac142800f4b5d74",
+    "src/agent/mcp-client.ts": "75af33a7c6522eb6488a79dd25ae0835be0ac291654d323cdd22c7e745e49296",
+    "src/agent/pi-session.ts": "a5bc2c5ffe6acbf0b89e500ef9fea1a8d5fa7d4a493a9b73de85a00e27002a89",
+    "src/agent/github-mcp-evidence.ts": "2060972a71f4e3a7307a50bc26735861a41ec902a89ca884672dff57142becee",
+    "skills/github-pr-analysis/SKILL.md": "a79abdaa738f0be094703eb4a3e9a9e2afde8ef66284d00a78f5e7aa83dc49b9",
+    "scripts/manual-qa/github-mcp-trace.ts": "aefb73e9a01e8d7239fb9f5aad9900adb5b86f217851472f09c1df4852deb7e6",
+    "scripts/manual-qa/github-mcp-acceptance.ts": "07cfa04ab72fa99bfec4251f97efa3cb29a033486957d78b45b7fc77f428875d",
+    "scripts/manual-qa/run-qa-github-mcp.mts": "da63334e9ff514492d625abf3b182bf511b6bfe0b64204193e87355ea3ba4190",
+    "test/agent/github-mcp-evidence.test.ts": "f5e795785d91fe52a1aeb966a036de9d8bca8214a3118292d0aede7321810f4e",
+    "test/agent/github-mcp-workflow.test.ts": "e8fe171fe70de30506ce0c328d290485a8d20ee59a7924b448624064b6a0f810",
+    "test/helpers/github-mcp-server.ts": "e03aa61bb4d48c6abfb1c4ab24e8f1243e941a4ae9112ef797660a531aca8439",
+    "test/manual-qa/github-mcp-qa.test.ts": "77d42296d8e9565b3a7a63d6d100661621fdef2ffa764f3f1eb26ff379f43260",
+    "test/manual-qa/github-mcp-acceptance.test.ts": "dcbf3dca5469802fba9ce0e68f0ca5e40756e18c48e38f799c6ca78e96eb5763"
+  },
+  "checks": [
+    {
+      "command": [
+        "bun",
+        "run",
+        "check"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 1106.6844179999998,
+      "logPath": "/workspace/.omo/evidence/github-pr-follow-up-2026-11-03.json.0.log"
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "lint"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 771.2047689999999,
+      "logPath": "/workspace/.omo/evidence/github-pr-follow-up-2026-11-03.json.1.log"
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "typecheck"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 3286.91091,
+      "logPath": "/workspace/.omo/evidence/github-pr-follow-up-2026-11-03.json.2.log"
+    },
+    {
+      "command": [
+        "/usr/local/bin/node",
+        "node_modules/vitest/vitest.mjs",
+        "run",
+        "test/agent/github-mcp-evidence.test.ts",
+        "test/agent/github-mcp-workflow.test.ts",
+        "test/agent/mcp-client.test.ts",
+        "test/agent/answer-citations.test.ts",
+        "test/agent/citation-links.test.ts",
+        "test/agent/citation-numbers.test.ts",
+        "test/agent/evidence-ledger.test.ts",
+        "test/agent/evidence-refs-e2e.test.ts",
+        "test/agent/pi-session.test.ts",
+        "test/manual-qa/github-mcp-qa.test.ts",
+        "test/manual-qa/github-mcp-acceptance.test.ts"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 7469.621868000001,
+      "logPath": "/workspace/.omo/evidence/github-pr-follow-up-2026-11-03.json.3.log"
+    },
+    {
+      "command": [
+        "bun",
+        "run",
+        "build"
+      ],
+      "status": "PASS",
+      "exitCode": 0,
+      "durationMs": 2618.8408999999992,
+      "logPath": "/workspace/.omo/evidence/github-pr-follow-up-2026-11-03.json.4.log"
+    }
+  ],
+  "L3": {
+    "status": "SKIP",
+    "reason": "Missing GITHUB_MCP_TOKEN, --manifest, --model; no real GitHub/model requests made."
+  },
+  "L4": {
+    "status": "SKIP",
+    "reason": "Missing GITHUB_MCP_TOKEN, --manifest, --model; no real GitHub/model requests made."
+  },
+  "comparison": {
+    "status": "SKIP",
+    "reason": "Missing GITHUB_MCP_TOKEN, --manifest, --model; no real GitHub/model requests made."
+  },
+  "realConfigBefore": {
+    "/tmp/autorag-github-qa/home/.autorag/config.json": "ABSENT",
+    "/tmp/autorag-github-qa/home/.autorag/config.fastembed.json": "ABSENT",
+    "/tmp/autorag-github-qa/pi/mcp.json": "ABSENT",
+    "/tmp/autorag-github-qa/autorag/config.json": "ABSENT"
+  },
+  "cases": [],
+  "realConfigAfter": {
+    "/tmp/autorag-github-qa/home/.autorag/config.json": "ABSENT",
+    "/tmp/autorag-github-qa/home/.autorag/config.fastembed.json": "ABSENT",
+    "/tmp/autorag-github-qa/pi/mcp.json": "ABSENT",
+    "/tmp/autorag-github-qa/autorag/config.json": "ABSENT"
+  },
+  "realConfigUnchanged": true,
+  "cleanup": {
+    "tempRootRemoved": true,
+    "stoppedOnlyOwnedClients": true
+  },
+  "tests": {
+    "files": 11,
+    "passed": 141,
+    "fullSuite": "NOT_RUN"
+  },
+  "layers": {
+    "L1": "PASS",
+    "L2": "PASS",
+    "L3": "SKIP",
+    "L4": "SKIP"
+  },
+  "qaScriptTypecheck": "PASS",
+  "executionBoundary": {
+    "environment": "isolated Docker, existing autorag-qa-ob8tmejo-dev image",
+    "network": "none",
+    "hostHomeMounted": false,
+    "dependenciesInstalled": false
+  },
+  "supplyChain": "Not required: no dependency or license-allowlist changes",
+  "liveE2E": "NOT_RUN; default local retrieval, embedding and public schema unchanged; GitHub-specific regressions ran",
+  "completion": {
+    "branch": "codex/github-pr-analysis-local-index",
+    "committed": false,
+    "pushed": false,
+    "reason": "Git author/committer identity is not configured; real-service/model acceptance awaits credentials and human review"
+  }
+}

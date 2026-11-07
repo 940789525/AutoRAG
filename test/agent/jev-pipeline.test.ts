@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { once } from "node:events";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,6 +15,7 @@ import {
 import { registerFauxProvider } from "@earendil-works/pi-ai/compat";
 import { type JevBackend, MockBackend } from "jev-use";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { summarizeGitHubUsage } from "../../scripts/manual-qa/github-mcp-acceptance.ts";
 import { AutoRAGAgent, type AutoRAGAgentOptions } from "../../src/agent/agent.ts";
 import { CITATION_QUESTION_ID_PREFIX } from "../../src/agent/citation-relevance.ts";
 import { EVIDENCE_QUESTION_ID_PREFIX } from "../../src/agent/evidence-judgment.ts";
@@ -300,6 +301,49 @@ function agentWith(options: Partial<AutoRAGAgentOptions> & Pick<AutoRAGAgentOpti
 		...options,
 	});
 }
+
+it("records routing, decomposition and answer usage once in the same search boundary", async () => {
+	const inner = jevRouting("local", 0.9);
+	let judgments = 0;
+	const backend: JevBackend = {
+		name: inner.name,
+		async judge(request) {
+			judgments++;
+			return { ...(await inner.judge(request)), usage: { inputTokens: 11, outputTokens: 3 } };
+		},
+	};
+	const agent = agentWith({
+		answerMode: "single",
+		model: fauxModel(
+			fauxAssistantMessage('{"queries":["fixture query"]}', { stopReason: "stop" }),
+			finalAnswer("Done"),
+		),
+		jev: { backend },
+	});
+	try {
+		await agent.searchDocuments("Find fixture information");
+		const log = readFileSync(join(root, "logs", "runs.jsonl"), "utf8")
+			.trim()
+			.split("\n")
+			.map((line) => JSON.parse(line));
+		const usage = log.filter((event) => event.event === "model_usage");
+		expect(usage.filter((event) => event.scope === "jev")).toHaveLength(judgments);
+		expect(usage.filter((event) => event.scope === "query_decomposition")).toHaveLength(1);
+		expect(usage.filter((event) => event.scope === "answer_session")).toHaveLength(1);
+		expect(new Set(usage.map((event) => event.sessionId)).size).toBe(1);
+		const summary = summarizeGitHubUsage(log);
+		expect(summary.complete).toBe(true);
+		expect(summary.fullPipelineTokens).toBe(usage.reduce((sum, event) => sum + event.totalTokens, 0));
+		expect(summary.fullPipelineTokens).toBeGreaterThan(
+			usage.find((event) => event.scope === "answer_session").totalTokens,
+		);
+		// Jev reports token counts, but no cache split or monetary price. Neither becomes a fabricated zero.
+		expect(summary.totalTokenCost).toBeNull();
+		expect(summary.cacheReadTokens).toBeNull();
+	} finally {
+		await agent.indexJobs.close();
+	}
+});
 
 /** Replaces the agent's private MinSync method; the field is the established test seam. */
 function injectMinSync(agent: AutoRAGAgent, method: unknown): void {

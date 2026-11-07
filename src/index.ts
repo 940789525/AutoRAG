@@ -22,6 +22,7 @@ export {
 	type SearchDocumentsStreamEvent,
 	type SearchDocumentWarning,
 } from "./agent/index.ts";
+export type { LocalEvidenceFilterConfig, RetrievalPolicy } from "./agent/query-routing.ts";
 export { buildSystemPrompt, type SystemPromptConfig } from "./agent/system-prompt.ts";
 export * from "./cloud/index.ts";
 export * from "./convert/index.ts";

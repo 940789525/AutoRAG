@@ -1,0 +1,862 @@
+{
+  "format": 1,
+  "model": "deepseek-flash",
+  "transport": "Pi InteractiveMode, real terminal PTY; source CLI; synthetic local roots; permission-mode full",
+  "toolSurface": "unchanged",
+  "fixture": {
+    "files": [
+      "青岚交接.md",
+      "值班手册.md",
+      "项目计划.md",
+      "会议记录.md",
+      "新增纪要.md"
+    ],
+    "indexed": [
+      "/docs/会议记录.md",
+      "/docs/值班手册.md",
+      "/docs/青岚交接.md",
+      "/docs/项目计划.md"
+    ],
+    "jobs": {
+      "e5129fa9-3be8-41d2-b7d2-194ba880d39b": "succeeded"
+    },
+    "model": "deepseek-flash"
+  },
+  "registeredAfterExplicitCommand": [
+    "/docs/会议记录.md",
+    "/docs/值班手册.md",
+    "/docs/新增纪要.md",
+    "/docs/青岚交接.md",
+    "/docs/项目计划.md"
+  ],
+  "cases": [
+    {
+      "id": "read1",
+      "userInput": "当前有哪些文件，这些文件是否都已建立索引？",
+      "submittedUTC": "2026-11-06T04:27:39.583555+00:00",
+      "finishedUTC": "2026-11-06T04:28:24.628290+00:00",
+      "durationSeconds": 45.04,
+      "inputRecords": 1,
+      "indexIntentCalls": 1,
+      "answerCalls": 5,
+      "answerUsage": {
+        "inputTokens": 2586,
+        "outputTokens": 2194,
+        "cacheReadTokens": 60544
+      },
+      "tools": [
+        "bash",
+        "manage_local_index",
+        "bash",
+        "bash"
+      ],
+      "newIndexTasks": [],
+      "finalAnswer": "**当前共 5 个文档，并非全部已建索引：4 个已登记在索引日志中，新出现的 1 个尚未索引。**\n\n- 现有文件为 **会议记录.md、值班手册.md、青岚交接.md、项目计划.md、新增纪要.md**，全部位于同一文档目录下。\n- **已索引（4 个）**：`/docs/会议记录.md`、`/docs/值班手册.md`、`/docs/青岚交接.md`、`/docs/项目计划.md`，在索引日志 sources 表中各有独立指纹记录 [file:/tmp/autorag-1106-tui-2qumm0iz/docs]。\n- **未索引（1 个）**：`新增纪要.md`，其修改时间为 04:27:35.688，晚于本次建库完成时间 04:27:35.319，属于建库之后新增的文件，因此在日志中没有对应条目 [file:/tmp/autorag-1106-tui-2qumm0iz/docs/新增纪要.md]。\n- 索引处于 ready 状态（profile local-qwen3，本次构建 4 文档 / 8 分块、失败 0），但 ready 标记与构建成功只说明当时那一批完成，不等于覆盖到之后新增的文件。\n\n结论：做一次索引刷新（通过 TUI 的索引刷新入口）即可把 `新增纪要.md` 纳入；本次只做了只读核对，未改动任何文件或索引。",
+      "runTimeline": [
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:41.273Z",
+          "sessionId": "unbound",
+          "scope": "index_intent",
+          "model": "deepseek-flash",
+          "stopReason": "stop",
+          "inputTokens": 151,
+          "outputTokens": 73,
+          "cacheReadTokens": 256,
+          "latencyMs": 1661.9787589999996
+        },
+        {
+          "event": "search_started",
+          "timestamp": "2026-11-06T04:27:41.281Z",
+          "sessionId": "1b14a45b-45c4-4c67-bba0-f7e4bcf031f4",
+          "retrievalPolicy": "on-demand",
+          "model": "deepseek-flash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:41.285Z",
+          "sessionId": "1b14a45b-45c4-4c67-bba0-f7e4bcf031f4",
+          "scope": "jev",
+          "model": "jev",
+          "stopReason": "error",
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "latencyMs": 1.2080459999997402
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:43.386Z",
+          "sessionId": "1b14a45b-45c4-4c67-bba0-f7e4bcf031f4",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 161,
+          "outputTokens": 290,
+          "cacheReadTokens": 13696,
+          "latencyMs": 2078.9287509999995
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:27:43.388Z",
+          "sessionId": "1b14a45b-45c4-4c67-bba0-f7e4bcf031f4",
+          "action": "tool_call",
+          "tool": "bash"
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:27:43.407Z",
+          "sessionId": "1b14a45b-45c4-4c67-bba0-f7e4bcf031f4",
+          "action": "tool_call",
+          "tool": "manage_local_index"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:50.690Z",
+          "sessionId": "1b14a45b-45c4-4c67-bba0-f7e4bcf031f4",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 937,
+          "outputTokens": 768,
+          "cacheReadTokens": 14080,
+          "latencyMs": 7224.541568000001
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:27:50.692Z",
+          "sessionId": "1b14a45b-45c4-4c67-bba0-f7e4bcf031f4",
+          "action": "tool_call",
+          "tool": "bash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:53.090Z",
+          "sessionId": "1b14a45b-45c4-4c67-bba0-f7e4bcf031f4",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 983,
+          "outputTokens": 337,
+          "cacheReadTokens": 15744,
+          "latencyMs": 2052.1292029999986
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:27:53.091Z",
+          "sessionId": "1b14a45b-45c4-4c67-bba0-f7e4bcf031f4",
+          "action": "tool_call",
+          "tool": "bash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:13.646Z",
+          "sessionId": "1b14a45b-45c4-4c67-bba0-f7e4bcf031f4",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "error",
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "latencyMs": 19990.948940999995
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:21.336Z",
+          "sessionId": "1b14a45b-45c4-4c67-bba0-f7e4bcf031f4",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "stop",
+          "inputTokens": 505,
+          "outputTokens": 799,
+          "cacheReadTokens": 17024,
+          "latencyMs": 5669.447132000001
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:21.353Z",
+          "sessionId": "1b14a45b-45c4-4c67-bba0-f7e4bcf031f4",
+          "scope": "jev",
+          "model": "jev",
+          "stopReason": "error",
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "latencyMs": 0.6123959999968065
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:21.379Z",
+          "sessionId": "1b14a45b-45c4-4c67-bba0-f7e4bcf031f4",
+          "scope": "jev",
+          "model": "jev",
+          "stopReason": "error",
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "latencyMs": 0.34878500000195345
+        },
+        {
+          "event": "search_completed",
+          "timestamp": "2026-11-06T04:28:21.379Z",
+          "sessionId": "1b14a45b-45c4-4c67-bba0-f7e4bcf031f4"
+        }
+      ],
+      "rawEvidenceInsideContainer": "/tmp/autorag-tui1106-mw4h3wj0",
+      "sessionJsonSHA256": "0d9e5b3eafc47075e3d72e84113cac62a335bdb3b5757d9185de0363e687472e",
+      "runJsonSHA256": "e5961cc8f520a62287fdd20e76861af363ae786d044f43a0b89028c28e0d976f"
+    },
+    {
+      "id": "read2",
+      "userInput": "当前本地资料库中有哪些内容，资料库是否都已完成索引建立？",
+      "submittedUTC": "2026-11-06T04:27:39.653569+00:00",
+      "finishedUTC": "2026-11-06T04:28:03.534969+00:00",
+      "durationSeconds": 23.88,
+      "inputRecords": 1,
+      "indexIntentCalls": 1,
+      "answerCalls": 7,
+      "answerUsage": {
+        "inputTokens": 2502,
+        "outputTokens": 2169,
+        "cacheReadTokens": 105088
+      },
+      "tools": [
+        "bash",
+        "bash",
+        "bash",
+        "bash",
+        "bash",
+        "bash"
+      ],
+      "newIndexTasks": [],
+      "finalAnswer": "**资料库目前只有一个根目录（`/docs`、共 5 个 Markdown 文档）。索引并没有全部完成：4 份已登记入库，1 份尚未入索引。**\n\n- 库内文档为 **会议记录、值班手册、青岚交接、项目计划、新增纪要**，均为短篇合成验收记录，内容以标题和一句样本说明为主 [file:/tmp/autorag-1106-tui-2qumm0iz/docs/会议记录.md] [file:/tmp/autorag-1106-tui-2qumm0iz/docs/值班手册.md] [file:/tmp/autorag-1106-tui-2qumm0iz/docs/青岚交接.md] [file:/tmp/autorag-1106-tui-2qumm0iz/docs/项目计划.md] [file:/tmp/autorag-1106-tui-2qumm0iz/docs/新增纪要.md]。\n- 索引任务的就绪标记为 **ready、partial=false**，嵌入配置为 **local-qwen3（Qwen3-Embedding-0.6B，1024 维）**，对应索引根为 **/docs** [file:/tmp/autorag-1106-tui-2qumm0iz/workspace/.autorag/local-index/ready.json]。\n- 索引日志中实际登记的源只有 **4 条**：/docs/会议记录.md、/docs/值班手册.md、/docs/青岚交接.md、/docs/项目计划.md。\n- **「新增纪要.md」没有入库**：它建立于其余四份之后约 7 秒（04:27:35，其余为 04:27:28），且索引待处理队列为空，说明这是初次索引之后新增的文件，尚未被收录。\n- 因此该文件的名称与正文按内容检索时不会被命中；需要在索引界面手动刷新/重建后，5 份文档才算全部建立索引。\n\n就绪标记只说明上一轮运行成功，并不代表覆盖了运行之后新增的文件；目前唯一缺的就是那份新增纪要。",
+      "runTimeline": [
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:41.565Z",
+          "sessionId": "unbound",
+          "scope": "index_intent",
+          "model": "deepseek-flash",
+          "stopReason": "stop",
+          "inputTokens": 156,
+          "outputTokens": 78,
+          "cacheReadTokens": 256,
+          "latencyMs": 1826.4629759999998
+        },
+        {
+          "event": "search_started",
+          "timestamp": "2026-11-06T04:27:41.572Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "retrievalPolicy": "on-demand",
+          "model": "deepseek-flash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:41.576Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "scope": "jev",
+          "model": "jev",
+          "stopReason": "error",
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "latencyMs": 0.9687329999997019
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:43.002Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 166,
+          "outputTokens": 179,
+          "cacheReadTokens": 13696,
+          "latencyMs": 1396.6280130000005
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:27:43.004Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "action": "tool_call",
+          "tool": "bash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:44.820Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 136,
+          "outputTokens": 188,
+          "cacheReadTokens": 13952,
+          "latencyMs": 1745.2819399999998
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:27:44.821Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "action": "tool_call",
+          "tool": "bash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:47.003Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 155,
+          "outputTokens": 183,
+          "cacheReadTokens": 14208,
+          "latencyMs": 2097.725135999999
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:27:47.003Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "action": "tool_call",
+          "tool": "bash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:48.988Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 583,
+          "outputTokens": 321,
+          "cacheReadTokens": 14464,
+          "latencyMs": 1932.7695669999994
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:27:48.989Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "action": "tool_call",
+          "tool": "bash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:52.669Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 586,
+          "outputTokens": 367,
+          "cacheReadTokens": 15360,
+          "latencyMs": 3584.7095580000005
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:27:52.670Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "action": "tool_call",
+          "tool": "bash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:54.934Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 706,
+          "outputTokens": 218,
+          "cacheReadTokens": 16256,
+          "latencyMs": 2044.3568239999986
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:27:54.935Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "action": "tool_call",
+          "tool": "bash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:00.204Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "stop",
+          "inputTokens": 170,
+          "outputTokens": 713,
+          "cacheReadTokens": 17152,
+          "latencyMs": 5199.792170000001
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:00.214Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "scope": "jev",
+          "model": "jev",
+          "stopReason": "error",
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "latencyMs": 0.20282399999996414
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:00.236Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b",
+          "scope": "jev",
+          "model": "jev",
+          "stopReason": "error",
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "latencyMs": 0.16476399999737623
+        },
+        {
+          "event": "search_completed",
+          "timestamp": "2026-11-06T04:28:00.237Z",
+          "sessionId": "dd6d5c83-5913-4718-a2ef-d516ef7ea31b"
+        }
+      ],
+      "rawEvidenceInsideContainer": "/tmp/autorag-tui1106-mw4h3wj0",
+      "sessionJsonSHA256": "8c76c3b7aa33d67c4864cbe7dda4c2f1c5dc8699b5ce716f0d28653548dab028",
+      "runJsonSHA256": "3a86d9405545cbc501d038d5d61d2c1ec885319b3932d124ed264b8cf7defa32"
+    },
+    {
+      "id": "read3",
+      "userInput": "库里都有什么？还有哪几份没被收录？",
+      "submittedUTC": "2026-11-06T04:27:39.638702+00:00",
+      "finishedUTC": "2026-11-06T04:27:52.407482+00:00",
+      "durationSeconds": 12.77,
+      "inputRecords": 1,
+      "indexIntentCalls": 0,
+      "answerCalls": 3,
+      "answerUsage": {
+        "inputTokens": 13879,
+        "outputTokens": 1108,
+        "cacheReadTokens": 29440
+      },
+      "tools": [
+        "bash",
+        "bash"
+      ],
+      "newIndexTasks": [],
+      "finalAnswer": "**库里共收录 4 份文档，还有 1 份未被收录：`新增纪要.md`。**\n\n- 已收录的 4 份：`/docs/会议记录.md`、`/docs/值班手册.md`、`/docs/青岚交接.md`、`/docs/项目计划.md`，这些条目都已在索引日志中登记 [file:/tmp/autorag-1106-tui-2qumm0iz/workspace/.autorag/local-index/8fe1db4aaa23718139a2a1aed1ad6da3e66a23b043b2597ad8ef57da2f0069e1/journal.sqlite]。\n- 检索目录中一共存在 **5 份文档**；其中未被收录的一份是 `新增纪要.md`：它在检索目录里存在，但在索引日志中找不到对应条目 [file:/tmp/autorag-1106-tui-2qumm0iz/docs]。\n- 当前索引 profile 是 **local-qwen3**，已经完成且状态不是部分完成，运行及完成信息记录在 ready.json；该索引没有覆盖整个目录，漏掉了上述文档 [file:/tmp/autorag-1106-tui-2qumm0iz/workspace/.autorag/local-index/ready.json]。\n- 登记在案并不代表内容已被抓取：要让 `新增纪要.md` 能被检索到，需要通过索引界面重新建立或刷新索引。\n\n本次扫描只覆盖配置中的检索目录和该 profile 的索引日志，没有检查其他磁盘位置。",
+      "runTimeline": [
+        {
+          "event": "search_started",
+          "timestamp": "2026-11-06T04:27:39.679Z",
+          "sessionId": "6bca15d6-543b-48fe-822a-a23dc1113882",
+          "retrievalPolicy": "on-demand",
+          "model": "deepseek-flash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:39.682Z",
+          "sessionId": "6bca15d6-543b-48fe-822a-a23dc1113882",
+          "scope": "jev",
+          "model": "jev",
+          "stopReason": "error",
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "latencyMs": 1.0067290000001776
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:42.781Z",
+          "sessionId": "6bca15d6-543b-48fe-822a-a23dc1113882",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 13090,
+          "outputTokens": 321,
+          "cacheReadTokens": 768,
+          "latencyMs": 3078.8633730000006
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:27:42.783Z",
+          "sessionId": "6bca15d6-543b-48fe-822a-a23dc1113882",
+          "action": "tool_call",
+          "tool": "bash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:45.485Z",
+          "sessionId": "6bca15d6-543b-48fe-822a-a23dc1113882",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 180,
+          "outputTokens": 452,
+          "cacheReadTokens": 14080,
+          "latencyMs": 2637.8240019999994
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:27:45.485Z",
+          "sessionId": "6bca15d6-543b-48fe-822a-a23dc1113882",
+          "action": "tool_call",
+          "tool": "bash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:49.030Z",
+          "sessionId": "6bca15d6-543b-48fe-822a-a23dc1113882",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "stop",
+          "inputTokens": 609,
+          "outputTokens": 335,
+          "cacheReadTokens": 14592,
+          "latencyMs": 3449.9738080000006
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:49.046Z",
+          "sessionId": "6bca15d6-543b-48fe-822a-a23dc1113882",
+          "scope": "jev",
+          "model": "jev",
+          "stopReason": "error",
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "latencyMs": 0.8236480000014126
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:27:49.072Z",
+          "sessionId": "6bca15d6-543b-48fe-822a-a23dc1113882",
+          "scope": "jev",
+          "model": "jev",
+          "stopReason": "error",
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "latencyMs": 0.36914700000124867
+        },
+        {
+          "event": "search_completed",
+          "timestamp": "2026-11-06T04:27:49.073Z",
+          "sessionId": "6bca15d6-543b-48fe-822a-a23dc1113882"
+        }
+      ],
+      "rawEvidenceInsideContainer": "/tmp/autorag-tui1106-mw4h3wj0",
+      "sessionJsonSHA256": "c24ef539f57efa5ce70076f1053fc9f69395f4c6b3f8249eb027e63409c28d2c",
+      "runJsonSHA256": "55f39e92355965a7cb3078c7e2408cd412df259018bba3f0411a347b67b25cd2"
+    },
+    {
+      "id": "common",
+      "userInput": "一周有几天？",
+      "submittedUTC": "2026-11-06T04:28:31.635886+00:00",
+      "finishedUTC": "2026-11-06T04:28:33.226004+00:00",
+      "durationSeconds": 1.59,
+      "inputRecords": 1,
+      "indexIntentCalls": 0,
+      "answerCalls": 1,
+      "answerUsage": {
+        "inputTokens": 154,
+        "outputTokens": 13,
+        "cacheReadTokens": 13696
+      },
+      "tools": [],
+      "newIndexTasks": [],
+      "finalAnswer": "一周有 **7 天**（周一至周日）。",
+      "runTimeline": [
+        {
+          "event": "search_started",
+          "timestamp": "2026-11-06T04:28:31.677Z",
+          "sessionId": "9f409032-96ba-4458-86fe-8a61848bed82",
+          "retrievalPolicy": "on-demand",
+          "model": "deepseek-flash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:31.680Z",
+          "sessionId": "9f409032-96ba-4458-86fe-8a61848bed82",
+          "scope": "jev",
+          "model": "jev",
+          "stopReason": "error",
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "latencyMs": 0.597168999999667
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:32.844Z",
+          "sessionId": "9f409032-96ba-4458-86fe-8a61848bed82",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "stop",
+          "inputTokens": 154,
+          "outputTokens": 13,
+          "cacheReadTokens": 13696,
+          "latencyMs": 1144.2618139999995
+        },
+        {
+          "event": "search_completed",
+          "timestamp": "2026-11-06T04:28:32.852Z",
+          "sessionId": "9f409032-96ba-4458-86fe-8a61848bed82"
+        }
+      ],
+      "rawEvidenceInsideContainer": "/tmp/autorag-tui1106-mw4h3wj0",
+      "sessionJsonSHA256": "4e5e5da6dd7818fa12974225e60f6e0d48c1c504e27ec735df03a0ffa3563a9d",
+      "runJsonSHA256": "e49cc3c76cc93f4384957831845aaf94355e8e2d4ba9f7758d08caaeba36afe7"
+    },
+    {
+      "id": "action",
+      "userInput": "帮我建立索引",
+      "submittedUTC": "2026-11-06T04:28:36.628262+00:00",
+      "finishedUTC": "2026-11-06T04:28:39.002956+00:00",
+      "durationSeconds": 2.37,
+      "inputRecords": 0,
+      "indexIntentCalls": 0,
+      "answerCalls": 0,
+      "answerUsage": {
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheReadTokens": 0
+      },
+      "tools": [],
+      "newIndexTasks": [
+        "62dda600-4395-4f2c-80a7-8ca3f87320a1"
+      ],
+      "finalAnswer": null,
+      "runTimeline": [],
+      "rawEvidenceInsideContainer": "/tmp/autorag-tui1106-mw4h3wj0",
+      "sessionJsonSHA256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "runJsonSHA256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "terminalSHA256": "e309cede8b46a8eb0dec6e258dc990a5393e78988c7f4004f4ad9fa312341a43",
+      "tasks": [
+        {
+          "jobId": "62dda600-4395-4f2c-80a7-8ca3f87320a1",
+          "mode": "refresh",
+          "state": "succeeded",
+          "embeddingProfile": "local-qwen3",
+          "startedAt": "2026-11-06T04:28:36.644Z",
+          "updatedAt": "2026-11-06T04:28:38.633Z",
+          "error": null
+        }
+      ],
+      "note": "No answer turn. The explicit command was observed in the actual terminal and the persisted job receipt."
+    },
+    {
+      "id": "missing",
+      "userInput": "当前有哪些文件，这些文件是否都已建立索引？",
+      "submittedUTC": "2026-11-06T04:28:48.827832+00:00",
+      "finishedUTC": "2026-11-06T04:29:05.946804+00:00",
+      "durationSeconds": 17.12,
+      "inputRecords": 1,
+      "indexIntentCalls": 1,
+      "answerCalls": 7,
+      "answerUsage": {
+        "inputTokens": 1412,
+        "outputTokens": 1681,
+        "cacheReadTokens": 102912
+      },
+      "tools": [
+        "bash",
+        "bash",
+        "bash",
+        "bash",
+        "manage_local_index",
+        "semantic_search_local_docs"
+      ],
+      "newIndexTasks": [],
+      "finalAnswer": "**当前配置的文档目录下共有 5 个文件，它们都还没有建立索引，因为本地索引从未构建过，不存在就绪指针，也没有任何索引任务在运行。**\n\n- 这 5 个文件都是 Markdown 文档，且都放在根目录、没有子目录：**会议记录.md**、**值班手册.md**、**新增纪要.md**、**青岚交接.md**、**项目计划.md**（每个文件大小均为 15 字节）。\n- 索引状态显示 **ready = false**：工作区下的本地索引目录不存在，既没有 `ready.json`，也没有任何来源注册记录，因此没有可比的“已注册”文件清单。\n- 语义检索也直接返回“local index is not ready”，这说明这 5 个文件都没有进入索引，覆盖率为 **0/5**。\n- 已配置的嵌入配置为 **local-qwen3**（本地 Qwen3-Embedding-0.6B），它本身可用，只是还没有执行过构建。\n- 要让这些文件变得可检索，需要通过 TUI 的索引控件发起一次构建/刷新；索引写入不能由普通命令代劳。\n\n扫描范围仅限于当前配置的这一个文档目录。如果目录下还有隐藏文件或子目录，那么它们不在本次统计之内。",
+      "runTimeline": [
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:49.968Z",
+          "sessionId": "unbound",
+          "scope": "index_intent",
+          "model": "deepseek-flash",
+          "stopReason": "stop",
+          "inputTokens": 151,
+          "outputTokens": 81,
+          "cacheReadTokens": 256,
+          "latencyMs": 1131.8414879999996
+        },
+        {
+          "event": "search_started",
+          "timestamp": "2026-11-06T04:28:49.972Z",
+          "sessionId": "22d3868c-a13e-4eb5-8877-1bb6e914a1d7",
+          "retrievalPolicy": "on-demand",
+          "model": "deepseek-flash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:49.974Z",
+          "sessionId": "22d3868c-a13e-4eb5-8877-1bb6e914a1d7",
+          "scope": "jev",
+          "model": "jev",
+          "stopReason": "error",
+          "inputTokens": null,
+          "outputTokens": null,
+          "cacheReadTokens": null,
+          "latencyMs": 0.8903119999995397
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:51.857Z",
+          "sessionId": "22d3868c-a13e-4eb5-8877-1bb6e914a1d7",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 161,
+          "outputTokens": 277,
+          "cacheReadTokens": 13696,
+          "latencyMs": 1865.2819860000009
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:28:51.858Z",
+          "sessionId": "22d3868c-a13e-4eb5-8877-1bb6e914a1d7",
+          "action": "tool_call",
+          "tool": "bash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:53.116Z",
+          "sessionId": "22d3868c-a13e-4eb5-8877-1bb6e914a1d7",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 247,
+          "outputTokens": 267,
+          "cacheReadTokens": 14080,
+          "latencyMs": 1187.7873650000001
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:28:53.117Z",
+          "sessionId": "22d3868c-a13e-4eb5-8877-1bb6e914a1d7",
+          "action": "tool_call",
+          "tool": "bash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:55.138Z",
+          "sessionId": "22d3868c-a13e-4eb5-8877-1bb6e914a1d7",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 180,
+          "outputTokens": 244,
+          "cacheReadTokens": 14464,
+          "latencyMs": 1804.4488700000002
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:28:55.140Z",
+          "sessionId": "22d3868c-a13e-4eb5-8877-1bb6e914a1d7",
+          "action": "tool_call",
+          "tool": "bash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:56.469Z",
+          "sessionId": "22d3868c-a13e-4eb5-8877-1bb6e914a1d7",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 184,
+          "outputTokens": 226,
+          "cacheReadTokens": 14720,
+          "latencyMs": 1246.927189
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:28:56.470Z",
+          "sessionId": "22d3868c-a13e-4eb5-8877-1bb6e914a1d7",
+          "action": "tool_call",
+          "tool": "bash"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:57.626Z",
+          "sessionId": "22d3868c-a13e-4eb5-8877-1bb6e914a1d7",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 201,
+          "outputTokens": 151,
+          "cacheReadTokens": 15104,
+          "latencyMs": 1102.7758009999998
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:28:57.626Z",
+          "sessionId": "22d3868c-a13e-4eb5-8877-1bb6e914a1d7",
+          "action": "tool_call",
+          "tool": "manage_local_index"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:28:58.945Z",
+          "sessionId": "22d3868c-a13e-4eb5-8877-1bb6e914a1d7",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "toolUse",
+          "inputTokens": 191,
+          "outputTokens": 123,
+          "cacheReadTokens": 15360,
+          "latencyMs": 1301.276159000001
+        },
+        {
+          "event": "retrieval_step",
+          "timestamp": "2026-11-06T04:28:58.946Z",
+          "sessionId": "22d3868c-a13e-4eb5-8877-1bb6e914a1d7",
+          "action": "tool_call",
+          "tool": "semantic_search_local_docs"
+        },
+        {
+          "event": "model_usage",
+          "timestamp": "2026-11-06T04:29:02.602Z",
+          "sessionId": "22d3868c-a13e-4eb5-8877-1bb6e914a1d7",
+          "scope": "answer_session",
+          "model": "deepseek-flash",
+          "stopReason": "stop",
+          "inputTokens": 248,
+          "outputTokens": 393,
+          "cacheReadTokens": 15488,
+          "latencyMs": 3647.589068000001
+        },
+        {
+          "event": "search_completed",
+          "timestamp": "2026-11-06T04:29:02.617Z",
+          "sessionId": "22d3868c-a13e-4eb5-8877-1bb6e914a1d7"
+        }
+      ],
+      "rawEvidenceInsideContainer": "/tmp/tui1106-missing-mw4h5igx",
+      "sessionJsonSHA256": "20f911793c12832a23999ac511f57ebd2407cd257d06e151d12cab0323dc54a6",
+      "runJsonSHA256": "8e287dcd2b03dbe83888030ce6b0426ab94374a061bc34aa60f2f312b6e4021e"
+    }
+  ],
+  "isolation": {
+    "main": {
+      "realConfigBefore": {
+        "config.json": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+        "config.fastembed.json": "716c12831b43095e4919bde13d079272106a28ffa0c25ccb1a4af32fddd91327"
+      },
+      "realConfigAfter": {
+        "config.json": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+        "config.fastembed.json": "716c12831b43095e4919bde13d079272106a28ffa0c25ccb1a4af32fddd91327"
+      },
+      "unchanged": true
+    },
+    "missingIndex": {
+      "realConfigBefore": {
+        "config.json": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+        "config.fastembed.json": "716c12831b43095e4919bde13d079272106a28ffa0c25ccb1a4af32fddd91327"
+      },
+      "realConfigAfter": {
+        "config.json": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+        "config.fastembed.json": "716c12831b43095e4919bde13d079272106a28ffa0c25ccb1a4af32fddd91327"
+      },
+      "unchanged": true
+    }
+  }
+}

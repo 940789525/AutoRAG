@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
 import {
 	type AssistantMessage,
 	type FauxProviderRegistration,
@@ -10,7 +11,7 @@ import {
 	fauxToolCall,
 } from "@earendil-works/pi-ai";
 import { registerFauxProvider } from "@earendil-works/pi-ai/compat";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AutoRAGAgent, type AutoRAGAgentOptions } from "../../src/agent/agent.ts";
 import type { SearchDocumentsStreamEvent } from "../../src/agent/search-documents.ts";
 import type {
@@ -219,37 +220,42 @@ describe("single-answer delivery by default", () => {
 		expect(prompts[0]).not.toContain("until its next message arrives");
 	});
 
-	it("still searches with tools before delivering a cited complete answer", async () => {
-		const rows: RetrievalResult[] = [
-			{
-				id: "msg-1",
-				source: "/kakao/acct-1/chunks/msg-1",
-				content: "Director approval is required.",
-				score: 1,
-				metadata: {},
-			},
-		];
-		const model = fauxModel(
-			true,
-			fauxAssistantMessage([fauxToolCall("search_datasource_kakao", { query: "refund approval", topK: 5 })], {
-				stopReason: "toolUse",
-			}),
-			(context) => {
-				const transcript = JSON.stringify(context.messages);
-				const id = transcript.match(/\[(e\d+)\] \/kakao\/acct-1\/chunks\/msg-1/)?.[1];
-				if (id === undefined) throw new Error("search returned no citable evidence");
-				return fauxAssistantMessage(`Director approval is required [${id}].`, { stopReason: "stop" });
-			},
-		);
-		const events = await collectEvents(
-			new AutoRAGAgent({ ...defaults(model), datasourceSkills: [makeSkill(rows)] }),
-			"refund approval?",
-		);
-		expect(events.some((event) => event.type === "preliminary")).toBe(false);
-		const complete = events.find((event) => event.type === "complete");
-		expect(complete?.type === "complete" && complete.response.answer).toContain("Director approval is required [1]");
-		expect(complete?.type === "complete" && complete.response.results[0]?.source).toBe(rows[0]?.source);
-	});
+	it.each(["legacy", "on-demand"] as const)(
+		"%s searches with tools before delivering a cited complete answer",
+		async (retrievalPolicy) => {
+			const rows: RetrievalResult[] = [
+				{
+					id: "msg-1",
+					source: "/kakao/acct-1/chunks/msg-1",
+					content: "Director approval is required.",
+					score: 1,
+					metadata: {},
+				},
+			];
+			const model = fauxModel(
+				true,
+				fauxAssistantMessage([fauxToolCall("search_datasource_kakao", { query: "refund approval", topK: 5 })], {
+					stopReason: "toolUse",
+				}),
+				(context) => {
+					const transcript = JSON.stringify(context.messages);
+					const id = transcript.match(/\[(e\d+)\] \/kakao\/acct-1\/chunks\/msg-1/)?.[1];
+					if (id === undefined) throw new Error("search returned no citable evidence");
+					return fauxAssistantMessage(`Director approval is required [${id}].`, { stopReason: "stop" });
+				},
+			);
+			const events = await collectEvents(
+				new AutoRAGAgent({ ...defaults(model), retrievalPolicy, datasourceSkills: [makeSkill(rows)] }),
+				"refund approval?",
+			);
+			expect(events.some((event) => event.type === "preliminary")).toBe(false);
+			const complete = events.find((event) => event.type === "complete");
+			expect(complete?.type === "complete" && complete.response.answer).toContain(
+				"Director approval is required [1]",
+			);
+			expect(complete?.type === "complete" && complete.response.results[0]?.source).toBe(rows[0]?.source);
+		},
+	);
 
 	it("preserves source failures instead of claiming the answer was verified", async () => {
 		const model = fauxModel(
@@ -264,6 +270,158 @@ describe("single-answer delivery by default", () => {
 	it("rejects an invalid library answer mode instead of silently enabling a pipeline", () => {
 		const model = fauxModel(true, finalAnswer("answer"));
 		expect(() => new AutoRAGAgent({ ...defaults(model), answerMode: "invalid" as "single" })).toThrow(/answerMode/);
+	});
+});
+
+describe("on-demand first question", () => {
+	it.each(["今天合肥天气怎么样？", "吉利目前校招有后端岗位吗？", "厦门银行目前校招有计算机岗位吗？"])(
+		"supports a public tool call without touching local retrieval: %s",
+		async (query) => {
+			const model = fauxModel(
+				false,
+				fauxAssistantMessage([fauxToolCall("web_search", { query })], { stopReason: "toolUse" }),
+				(context) => {
+					expect(JSON.stringify(context.messages)).toContain("PUBLIC_FIXTURE");
+					return fauxAssistantMessage("Public fixture checked.");
+				},
+			);
+			const agent = new AutoRAGAgent({ ...agentOptions(model), retrievalPolicy: "on-demand" });
+			const retrieve = vi.fn(async () => []);
+			Object.assign(agent, { minSyncMethod: { retrieve } });
+			const web = (agent as unknown as { tools: AgentTool[] }).tools.find((tool) => tool.name === "web_search")!;
+			const search = vi
+				.spyOn(web, "execute")
+				.mockResolvedValue({ content: [{ type: "text", text: "PUBLIC_FIXTURE" }], details: {} });
+			const result = await agent.searchDocuments(query);
+			expect(search).toHaveBeenCalledTimes(1);
+			expect(retrieve).not.toHaveBeenCalled();
+			expect(result.answer).toBe("Public fixture checked.");
+		},
+	);
+	it("rejects a tool attempt to widen an API-scoped search before calling the index", async () => {
+		const model = fauxModel(
+			false,
+			fauxAssistantMessage([fauxToolCall("semantic_search_local_docs", { query: "refund", scope: "/docs" })], {
+				stopReason: "toolUse",
+			}),
+			(context) => {
+				expect(JSON.stringify(context.messages)).toContain("outside or cannot be proven");
+				return fauxAssistantMessage("No evidence in the requested scope.");
+			},
+		);
+		const agent = new AutoRAGAgent({ ...agentOptions(model), retrievalPolicy: "on-demand" });
+		const retrieve = vi.fn(async () => []);
+		Object.assign(agent, { minSyncMethod: { retrieve } });
+		const result = await agent.searchDocuments("Find my local policy", { scope: "/docs/refund-policy.txt" });
+		expect(retrieve).not.toHaveBeenCalled();
+		expect(result.answer).toBe("No evidence in the requested scope.");
+	});
+	it.each(["single", "progressive"] as const)(
+		"uses a single tool-enabled answer loop in %s mode",
+		async (answerMode) => {
+			const prompts: string[] = [];
+			const tools: string[] = [];
+			const model = fauxModel(false, (context) => {
+				for (const message of context.messages)
+					if (message.role === "system") tools.push(...(message.toolsAdded ?? []).map((t) => t.name));
+				prompts.push(JSON.stringify(context.messages.filter((m) => m.role !== "system")));
+				return fauxAssistantMessage("I would need a current public weather source.");
+			});
+			const agent = new AutoRAGAgent({
+				...agentOptions(model),
+				retrievalPolicy: "on-demand",
+				answerMode,
+				jev: false,
+			});
+			const retrieve = vi.fn(async () => []);
+			const memory = vi.fn(async () => ({ empty: false, text: "UNRELATED_MEMORY_CANARY" }));
+			Object.assign(agent, { minSyncMethod: { retrieve }, loadMemoryContextFor: memory });
+			const events = await collectEvents(agent, "今天合肥天气怎么样？");
+			expect(retrieve).not.toHaveBeenCalled();
+			expect(memory).not.toHaveBeenCalled();
+			expect(prompts).toHaveLength(1);
+			expect(prompts[0]).toContain("今天合肥天气怎么样？");
+			expect(prompts[0]).not.toMatch(/Baseline retrieval|UNRELATED_MEMORY_CANARY/u);
+			expect(tools).toContain("semantic_search_local_docs");
+			expect(tools).toContain("check_memory");
+			expect(events.filter((e) => e.type === "complete")).toHaveLength(1);
+			expect(events.some((e) => e.type === "preliminary")).toBe(false);
+		},
+	);
+
+	it("limits status inventory to the caller scope, file allowlist and configured exclusions", async () => {
+		const folder = join(docs, "visible");
+		mkdirSync(folder);
+		for (const name of ["allowed.bin", "excluded.md", "other.md"])
+			writeFileSync(join(folder, name), "NOT_FILE_CONTENT");
+		let payload = "";
+		const model = fauxModel(
+			false,
+			fauxAssistantMessage([fauxToolCall("manage_local_index", { operation: "status", includeFiles: true })], {
+				stopReason: "toolUse",
+			}),
+			(context) => {
+				const toolMessage = context.messages.find((m) => m.role === "toolResult");
+				payload = JSON.stringify(toolMessage?.content);
+				return fauxAssistantMessage("Inventory complete.");
+			},
+		);
+		const agent = new AutoRAGAgent({
+			...agentOptions(model),
+			retrievalPolicy: "on-demand",
+			excludePaths: [join(folder, "excluded.md")],
+		});
+		await agent.searchDocuments("Which files are indexed?", {
+			scope: "/docs/visible",
+			sourceIds: ["/docs/visible/allowed.bin", "/docs/visible/excluded.md", "/docs/refund-policy.txt"],
+		});
+		expect(payload).toContain("/docs/visible/allowed.bin");
+		expect(payload).toContain("unknown");
+		expect(payload).not.toMatch(/excluded\.md|other\.md|refund-policy\.txt|NOT_FILE_CONTENT/u);
+	});
+
+	it("searches only after a tool call and carries the API scope through a tool that omits it", async () => {
+		const retrieve = vi.fn(async (_q: string, _o: RetrievalOptions) => [
+			{
+				id: "local-policy",
+				content: "LOCAL_POLICY_CANARY",
+				source: join(docs, "refund-policy.txt"),
+				score: 0.8,
+				metadata: {},
+			},
+		]);
+		const prompts: string[] = [];
+		const model = fauxModel(
+			false,
+			(context) => {
+				prompts.push(JSON.stringify(context.messages));
+				expect(retrieve).not.toHaveBeenCalled();
+				return fauxAssistantMessage([fauxToolCall("semantic_search_local_docs", { query: "refund" })], {
+					stopReason: "toolUse",
+				});
+			},
+			(context) => {
+				prompts.push(JSON.stringify(context.messages));
+				return fauxAssistantMessage("Director approval [e1].");
+			},
+		);
+		const agent = new AutoRAGAgent({ ...agentOptions(model), retrievalPolicy: "on-demand" });
+		Object.assign(agent, { minSyncMethod: { retrieve } });
+		const details: unknown[] = [];
+		agent.subscribe((event) => {
+			if (event.type === "tool_execution_end") details.push(event.result.details);
+		});
+		const answer = await agent.searchDocuments("Find the local refund policy", {
+			scope: "/docs/refund-policy.txt",
+			topK: 3,
+		});
+		expect(retrieve).toHaveBeenCalledTimes(1);
+		expect(retrieve.mock.calls[0]?.[1]).toMatchObject({ scope: "/docs/refund-policy.txt", topK: 3 });
+		expect(prompts).toHaveLength(2);
+		expect(prompts[0]).not.toContain("LOCAL_POLICY_CANARY");
+		expect(prompts[1]).toContain("LOCAL_POLICY_CANARY");
+		expect(answer.answer).toContain("[1]");
+		expect(details).toEqual([expect.objectContaining({ resultCount: 1 })]);
 	});
 });
 

@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { AutoRAGRunLogger } from "../../src/observability/run-log.ts";
+import { AutoRAGRunLogger, assistantUsageEvent } from "../../src/observability/run-log.ts";
 
 let root: string;
 
@@ -15,6 +15,18 @@ afterEach(() => {
 });
 
 describe("AutoRAGRunLogger", () => {
+	it("records a failed completion without pretending its usage is zero", () => {
+		expect(assistantUsageEvent(undefined, "query_decomposition", "s", { latencyMs: 10 })).toMatchObject({
+			scope: "query_decomposition",
+			sessionId: "s",
+			usageReported: false,
+			stopReason: "error",
+			totalTokens: null,
+			inputTokens: null,
+			outputTokens: null,
+			cost: null,
+		});
+	});
 	it("writes the single model identity without child-agent fields", () => {
 		const path = join(root, "runs.jsonl");
 		new AutoRAGRunLogger(path).write({

@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "samples": [
+    {
+      "id": "public-2083-usage",
+      "public": true,
+      "url": "https://github.com/Marker-Inc-Korea/AutoRAG/pull/2083",
+      "headSha": "db0a301672ec48768e61c4fe782815ff0fcf8002",
+      "question": "请从 GitHub 重新读取此 PR，说明主要变更、明确关联的 Issue、是否有评论或评审，以及当前提交的 CI 结果。给出完整 SHA 和来源；没有证据的地方说明范围。用中文简短回答。",
+      "expectedText": ["webSearch", "db0a301672ec48768e61c4fe782815ff0fcf8002"]
+    }
+  ]
+}

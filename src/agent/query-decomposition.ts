@@ -93,20 +93,24 @@ export function createModelDecompositionCompleter(
 	target: DecompositionModel,
 	signal?: AbortSignal,
 	maxTokens = 2048,
-	onResult?: (message: AssistantMessage) => void,
+	onResult?: (message: AssistantMessage | undefined) => void,
 ): DecompositionCompleter {
 	return async (prompt) => {
-		const result: AssistantMessage = await completeSimple(
-			target.model,
-			{ messages: [{ role: "user", content: prompt, timestamp: Date.now() }] },
-			{
-				...(target.apiKey !== undefined ? { apiKey: target.apiKey } : {}),
-				...(signal !== undefined ? { signal } : {}),
-				reasoning: "minimal",
-				maxTokens,
-			},
-		);
-		onResult?.(result);
+		let result: AssistantMessage | undefined;
+		try {
+			result = await completeSimple(
+				target.model,
+				{ messages: [{ role: "user", content: prompt, timestamp: Date.now() }] },
+				{
+					...(target.apiKey !== undefined ? { apiKey: target.apiKey } : {}),
+					...(signal !== undefined ? { signal } : {}),
+					reasoning: "minimal",
+					maxTokens,
+				},
+			);
+		} finally {
+			onResult?.(result);
+		}
 		if (result.stopReason === "error" || result.stopReason === "aborted") {
 			throw new Error(result.errorMessage ?? `query decomposition ${result.stopReason}`);
 		}

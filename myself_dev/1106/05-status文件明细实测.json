@@ -1,0 +1,358 @@
+{
+  "method": "Real Pi InteractiveMode in development container, deepseek-flash; two independent TUI sessions over five synthetic files; matching questions and model to the earlier trace. Permission mode full in isolated QA.",
+  "baseline": "04-真实TUI-trace.json",
+  "fixture": {
+    "files": [
+      "青岚交接.md",
+      "值班手册.md",
+      "项目计划.md",
+      "会议记录.md",
+      "新增纪要.md"
+    ],
+    "indexed": [
+      "/docs/会议记录.md",
+      "/docs/值班手册.md",
+      "/docs/青岚交接.md",
+      "/docs/项目计划.md"
+    ],
+    "jobs": {
+      "2c256f84-14c9-4e36-8029-74fa7dd7742a": "succeeded"
+    },
+    "model": "deepseek-flash"
+  },
+  "indexUnchangedDuringQueries": true,
+  "cases": [
+    {
+      "input": "当前有哪些文件，这些文件是否都已建立索引？",
+      "before": {
+        "indexIntentCalls": 1,
+        "answerCalls": 5,
+        "tools": [
+          "bash",
+          "manage_local_index",
+          "bash",
+          "bash"
+        ],
+        "durationSeconds": 45.04,
+        "answerUsage": {
+          "inputTokens": 2586,
+          "outputTokens": 2194,
+          "cacheReadTokens": 60544
+        }
+      },
+      "after": {
+        "indexIntentCalls": 1,
+        "answerCalls": 2,
+        "durationSeconds": 5.32,
+        "tools": [
+          "manage_local_index"
+        ],
+        "answerUsage": {
+          "inputTokens": 354,
+          "outputTokens": 244,
+          "cacheReadTokens": 27644
+        },
+        "timeline": [
+          {
+            "event": "model_usage",
+            "timestamp": "2026-11-06T05:08:26.091Z",
+            "scope": "index_intent",
+            "model": "deepseek-flash",
+            "stopReason": "stop",
+            "inputTokens": 151,
+            "outputTokens": 80,
+            "cacheReadTokens": 256,
+            "latencyMs": 1374.9369170000004
+          },
+          {
+            "event": "search_started",
+            "timestamp": "2026-11-06T05:08:26.094Z",
+            "model": "deepseek-flash"
+          },
+          {
+            "event": "model_usage",
+            "timestamp": "2026-11-06T05:08:26.096Z",
+            "scope": "jev",
+            "model": "jev",
+            "stopReason": "error",
+            "inputTokens": null,
+            "outputTokens": null,
+            "cacheReadTokens": null,
+            "latencyMs": 0.5760030000001279
+          },
+          {
+            "event": "model_usage",
+            "timestamp": "2026-11-06T05:08:28.080Z",
+            "scope": "answer_session",
+            "model": "deepseek-flash",
+            "stopReason": "toolUse",
+            "inputTokens": 134,
+            "outputTokens": 131,
+            "cacheReadTokens": 13692,
+            "latencyMs": 1971.2280839999994
+          },
+          {
+            "event": "retrieval_step",
+            "timestamp": "2026-11-06T05:08:28.081Z",
+            "tool": "manage_local_index"
+          },
+          {
+            "event": "model_usage",
+            "timestamp": "2026-11-06T05:08:29.636Z",
+            "scope": "answer_session",
+            "model": "deepseek-flash",
+            "stopReason": "stop",
+            "inputTokens": 220,
+            "outputTokens": 113,
+            "cacheReadTokens": 13952,
+            "latencyMs": 1536.2612019999997
+          },
+          {
+            "event": "search_completed",
+            "timestamp": "2026-11-06T05:08:29.654Z"
+          }
+        ],
+        "toolArguments": {
+          "operation": "status",
+          "includeFiles": true,
+          "i": "检查当前本地文件清单及各自的索引注册状态"
+        },
+        "toolReturn": {
+          "basis": "AutoRAG enumerated the permitted local files and checked registration in the active index journal. IDs are virtual source identifiers, not filesystem paths. For inventory/coverage answer directly from this result; do not recheck with bash or search.",
+          "job": {
+            "jobId": "2c256f84-14c9-4e36-8029-74fa7dd7742a",
+            "mode": "build",
+            "state": "succeeded"
+          },
+          "activeIndex": {
+            "embeddingProfile": "local-qwen3",
+            "ready": true
+          },
+          "coverage": {
+            "files": [
+              {
+                "id": "/docs/会议记录.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/值班手册.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/新增纪要.md",
+                "status": "unregistered"
+              },
+              {
+                "id": "/docs/青岚交接.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/项目计划.md",
+                "status": "registered"
+              }
+            ],
+            "total": 5,
+            "registered": 4,
+            "complete": true,
+            "diagnostics": []
+          }
+        },
+        "finalAnswer": "**当前共有 5 个文件，其中 4 个已经建立索引，1 个尚未入库。**\n\n- 已建立索引：**会议记录.md、值班手册.md、青岚交接.md、项目计划.md** [e1]\n- 未建立索引：**新增纪要.md**（状态：unregistered）[e1]\n- 索引任务已完成，没有出现异常诊断、缺漏或未知状态 [e1]\n\n如果你希望在检索时也能覆盖 **新增纪要.md**，需要执行一次即可刷新索引。",
+        "newJobs": [],
+        "rawDirectoryInContainer": "/tmp/autorag-status-files-mw4ik9wh",
+        "sessionSHA256": "c6406f65226b4a48d9c9bd7ed99af7b43a783bfbec42fd9b8db04f999c5c9f18"
+      }
+    },
+    {
+      "input": "当前本地资料库中有哪些内容，资料库是否都已完成索引建立？",
+      "before": {
+        "indexIntentCalls": 1,
+        "answerCalls": 7,
+        "tools": [
+          "bash",
+          "bash",
+          "bash",
+          "bash",
+          "bash",
+          "bash"
+        ],
+        "durationSeconds": 23.88,
+        "answerUsage": {
+          "inputTokens": 2502,
+          "outputTokens": 2169,
+          "cacheReadTokens": 105088
+        }
+      },
+      "after": {
+        "indexIntentCalls": 1,
+        "answerCalls": 2,
+        "durationSeconds": 6.16,
+        "tools": [
+          "manage_local_index"
+        ],
+        "answerUsage": {
+          "inputTokens": 469,
+          "outputTokens": 519,
+          "cacheReadTokens": 27520
+        },
+        "timeline": [
+          {
+            "event": "model_usage",
+            "timestamp": "2026-11-06T05:08:25.983Z",
+            "scope": "index_intent",
+            "model": "deepseek-flash",
+            "stopReason": "stop",
+            "inputTokens": 156,
+            "outputTokens": 82,
+            "cacheReadTokens": 256,
+            "latencyMs": 1309.360925
+          },
+          {
+            "event": "search_started",
+            "timestamp": "2026-11-06T05:08:25.987Z",
+            "model": "deepseek-flash"
+          },
+          {
+            "event": "model_usage",
+            "timestamp": "2026-11-06T05:08:25.989Z",
+            "scope": "jev",
+            "model": "jev",
+            "stopReason": "error",
+            "inputTokens": null,
+            "outputTokens": null,
+            "cacheReadTokens": null,
+            "latencyMs": 0.49188500000036584
+          },
+          {
+            "event": "model_usage",
+            "timestamp": "2026-11-06T05:08:27.675Z",
+            "scope": "answer_session",
+            "model": "deepseek-flash",
+            "stopReason": "toolUse",
+            "inputTokens": 135,
+            "outputTokens": 112,
+            "cacheReadTokens": 13696,
+            "latencyMs": 1671.9943049999993
+          },
+          {
+            "event": "retrieval_step",
+            "timestamp": "2026-11-06T05:08:27.677Z",
+            "tool": "manage_local_index"
+          },
+          {
+            "event": "model_usage",
+            "timestamp": "2026-11-06T05:08:30.445Z",
+            "scope": "answer_session",
+            "model": "deepseek-flash",
+            "stopReason": "stop",
+            "inputTokens": 334,
+            "outputTokens": 407,
+            "cacheReadTokens": 13824,
+            "latencyMs": 2743.9291189999994
+          },
+          {
+            "event": "search_completed",
+            "timestamp": "2026-11-06T05:08:30.452Z"
+          }
+        ],
+        "toolArguments": {
+          "operation": "status",
+          "includeFiles": true,
+          "i": "检查本地资料库收录文件清单与索引建立状态"
+        },
+        "toolReturn": {
+          "basis": "AutoRAG enumerated the permitted local files and checked registration in the active index journal. IDs are virtual source identifiers, not filesystem paths. For inventory/coverage answer directly from this result; do not recheck with bash or search.",
+          "job": {
+            "jobId": "2c256f84-14c9-4e36-8029-74fa7dd7742a",
+            "mode": "build",
+            "state": "succeeded"
+          },
+          "activeIndex": {
+            "embeddingProfile": "local-qwen3",
+            "ready": true
+          },
+          "coverage": {
+            "files": [
+              {
+                "id": "/docs/会议记录.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/值班手册.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/新增纪要.md",
+                "status": "unregistered"
+              },
+              {
+                "id": "/docs/青岚交接.md",
+                "status": "registered"
+              },
+              {
+                "id": "/docs/项目计划.md",
+                "status": "registered"
+              }
+            ],
+            "total": 5,
+            "registered": 4,
+            "complete": true,
+            "diagnostics": []
+          }
+        },
+        "finalAnswer": "**本地资料库当前共有 5 个文档，已经索引完成（索引状态为 ready，构建任务成功），但只有 4 个已完成索引注册，仍有 1 个未被索引。**\n\n- **已建索引**：`/docs/会议记录.md`、`/docs/值班手册.md`、`/docs/青岚交接.md`、`/docs/项目计划.md` [e1]\n- **未建索引**：`/docs/新增纪要.md` 处于 unregistered 状态 [e1]\n- **索引配置**：当前活动索引使用 **local-qwen3** 嵌入配置，状态为 ready [e1]\n- **构建任务**：作业 **2c256f84-14c9-4e36-8029-74fa7dd7742a** 的状态为 succeeded，且没有诊断错误 [e1]\n\n因此，文件枚举与扫描已经完整结束，覆盖状态为 complete；但索引内容覆盖尚未齐全：5 个文件中有 1 个未注册，需要重建或刷新索引后，该文件才能进入检索范围。",
+        "newJobs": [],
+        "rawDirectoryInContainer": "/tmp/autorag-status-files-mw4ik9wh",
+        "sessionSHA256": "510fa7d8252749510e39531f7858a776c707c67e38c93e0b445c68b2956a61e2"
+      }
+    }
+  ],
+  "isolation": {
+    "realConfigBefore": {
+      "config.json": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+      "config.fastembed.json": "716c12831b43095e4919bde13d079272106a28ffa0c25ccb1a4af32fddd91327"
+    },
+    "realConfigAfter": {
+      "config.json": "c655960cce74a0087340214e665827c1c8241aa736e6b0d18b114ad7d3a816ac",
+      "config.fastembed.json": "716c12831b43095e4919bde13d079272106a28ffa0c25ccb1a4af32fddd91327"
+    },
+    "unchanged": true
+  },
+  "developmentProbes": [
+    [
+      {
+        "question": "当前有哪些文件，这些文件是否都已建立索引？",
+        "tools": [
+          "manage_local_index"
+        ],
+        "answerCalls": 2
+      },
+      {
+        "question": "当前本地资料库中有哪些内容，资料库是否都已完成索引建立？",
+        "tools": [
+          "manage_local_index",
+          "manage_local_index"
+        ],
+        "answerCalls": 3
+      }
+    ],
+    [
+      {
+        "question": "当前有哪些文件，这些文件是否都已建立索引？",
+        "tools": [
+          "manage_local_index"
+        ],
+        "answerCalls": 2
+      },
+      {
+        "question": "当前本地资料库中有哪些内容，资料库是否都已完成索引建立？",
+        "tools": [
+          "manage_local_index",
+          "bash",
+          "fsearch_search"
+        ],
+        "answerCalls": 4
+      }
+    ]
+  ]
+}

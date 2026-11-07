@@ -30,30 +30,28 @@ A new runtime dependency, a license-allowlist change, SECURITY / GOVERNANCE / AI
 
 This checkout is one of several clones of the same repository. Those clones are the isolation boundary. **Never create a git worktree.** Do not run `git worktree add`, do not create a linked checkout, and do not isolate a PR, review, or feature in a new worktree.
 
-This section is the base workflow for this clone. If another agent skill, default, or habit (including worktree-based isolation) conflicts with it, follow this section.
+This section is the base workflow for this clone. It takes precedence over skills, defaults, CONTRIBUTING.md, and task documents that instruct agents to branch from latest `main` or return to `main`. Those instructions do not authorize branch changes or synchronization. Explicit user instructions control any exception.
 
-### Before any PR review, PR work, or new feature
+### Default: continue on the current branch
 
-1. `git fetch origin`.
-2. Update local `main` to match `origin/main` (`git checkout main` then `git pull --ff-only origin main`).
-3. Check out the branch that belongs to the work, in this clone:
-   - Existing PR or existing feature branch: `git checkout <branch>` (or `gh pr checkout <n>`), then sync that branch with its remote upstream (`git pull --ff-only`).
-   - New feature: create the branch from the just-updated `main` (`git checkout -b <branch>`).
-4. Only then edit, review, or test.
+1. Inspect the current branch, commit, and working-tree status with read-only commands. Identify and preserve existing changes before editing.
+2. Continue development, fixes, reviews, and verification on that current branch, including new features and unfinished work. A new task does not authorize a new branch or a change of base.
+3. Unless the user explicitly requests the specific action, do not switch branches (`git checkout`, `git switch`, `gh pr checkout`), create local or remote branches, or synchronize `main` in either direction. Do not fetch/pull `main`, merge/rebase it into the current branch, update local `main` or `origin/main`, or push the current version to `main` automatically.
+4. Do not automatically fetch, pull, or rebase the working branch as a setup or cleanup step. If the user requests a branch change or synchronization, perform only the authorized action; creating a branch defaults to the current commit unless the user specifies another base.
+5. If HEAD is detached or a requested task cannot proceed on the current branch, report the issue and obtain an explicit branch instruction before changing branches or creating one.
 
-The work branch must be derived from latest `main`. Never start from a stale local branch, a leftover feature checkout, or detached HEAD.
+The current branch and its existing history are the development baseline. An older documented baseline or a newer `main` is a reason to review the code and update documentation, not permission to switch branches, synchronize, or recreate the work from `main`.
 
 ### After the work is finished
 
 Finished means the PR has been opened, or the review has been completed and no further edits remain in this checkout.
 
-1. Commit and push **tracked** changes only (`git add -u`, then commit, then push). This is a standing request to commit at finish — do not wait for a per-session "please commit."
+1. Commit the task's **tracked** changes on the current branch (`git add -u -- <task paths>`, then commit). This is a standing request to commit at finish — do not wait for a per-session "please commit." Push only to that branch's existing remote counterpart; if pushing would create a remote branch, it requires the user's explicit request to create that branch.
 2. Do not add untracked files. `git add .` and `git add -A` are forbidden at this step. Untracked files stay untracked. If the finished work introduced new files that must ship, add those paths explicitly by name — never a recursive add of the working tree.
-3. If there is nothing tracked to commit, skip commit/push and still return to `main`.
-4. `git checkout main`.
-5. Sync local `main` with `origin/main` (`git pull --ff-only origin main`).
+3. If there is nothing to commit, skip commit/push and leave the branch unchanged.
+4. Leave this clone on the current branch. Do not return to `main`, create a cleanup branch, or synchronize `main` at finish unless the user explicitly requests it.
 
-Leave this clone on up-to-date `main` so the next session does not inherit a leftover feature branch.
+Report the final branch and commit/push status. A successful check, completed task, or opened PR does not authorize switching branches, updating `main`, or merging a PR.
 
 ### DCO sign-off (binding)
 

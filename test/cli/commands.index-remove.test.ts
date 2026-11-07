@@ -4,7 +4,9 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { runIndex } from "../../src/cli/commands/index.ts";
 import type { CommandContext } from "../../src/cli/commands/types.ts";
+import { prepareSourceOperation } from "../../src/indexing/source-operation.ts";
 import { loadMirrorIndex, saveMirrorIndex } from "../../src/mirror/index-store.ts";
+import { parsedOutputPath } from "../../src/mirror/paths.ts";
 
 /**
  * The semantic cleanup is delegated to a refresh, which needs an embedder and a
@@ -19,7 +21,8 @@ const agent = vi.hoisted(() => ({
 vi.mock("../../src/agent/agent.ts", async (importOriginal) => {
 	const actual = await importOriginal<typeof import("../../src/agent/agent.ts")>();
 	class StubAgent {
-		async refresh(force = false, opts?: { methods?: readonly string[] }) {
+		async refresh(force = false, opts?: { methods?: readonly string[]; beforeSync?: () => void }) {
+			opts?.beforeSync?.();
 			agent.calls.push({ force, methods: opts?.methods });
 			return {
 				scanned: 1,
@@ -99,7 +102,7 @@ function seedIndexedSource(): Fixture {
 	const body = "# Refunds\n\nDirector approval is required before payout.\n";
 	const sourcePath = join(docs, "policy.md");
 	writeFileSync(sourcePath, body);
-	const outputPath = join(workspace, ".autorag", "parsed", "files", "policy.md.md");
+	const outputPath = parsedOutputPath(workspace, "/docs/policy.md");
 	writeFileSync(outputPath, body);
 
 	saveMirrorIndex(workspace, {
@@ -257,6 +260,35 @@ describe("runIndex remove", () => {
 		expect(JSON.parse(stdout[0]).excluded).toBe(false);
 	});
 
+	it("can resume an interrupted removal and restore only its own exclusion", async () => {
+		const fx = seedIndexedSource();
+		const root = join(tmpDir, "docs");
+		const apply = (mode: "remove" | "restore") =>
+			prepareSourceOperation(mode, fx.workspace, [root], fx.configPath, "/docs/policy.md");
+		apply("remove");
+		// Simulate restarting before semantic cleanup, followed by an unrelated config edit.
+		const cfg = JSON.parse(readFileSync(fx.configPath, "utf8"));
+		const other = join(root, "another.md");
+		writeFileSync(fx.configPath, JSON.stringify({ ...cfg, excludePaths: [...cfg.excludePaths, other, root] }));
+		expect(apply("remove")).toBe(false);
+		expect(() => apply("restore")).toThrow("another path");
+		expect(readExcludePaths(fx.configPath)).toEqual([fx.sourcePath, other, root]);
+		writeFileSync(fx.configPath, JSON.stringify({ ...cfg, excludePaths: [fx.sourcePath, other] }));
+		apply("restore");
+		expect(readExcludePaths(fx.configPath)).toEqual([other]);
+		expect(existsSync(fx.sourcePath)).toBe(true);
+		expect(existsSync(fx.outputPath)).toBe(false);
+	});
+	it("refuses restoration of an exclusion that the user configured", () => {
+		const fx = seedIndexedSource();
+		const cfg = JSON.parse(readFileSync(fx.configPath, "utf8"));
+		writeFileSync(fx.configPath, JSON.stringify({ ...cfg, excludePaths: [fx.sourcePath] }));
+		const apply = (mode: "remove" | "restore") =>
+			prepareSourceOperation(mode, fx.workspace, [join(tmpDir, "docs")], fx.configPath, "/docs/policy.md");
+		expect(apply("remove")).toBe(false);
+		expect(() => apply("restore")).toThrow("No restorable exclusion");
+		expect(readExcludePaths(fx.configPath)).toEqual([fx.sourcePath]);
+	});
 	it("returns exit 1 once the source is no longer indexed", async () => {
 		const fx = seedIndexedSource();
 		const first = makeCtx({

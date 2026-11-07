@@ -28,6 +28,18 @@ CREATE TABLE IF NOT EXISTS pending (id TEXT PRIMARY KEY, payload TEXT NOT NULL);
 			.all()
 			.map((row) => String(row.id));
 	}
+	/** Open only an existing journal. The writer constructor would create/initialize one. */
+	static registeredSources(directory: string, ids: readonly string[]): Set<string> {
+		const db = new DatabaseSync(join(directory, "journal.sqlite"), { readOnly: true });
+		try {
+			const rows = db
+				.prepare("SELECT id FROM sources WHERE id IN (SELECT value FROM json_each(?))")
+				.all(JSON.stringify(ids));
+			return new Set(rows.map((row) => String(row.id)));
+		} finally {
+			db.close();
+		}
+	}
 	hasPending(): boolean {
 		return this.db.prepare("SELECT 1 FROM pending LIMIT 1").get() !== undefined;
 	}

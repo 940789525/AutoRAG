@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_MCP_TOKEN}",
+        "X-MCP-Readonly": "true",
+        "X-MCP-Tools": "pull_request_read,issue_read,actions_list,actions_get,get_job_logs"
+      },
+      "exposure": "direct",
+      "description": "只读查询 GitHub PR、关联 Issue、变更、评论与 CI 日志。适用于有明确 PR 链接的项目问题与变更分析。"
+    }
+  }
+}

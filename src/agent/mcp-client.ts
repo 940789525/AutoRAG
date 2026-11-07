@@ -8,6 +8,7 @@ import {
 	type McpServerConfig,
 } from "@earendil-works/pi-coding-agent";
 import { z } from "zod";
+import { githubPrSkillPath } from "./github-mcp-evidence.ts";
 
 /** pi's system-prompt section naming the MCP servers whose tools the model does not see declared. */
 export const MCP_SERVERS_SECTION = "mcp_servers";
@@ -38,6 +39,7 @@ export interface AutoRAGMcpClient {
 	readonly extensionFactories: readonly ExtensionFactory[];
 	/** Entries the session's `tools` allow-list needs so the extensions' tools stay active. */
 	readonly toolNames: readonly string[];
+	readonly skillPaths: readonly string[];
 }
 
 /**
@@ -76,9 +78,11 @@ export function createAutoRAGMcpClient(agentDir: string): AutoRAGMcpClient | und
 	// `loadConfig` replaces pi's default, which reads `getAgentDir()` (not the session's agent
 	// directory) and the project file. Registered servers are connected on session start either way.
 	const mcp = createMcpExtension({ loadConfig: () => ({ servers: [], errors }) });
+	const githubSkill = servers.some(([name]) => name === "github") ? githubPrSkillPath() : undefined;
 	return {
 		extensionFactories: [register, mcp, createCodemodeExtension(), createToolSearchExtension()],
 		toolNames: MCP_TOOL_NAMES,
+		skillPaths: githubSkill ? [githubSkill] : [],
 	};
 }
 

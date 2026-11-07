@@ -144,6 +144,26 @@ export class LocalDocumentIndex {
 	isReady(): boolean {
 		return this.status() !== "configured";
 	}
+	async sourceChunkCount(id: string): Promise<number> {
+		const { profile } = JSON.parse(readFileSync(join(this.directory, "ready.json"), "utf8"));
+		if (typeof profile !== "string" || !/^[a-f0-9]{64}$/u.test(profile))
+			throw new Error("Invalid active index profile");
+		const store = await LanceIndexStore.openExisting(join(this.directory, profile, "store"));
+		return store.sourceChunkCount(id);
+	}
+	/** Inventory checks committed membership only; it never initializes an embedder or index. */
+	registeredSources(ids: readonly string[]): Set<string> {
+		const path = join(this.directory, "ready.json");
+		const pointer = readFileSync(path, "utf8");
+		const readinessError = this.readinessError();
+		if (readinessError) throw new Error(readinessError);
+		const { profile } = JSON.parse(pointer);
+		if (typeof profile !== "string" || !/^[a-f0-9]{64}$/u.test(profile))
+			throw new Error(`Invalid local index profile in ${path}`);
+		const registered = IndexJournal.registeredSources(join(this.directory, profile), ids);
+		if (readFileSync(path, "utf8") !== pointer) throw new Error("Local index changed while checking registration");
+		return registered;
+	}
 	/** Explain why a persisted index cannot be queried without opening or modifying its store. */
 	readinessError(): string | undefined {
 		const path = join(this.directory, "ready.json");
