@@ -1,0 +1,10 @@
+# T1 probe only; Linux x86_64 / CPython 3.12. Not product dependencies.
+# CPU wheels are deliberately selected instead of the CUDA distributions.
+--extra-index-url https://download.pytorch.org/whl/cpu
+docling[rapidocr]==2.148.0
+rapidocr==3.10.0
+docling-ibm-models==4.0.4
+torch==2.9.1+cpu
+torchvision==0.24.1+cpu
+reportlab==5.1.0
+psutil==7.2.2

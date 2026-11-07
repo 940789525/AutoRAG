@@ -1,0 +1,168 @@
+{
+  "version": 1,
+  "sources": {
+    "version": 1,
+    "repositories": [
+      {
+        "repository": "docling-project/docling-layout-heron",
+        "revision": "8f39ad3c0b4c58e9c2d2c84a38465abf757272d8",
+        "patterns": [
+          "*.json",
+          "*.safetensors",
+          "README.md",
+          "LICENSE*"
+        ],
+        "license": "apache-2.0"
+      },
+      {
+        "repository": "docling-project/docling-models",
+        "revision": "fc0f2d45e2218ea24bce5045f58a389aed16dc23",
+        "patterns": [
+          "model_artifacts/tableformer/**",
+          "README.md",
+          "LICENSE*"
+        ],
+        "license": "cdla-permissive-2.0"
+      }
+    ],
+    "font": {
+      "revision": "a85815a42757630ce188fdad368c2dfc444d4773",
+      "license": "OFL-1.1",
+      "url": "https://raw.githubusercontent.com/google/fonts/a85815a42757630ce188fdad368c2dfc444d4773/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
+    },
+    "tesseract": {
+      "repository": "tesseract-ocr/tessdata_fast",
+      "revision": "87416418657359cb625c412a48b6e1d6d41c29bd",
+      "license": "Apache-2.0"
+    }
+  },
+  "qwen": {
+    "model": "Qwen/Qwen3-Embedding-0.6B",
+    "repository": "Qdrant/Qwen3-Embedding-0.6B-onnx",
+    "revision": "af95f2c416ffe9379369ad64f9113e865db6112c",
+    "dimension": 1024,
+    "license": "Apache-2.0",
+    "files": {
+      "config.json": "da2b52e46d1469b9f6ff3a45e2bec36b2bb667de5ea9dd5a076e8bfe3b30cc05",
+      "tokenizer_config.json": "1c45aaa97b2bec1d2e1ab0df53e1b2ed2f9568b871b25ca56095c0b83a5d4e93",
+      "special_tokens_map.json": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd",
+      "tokenizer.json": "def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a",
+      "onnx/model.onnx": "754d6ba1c7a323d7b3af0d85b8268f8b716b0cd362ce73295e0f71d3dd831639",
+      "onnx/model.onnx_data": "15d02a315e3b95296700c73d72a436e79facf4e17d919345bed730e98433bcb4"
+    }
+  },
+  "rapidocrSource": {
+    "package": "rapidocr==3.10.0",
+    "source": "Hash-locked wheel, bundled ONNX artifacts",
+    "license": "Apache-2.0",
+    "licenseEvidence": "https://rapidai.github.io/RapidOCRDocs/main/en/model_licenses/",
+    "variant": "PP-OCRv6 multilingual small"
+  },
+  "files": [
+    {
+      "path": "NotoSansSC.ttf",
+      "bytes": 17772300,
+      "sha256": "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da"
+    },
+    {
+      "path": "docling-project--docling-layout-heron/README.md",
+      "bytes": 3219,
+      "sha256": "175700839bc7808eac6af1d0c23e4f483606ab2276fe01122f4093e61a1a65b6"
+    },
+    {
+      "path": "docling-project--docling-layout-heron/config.json",
+      "bytes": 3268,
+      "sha256": "fdea30805ce2f5666b147fca941dcdd27ad468e27d6ed21902207d3da056a97d"
+    },
+    {
+      "path": "docling-project--docling-layout-heron/model.safetensors",
+      "bytes": 171658996,
+      "sha256": "00333a43451945aaf89db8ca9c0a17e75d1537c17db60fdb91aa95f4c7929e0c"
+    },
+    {
+      "path": "docling-project--docling-layout-heron/preprocessor_config.json",
+      "bytes": 444,
+      "sha256": "cd38cd59999e7a95d68e487fbe5132df3d4e5c32a0836add57e6126ba0c4eaf1"
+    },
+    {
+      "path": "docling-project--docling-models/README.md",
+      "bytes": 3413,
+      "sha256": "d17f233378eff1240b623b36da76ee8b40afcca05d505949713bf03f7e00822a"
+    },
+    {
+      "path": "docling-project--docling-models/model_artifacts/tableformer/accurate/tableformer_accurate.safetensors",
+      "bytes": 212758388,
+      "sha256": "2a7d6c924b3cd12fb99a09280ca9c33a89c5d60b93253617d2e088c1a40374d9"
+    },
+    {
+      "path": "docling-project--docling-models/model_artifacts/tableformer/accurate/tm_config.json",
+      "bytes": 7060,
+      "sha256": "984e122ceb8ccf84d84c9d2882f6f2302a44b4f1e577babd6289892c36f3cffd"
+    },
+    {
+      "path": "docling-project--docling-models/model_artifacts/tableformer/fast/tableformer_fast.safetensors",
+      "bytes": 145453276,
+      "sha256": "3119563aab5a7c96fda4d621119b63fd8806272b86c30936d15507616422f718"
+    },
+    {
+      "path": "docling-project--docling-models/model_artifacts/tableformer/fast/tm_config.json",
+      "bytes": 7060,
+      "sha256": "dca6762508dddfae6d57d6cb4ef822c6000119dff0f3b6489db7413118c2622a"
+    },
+    {
+      "path": "qwen/config.json",
+      "bytes": 747,
+      "sha256": "da2b52e46d1469b9f6ff3a45e2bec36b2bb667de5ea9dd5a076e8bfe3b30cc05"
+    },
+    {
+      "path": "qwen/onnx/model.onnx",
+      "bytes": 4031521,
+      "sha256": "754d6ba1c7a323d7b3af0d85b8268f8b716b0cd362ce73295e0f71d3dd831639"
+    },
+    {
+      "path": "qwen/onnx/model.onnx_data",
+      "bytes": 2383106048,
+      "sha256": "15d02a315e3b95296700c73d72a436e79facf4e17d919345bed730e98433bcb4"
+    },
+    {
+      "path": "qwen/special_tokens_map.json",
+      "bytes": 613,
+      "sha256": "76862e765266b85aa9459767e33cbaf13970f327a0e88d1c65846c2ddd3a1ecd"
+    },
+    {
+      "path": "qwen/tokenizer.json",
+      "bytes": 11423705,
+      "sha256": "def76fb086971c7867b829c23a26261e38d9d74e02139253b38aeb9df8b4b50a"
+    },
+    {
+      "path": "qwen/tokenizer_config.json",
+      "bytes": 5402,
+      "sha256": "1c45aaa97b2bec1d2e1ab0df53e1b2ed2f9568b871b25ca56095c0b83a5d4e93"
+    },
+    {
+      "path": "rapidocr/PP-OCRv6_det_small.onnx",
+      "bytes": 9929594,
+      "sha256": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f"
+    },
+    {
+      "path": "rapidocr/PP-OCRv6_rec_small.onnx",
+      "bytes": 21234383,
+      "sha256": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884"
+    },
+    {
+      "path": "rapidocr/ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+      "bytes": 585532,
+      "sha256": "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"
+    },
+    {
+      "path": "tessdata/chi_sim.traineddata",
+      "bytes": 2469156,
+      "sha256": "a5fcb6f0db1e1d6d8522f39db4e848f05984669172e584e8d76b6b3141e1f730"
+    },
+    {
+      "path": "tessdata/eng.traineddata",
+      "bytes": 4113088,
+      "sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2"
+    }
+  ]
+}

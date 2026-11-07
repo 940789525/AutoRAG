@@ -45,8 +45,8 @@
 - PDF、DOCX、XLSX 由新后端接管；图片仅在 OCR 开启时注册。按明确的配置选择后端，不能让两个解析器在现有 registry 中重复注册同一扩展名。
 - HWP、HWPX、HML、HWPML 和旧 XLS 继续用 kordoc；PPTX、EML、纯文本沿用各自路径。未来移除兼容格式另行定范围。
 - 使用 Docling 标准 PDF 解析、RapidOCR 的轻量 ONNX CPU 配置、版面模型和 TableFormer；不启用 VLM pipeline、图片描述、公式／代码增强和全量模型下载。
-- TableFormer FAST 为资源探针起点，与 ACCURATE 对照后冻结满足质量门槛的配置；若两者均不达标，不自动更换技术路线或降低验收要求。
-- RapidOCR 模型按真实识别字典选择。不能把现有 `['zh-hans','en']` 原样传给只采用首个语言的上游接口；中英混排作为独立必测场景。
+- T1 对照后冻结 **TableFormer ACCURATE**，与 Heron 版面模型配套；版本、哈希、资源和质量结果见 [RESULTS.md](RESULTS.md)。
+- RapidOCR 的 `lang=["ch"]` 配合显式固定的 PP-OCRv6 multilingual small 权重和该模型自带字典，为简中、英文、混排共用一条识别路径。不能把现有 `['zh-hans','en']` 原样传给上游当作两个识别器。
 
 ### 3.2 本地进程与资源
 

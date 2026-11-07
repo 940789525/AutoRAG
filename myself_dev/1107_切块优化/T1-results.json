@@ -1,0 +1,849 @@
+{
+  "version": 1,
+  "date": "2026-11-07",
+  "sourceCommit": "860815acc216b7214f605d2e85b4279a2101acec",
+  "sourceState": "T1 QA scripts added; existing product source unmodified",
+  "fixtureManifestVersion": 2,
+  "fixtureManifestSha256": "8b97eef446946d0d2095c74624ece1c505907785b0d24465b96ff7717f3c0e3b",
+  "modelLockSha256": "557c21fa85bea9b951a4e3da352ecae1dbf824ce30649717bfd785bf4c57794d",
+  "pythonRequirementsSha256": "893ccec2f928abe0a304a7383dd27562e50b2d3eaf97994f0ed9881adf1c5d19",
+  "pythonPackageMetadataSha256": "8b7cf97cb1e8ef64948bf1e3ef1c32f6c1f125c8bc5dcdc8696a399cf789b23a",
+  "scriptsSha256": {
+    "baseline.mts": "f1ddd2d5e77787770b3317fc2c3f35aec11315421c95a6bbcb5e62a369606d6b",
+    "evaluate.py": "44c53aac635d2b61c5b206d9681b07d2df6fd7d45de17d958a293a90a92ab027",
+    "fixtures.py": "fe59c3d0e7382d7d8d28b8bd1c707d9a5624745433d8f1e4d1fa01bb205caf97",
+    "prepare.py": "e38e421b828e592d406d54522695d21e84fd83014ecc2618854d786040ef3e7c",
+    "run.py": "daa0cb21f90faf873ae93342467577b371665eb0af79b2384a04071fac8082c3",
+    "worker.py": "26e9b0dcef02a2df88d375abdf973dae3cc0b3a31c716e5a6e6a46c5e143086b"
+  },
+  "environment": {
+    "hostCpu": "Intel Core i7-10750H",
+    "hostRamGiB": 32,
+    "platform": "Linux x86_64",
+    "dockerImage": "autorag-xsy-dev:2.11.1-fastembed",
+    "dockerImageId": "sha256:e0dee75ffc697e082f97ea22932369a0d8906f798d0b4ba52116996738f72939",
+    "dockerVmCpuCount": 12,
+    "dockerVmMemoryBytes": 16719163392,
+    "node": "24.22.2",
+    "bun": "1.4.2",
+    "python": "3.12.3",
+    "network": "none",
+    "cpuMax": "400000 100000",
+    "memoryMaxBytes": 8589934592,
+    "memorySwapMaxBytes": 0,
+    "device": "cpu",
+    "sampleIntervalSeconds": 0.1,
+    "fileDeadlineSeconds": 120
+  },
+  "gate": {
+    "decision": "accurate",
+    "A01": "pass: probe formats and OCR-off guard; product route remains pending",
+    "A02": "pass: core and holdout target relationships at parse layer",
+    "A08": "pass: offline local probe with co-resident FastEmbed"
+  },
+  "frozenParser": {
+    "docling": "2.148.0",
+    "rapidocr": "3.10.0",
+    "onnxruntime": "1.31.1",
+    "torch": "2.9.1+cpu",
+    "layoutModel": "Heron",
+    "tableMode": "accurate",
+    "ocrModel": "PP-OCRv6 multilingual small",
+    "ocrLangArgument": [
+      "ch"
+    ],
+    "ocrLanguageCoverageTested": [
+      "zh",
+      "en",
+      "mixed"
+    ],
+    "inferThreads": 4,
+    "fileConcurrency": 1,
+    "pageQueue": 1,
+    "predecodeBuffer": 1,
+    "stageBatchSize": 1,
+    "enrichment": false,
+    "vlm": false,
+    "doclingTimeoutSeconds": 110,
+    "wire": {
+      "protocol": "JSONL",
+      "v": 1,
+      "requestMaxBytes": 8192,
+      "responseMaxBytes": 4194304,
+      "diagnosticsStream": "stderr"
+    }
+  },
+  "fixtureFiles": [
+    {
+      "id": "zh-dual-scan",
+      "file": "zh-dual-scan.pdf",
+      "family": "dual",
+      "sha256": "491228e68903f57153bcf8ec264058a71b918b8c0b012fa77ce8f8bc38365418"
+    },
+    {
+      "id": "en-dual-native",
+      "file": "en-dual-native.pdf",
+      "family": "dual",
+      "sha256": "838bd09f3a33f66b0fa6fe5434c3cdef145b2dd9bfa1a4390c92a723da4469ff"
+    },
+    {
+      "id": "mixed-dual-scan",
+      "file": "mixed-dual-scan.pdf",
+      "family": "dual-offset",
+      "sha256": "59bead623f4045f5ea52a83632a0722070608045aa671dc208205a6f8da57dc0"
+    },
+    {
+      "id": "zh-image",
+      "file": "zh-image.png",
+      "family": "single",
+      "sha256": "9257d2051d9ae59a437d2bb9daba7d2bc39b7a529391bf6f084570a8b08cff2f"
+    },
+    {
+      "id": "en-image",
+      "file": "en-image.jpg",
+      "family": "single",
+      "sha256": "001d53b7245abe748562da19b0035a5c122fe049f3cc9c171dc83e5c371dbb5f"
+    },
+    {
+      "id": "mixed-image",
+      "file": "mixed-image.webp",
+      "family": "single",
+      "sha256": "6c553d9600cdecdd077067f5e15cd0ed042a153d97b7604412a76f7f31e8783b"
+    },
+    {
+      "id": "zh-office",
+      "file": "zh-office.docx",
+      "family": "single",
+      "sha256": "1fadc169c42688a157d3db73246e26de6460b656f3683829fb6e456a7572a124"
+    },
+    {
+      "id": "en-sheet",
+      "file": "en-sheet.xlsx",
+      "family": "single",
+      "sha256": "4adeee2b726d9407ac8d1f40126c0b28d2de2d3fdf1d0f4c6b58919b36e5e352"
+    },
+    {
+      "id": "en-merged",
+      "file": "en-merged.pdf",
+      "family": "merged",
+      "sha256": "f9cdab8b02b914d7569d9b2158183901445e121dc24b8e99135d0481bf03f326"
+    },
+    {
+      "id": "zh-merged-scan",
+      "file": "zh-merged-scan.pdf",
+      "family": "merged",
+      "sha256": "fb4a4b848a9602e9becda13627a2875a07e5a9cb7f03cfea73e1d2b3996d7f61"
+    },
+    {
+      "id": "mixed-multipage",
+      "file": "mixed-multipage.pdf",
+      "family": "multipage",
+      "sha256": "8e7c6ba302d06aee03095ebd6d75e2e51e3456ee6b2e1debd0a28add2bdbd97c"
+    },
+    {
+      "id": "en-wide",
+      "file": "en-wide.pdf",
+      "family": "wide",
+      "sha256": "47417acc6561936a4b9f89a497c46727ba5f7ee1c8b2851af5bce701a72e4ba9"
+    }
+  ],
+  "modes": {
+    "baseline": {
+      "rawReportSha256": "ce7a5de2bd727a9a9bf7fbe0f20abbdd6f7ed1f9667dd4ab4cd93b7b99c70084",
+      "targetRecordsCorrect": 24,
+      "targetRecordsTotal": 48,
+      "passingDocuments": 6,
+      "warmMedianSeconds": 0.55845,
+      "warmP95Seconds": 1.5559,
+      "parserWeightsBytes": 6582244,
+      "parserPeakTreeRssBytes": 596959232,
+      "memoryPeakBytes": 2674679808,
+      "memoryEventsBefore": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "memoryEventsAfter": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "embeddingRequests": 3,
+      "embeddingErrors": [],
+      "cleanup": [
+        {
+          "process": "parser",
+          "pid": 18,
+          "exitCode": -15
+        },
+        {
+          "process": "FastEmbed",
+          "pid": 8,
+          "exitCode": -15
+        }
+      ],
+      "resourcePass": true,
+      "records": [
+        {
+          "case": "zh-dual-scan",
+          "split": "dev",
+          "language": "zh",
+          "core": true,
+          "phase": "cold",
+          "seconds": 2.1613,
+          "status": "success",
+          "tableCount": 0,
+          "expectedRecords": 4,
+          "correctRecords": 0,
+          "pass": false
+        },
+        {
+          "case": "zh-dual-scan",
+          "split": "dev",
+          "language": "zh",
+          "core": true,
+          "phase": "warm",
+          "seconds": 1.4048,
+          "status": "success",
+          "tableCount": 0,
+          "expectedRecords": 4,
+          "correctRecords": 0,
+          "pass": false
+        },
+        {
+          "case": "en-dual-native",
+          "split": "dev",
+          "language": "en",
+          "core": true,
+          "phase": "warm",
+          "seconds": 0.0715,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true
+        },
+        {
+          "case": "mixed-dual-scan",
+          "split": "holdout",
+          "language": "mixed",
+          "core": true,
+          "phase": "warm",
+          "seconds": 1.413,
+          "status": "success",
+          "tableCount": 0,
+          "expectedRecords": 4,
+          "correctRecords": 0,
+          "pass": false
+        },
+        {
+          "case": "zh-image",
+          "split": "dev",
+          "language": "zh",
+          "core": false,
+          "phase": "warm",
+          "seconds": 0.9705,
+          "status": "success",
+          "tableCount": 0,
+          "expectedRecords": 4,
+          "correctRecords": 0,
+          "pass": false
+        },
+        {
+          "case": "en-image",
+          "split": "dev",
+          "language": "en",
+          "core": false,
+          "phase": "warm",
+          "seconds": 1.0672,
+          "status": "success",
+          "tableCount": 0,
+          "expectedRecords": 4,
+          "correctRecords": 0,
+          "pass": false
+        },
+        {
+          "case": "mixed-image",
+          "split": "dev",
+          "language": "mixed",
+          "core": false,
+          "phase": "warm",
+          "seconds": 1.223,
+          "status": "success",
+          "tableCount": 0,
+          "expectedRecords": 4,
+          "correctRecords": 0,
+          "pass": false
+        },
+        {
+          "case": "zh-office",
+          "split": "dev",
+          "language": "zh",
+          "core": false,
+          "phase": "warm",
+          "seconds": 0.1464,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true
+        },
+        {
+          "case": "en-sheet",
+          "split": "dev",
+          "language": "en",
+          "core": false,
+          "phase": "warm",
+          "seconds": 0.0138,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true
+        },
+        {
+          "case": "en-merged",
+          "split": "holdout",
+          "language": "en",
+          "core": false,
+          "phase": "warm",
+          "seconds": 0.0274,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true
+        },
+        {
+          "case": "zh-merged-scan",
+          "split": "holdout",
+          "language": "zh",
+          "core": false,
+          "phase": "warm",
+          "seconds": 1.5559,
+          "status": "success",
+          "tableCount": 0,
+          "expectedRecords": 4,
+          "correctRecords": 0,
+          "pass": false
+        },
+        {
+          "case": "mixed-multipage",
+          "split": "holdout",
+          "language": "mixed",
+          "core": false,
+          "phase": "warm",
+          "seconds": 0.0221,
+          "status": "success",
+          "tableCount": 2,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true
+        },
+        {
+          "case": "en-wide",
+          "split": "dev",
+          "language": "en",
+          "core": false,
+          "phase": "warm",
+          "seconds": 0.0217,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true
+        }
+      ]
+    },
+    "fast": {
+      "rawReportSha256": "ac791326a033c35c10be6573ded88339909122418a06515bf6b431edb00fb15f",
+      "targetRecordsCorrect": 31,
+      "targetRecordsTotal": 48,
+      "passingDocuments": 5,
+      "warmMedianSeconds": 7.3391,
+      "warmP95Seconds": 11.103,
+      "parserWeightsBytes": 348861781,
+      "parserPeakTreeRssBytes": 1841283072,
+      "memoryPeakBytes": 3525312512,
+      "memoryEventsBefore": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "memoryEventsAfter": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "embeddingRequests": 13,
+      "embeddingErrors": [],
+      "cleanup": [
+        {
+          "process": "parser",
+          "pid": 18,
+          "exitCode": -15
+        },
+        {
+          "process": "FastEmbed",
+          "pid": 8,
+          "exitCode": -15
+        }
+      ],
+      "resourcePass": true,
+      "records": [
+        {
+          "case": "zh-dual-scan",
+          "split": "dev",
+          "language": "zh",
+          "core": true,
+          "phase": "cold",
+          "seconds": 24.0925,
+          "status": "success",
+          "tableCount": 2,
+          "expectedRecords": 4,
+          "correctRecords": 2,
+          "pass": false,
+          "pages": 1
+        },
+        {
+          "case": "zh-dual-scan",
+          "split": "dev",
+          "language": "zh",
+          "core": true,
+          "phase": "warm",
+          "seconds": 8.037,
+          "status": "success",
+          "tableCount": 2,
+          "expectedRecords": 4,
+          "correctRecords": 2,
+          "pass": false,
+          "pages": 1
+        },
+        {
+          "case": "en-dual-native",
+          "split": "dev",
+          "language": "en",
+          "core": true,
+          "phase": "warm",
+          "seconds": 5.9666,
+          "status": "success",
+          "tableCount": 2,
+          "expectedRecords": 4,
+          "correctRecords": 2,
+          "pass": false,
+          "pages": 1
+        },
+        {
+          "case": "mixed-dual-scan",
+          "split": "holdout",
+          "language": "mixed",
+          "core": true,
+          "phase": "warm",
+          "seconds": 8.428,
+          "status": "success",
+          "tableCount": 2,
+          "expectedRecords": 4,
+          "correctRecords": 3,
+          "pass": false,
+          "pages": 1
+        },
+        {
+          "case": "zh-image",
+          "split": "dev",
+          "language": "zh",
+          "core": false,
+          "phase": "warm",
+          "seconds": 8.1085,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 1,
+          "pass": false,
+          "pages": 1
+        },
+        {
+          "case": "en-image",
+          "split": "dev",
+          "language": "en",
+          "core": false,
+          "phase": "warm",
+          "seconds": 7.6008,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 2,
+          "pass": false,
+          "pages": 1
+        },
+        {
+          "case": "mixed-image",
+          "split": "dev",
+          "language": "mixed",
+          "core": false,
+          "phase": "warm",
+          "seconds": 7.0774,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 0,
+          "pass": false,
+          "pages": 1
+        },
+        {
+          "case": "zh-office",
+          "split": "dev",
+          "language": "zh",
+          "core": false,
+          "phase": "warm",
+          "seconds": 0.0346,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        },
+        {
+          "case": "en-sheet",
+          "split": "dev",
+          "language": "en",
+          "core": false,
+          "phase": "warm",
+          "seconds": 0.0123,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        },
+        {
+          "case": "en-merged",
+          "split": "holdout",
+          "language": "en",
+          "core": false,
+          "phase": "warm",
+          "seconds": 5.0652,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        },
+        {
+          "case": "zh-merged-scan",
+          "split": "holdout",
+          "language": "zh",
+          "core": false,
+          "phase": "warm",
+          "seconds": 8.4165,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        },
+        {
+          "case": "mixed-multipage",
+          "split": "holdout",
+          "language": "mixed",
+          "core": false,
+          "phase": "warm",
+          "seconds": 11.103,
+          "status": "success",
+          "tableCount": 2,
+          "expectedRecords": 4,
+          "correctRecords": 1,
+          "pass": false,
+          "pages": 2
+        },
+        {
+          "case": "en-wide",
+          "split": "dev",
+          "language": "en",
+          "core": false,
+          "phase": "warm",
+          "seconds": 5.1496,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        }
+      ]
+    },
+    "accurate": {
+      "rawReportSha256": "eccabdad3b314c4aa9142f0ec8b2c4025d1e8356204ffba7defcd991fa2cc5fa",
+      "targetRecordsCorrect": 48,
+      "targetRecordsTotal": 48,
+      "passingDocuments": 12,
+      "warmMedianSeconds": 8.35275,
+      "warmP95Seconds": 11.0138,
+      "parserWeightsBytes": 416166893,
+      "parserPeakTreeRssBytes": 1850097664,
+      "memoryPeakBytes": 4279377920,
+      "memoryEventsBefore": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "memoryEventsAfter": {
+        "low": 0,
+        "high": 0,
+        "max": 0,
+        "oom": 0,
+        "oom_kill": 0,
+        "oom_group_kill": 0
+      },
+      "embeddingRequests": 15,
+      "embeddingErrors": [],
+      "cleanup": [
+        {
+          "process": "parser",
+          "pid": 18,
+          "exitCode": -15
+        },
+        {
+          "process": "FastEmbed",
+          "pid": 8,
+          "exitCode": -15
+        }
+      ],
+      "resourcePass": true,
+      "records": [
+        {
+          "case": "zh-dual-scan",
+          "split": "dev",
+          "language": "zh",
+          "core": true,
+          "phase": "cold",
+          "seconds": 28.67,
+          "status": "success",
+          "tableCount": 2,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        },
+        {
+          "case": "zh-dual-scan",
+          "split": "dev",
+          "language": "zh",
+          "core": true,
+          "phase": "warm",
+          "seconds": 9.957,
+          "status": "success",
+          "tableCount": 2,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        },
+        {
+          "case": "en-dual-native",
+          "split": "dev",
+          "language": "en",
+          "core": true,
+          "phase": "warm",
+          "seconds": 7.8219,
+          "status": "success",
+          "tableCount": 2,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        },
+        {
+          "case": "mixed-dual-scan",
+          "split": "holdout",
+          "language": "mixed",
+          "core": true,
+          "phase": "warm",
+          "seconds": 10.0142,
+          "status": "success",
+          "tableCount": 2,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        },
+        {
+          "case": "zh-image",
+          "split": "dev",
+          "language": "zh",
+          "core": false,
+          "phase": "warm",
+          "seconds": 9.1315,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        },
+        {
+          "case": "en-image",
+          "split": "dev",
+          "language": "en",
+          "core": false,
+          "phase": "warm",
+          "seconds": 8.5849,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        },
+        {
+          "case": "mixed-image",
+          "split": "dev",
+          "language": "mixed",
+          "core": false,
+          "phase": "warm",
+          "seconds": 9.2144,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        },
+        {
+          "case": "zh-office",
+          "split": "dev",
+          "language": "zh",
+          "core": false,
+          "phase": "warm",
+          "seconds": 0.0325,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        },
+        {
+          "case": "en-sheet",
+          "split": "dev",
+          "language": "en",
+          "core": false,
+          "phase": "warm",
+          "seconds": 0.0126,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        },
+        {
+          "case": "en-merged",
+          "split": "holdout",
+          "language": "en",
+          "core": false,
+          "phase": "warm",
+          "seconds": 6.4194,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        },
+        {
+          "case": "zh-merged-scan",
+          "split": "holdout",
+          "language": "zh",
+          "core": false,
+          "phase": "warm",
+          "seconds": 8.1206,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        },
+        {
+          "case": "mixed-multipage",
+          "split": "holdout",
+          "language": "mixed",
+          "core": false,
+          "phase": "warm",
+          "seconds": 11.0138,
+          "status": "success",
+          "tableCount": 2,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 2
+        },
+        {
+          "case": "en-wide",
+          "split": "dev",
+          "language": "en",
+          "core": false,
+          "phase": "warm",
+          "seconds": 7.1127,
+          "status": "success",
+          "tableCount": 1,
+          "expectedRecords": 4,
+          "correctRecords": 4,
+          "pass": true,
+          "pages": 1
+        }
+      ]
+    }
+  },
+  "coResidentEmbedding": {
+    "model": "Qwen/Qwen3-Embedding-0.6B",
+    "dimension": 1024,
+    "revision": "af95f2c416ffe9379369ad64f9113e865db6112c/fastembed-0.9.1/v1",
+    "device": "cpu"
+  },
+  "offlineChecks": {
+    "mode": "fast",
+    "rawReportSha256": "660c801e7124f1b2310afe229a87493b69073c73d9c7f4c11cddfd0584af6a89",
+    "checks": [
+      {
+        "check": "missing-model",
+        "pass": true,
+        "seconds": 10.7995
+      },
+      {
+        "check": "ocr-disabled",
+        "pass": true,
+        "seconds": 20.0043
+      }
+    ]
+  },
+  "verification": {
+    "check": "pass",
+    "lint": "pass",
+    "typecheck": "pass",
+    "build": "pass",
+    "jsSupplyChain": "pass",
+    "vitestPassed": 110,
+    "pythonPassed": 11,
+    "dailyConfigHashesUnchanged": true
+  }
+}
