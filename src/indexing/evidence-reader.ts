@@ -2,6 +2,7 @@ import { readFile, realpath } from "node:fs/promises";
 import { fileSha256 } from "../filesystem/content-fingerprint.ts";
 import { loadActiveMirrorIndex, type ParsedMirrorEntry } from "../mirror/index-store.ts";
 import { mirrorOutputPath, readStructure } from "../mirror/structured.ts";
+import type { DocumentStructure } from "../parser/table-structure.ts";
 import { contentHash } from "./chunker.ts";
 import type { LocalReadHandle } from "./evidence.ts";
 import type { IndexEvidenceChunk } from "./types.ts";
@@ -13,6 +14,7 @@ export interface EvidenceRevision {
 	readonly sourceSha256: string;
 	readonly outputSha256: string;
 	readonly structureSha256?: string;
+	readonly structure?: DocumentStructure;
 	readonly markdown: string;
 }
 
@@ -33,9 +35,9 @@ export async function readEvidenceRevision(
 	const markdown = await readFile(entry.outputPath, { encoding: "utf8", signal });
 	const outputSha256 = contentHash(markdown);
 	if (sourceSha256 !== entry.sourceSha256 || outputSha256 !== entry.outputSha256) return undefined;
-	await readStructure(root, entry, markdown, signal);
+	const structure = await readStructure(root, entry, markdown, signal);
 	if ((await realpath(entry.sourcePath)) !== source || !authorize(source, entry.virtualPath)) return undefined;
-	return { source, sourceSha256, outputSha256, structureSha256: entry.structureSha256, markdown };
+	return { source, sourceSha256, outputSha256, structureSha256: entry.structureSha256, structure, markdown };
 }
 
 export function evidenceHandle(

@@ -1,6 +1,6 @@
 # 三步实施与验收计划
 
-状态：**T1、T2 已完成，T3 待实施**。实测见 [RESULTS.md](RESULTS.md)，需求编号见 [SPEC.md](SPEC.md)。
+状态为 **T1、T2 已完成，T3 已接入，真实首轮回答验收待完成**。实测见 [RESULTS.md](RESULTS.md)，需求编号见 [SPEC.md](SPEC.md)。
 
 ## T1 冻结本地解析配置并完成资源探针
 
@@ -29,8 +29,8 @@
 
 ## T3 实现父表回读并验收切换
 
-- [ ] 接入受限 `read_local_table` 的 rows／image 视图、可信 ledger 定位、稳定游标、行组证据 ID 和覆盖信息；增加分页终止及预算处理。
-- [ ] 复用 scope／sourceIds 限定明确文件；全量问题能遍历父表，未遍历完显式说明。原件读取有版本／权限检查，核读图像真正进入模型输入。
+- [x] 接入受限 `read_local_table` 的 rows／image 视图、ledger 定位、游标、行组证据 ID 和覆盖信息，校验分页和预算。
+- [ ] 复用 scope／sourceIds 限定文件，原页和图像入参检查已通过。真实本地视觉模型接收原页并完成第一轮回答仍待验证。
 - [ ] 验证同一会话、跨轮、resume、分支、源变化、删除和切换后端；旧 eN／游标不可错误解析到新内容。
 - [ ] 更新安装／迁移／回滚说明、离线模型准备、`index inspect` 诊断与相关调用方；审阅并更新 `scripts/live-e2e/`、`test/live-e2e/`、manifest 和预检中受影响的部分，重新生成对应冷／暖证据。
 - [ ] 完成下表验收与仓库检查，在 [RESULTS.md](RESULTS.md) 追加结果、失败原因和未覆盖项；不得把待测行写成 PASS。

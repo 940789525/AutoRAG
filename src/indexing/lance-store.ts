@@ -44,6 +44,16 @@ export class LanceIndexStore implements IndexStore {
 			.toArray();
 		return rows[0] as IndexEvidenceChunk | undefined;
 	}
+	async readTableChunks(sourceId: string): Promise<IndexEvidenceChunk[]> {
+		const rows = await this.table
+			.query()
+			.where(`source_id = ${sqlString(sourceId)} AND kind IN ('table','table-row-fragment','table-cell-fragment')`)
+			.select(["id", "source_id", "source_path", "text", "heading", "kind", "start", "end", "tokens"])
+			.limit(4097)
+			.toArray();
+		if (rows.length > 4096) throw new Error("This source exceeds the 4096 indexed table chunk read limit");
+		return rows as IndexEvidenceChunk[];
+	}
 	async sourceChunkCount(sourceId: string): Promise<number> {
 		return this.table.countRows(`source_id = ${sqlString(sourceId)}`);
 	}

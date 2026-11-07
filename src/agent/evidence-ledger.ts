@@ -140,6 +140,13 @@ function toEvidenceRef(entry: LedgerEntry): AutoRAGEvidenceRef {
 	};
 }
 
+export function evidenceLedgerKey(source: string, content: string, handle?: LocalReadHandle): string {
+	const digest = createHash("sha256").update(content.replace(/\s+/gu, " ").trim()).digest("hex");
+	return handle?.structureSha256
+		? `${source}\0${digest}\0${handle.profile}\0${handle.chunkId}`
+		: `${source}\0${digest}`;
+}
+
 /**
  * Record of every piece of evidence the retrieval tools returned in one
  * conversation.
@@ -204,13 +211,12 @@ export class EvidenceLedger {
 	}
 
 	/** Record evidence and return its id. The same chunk always gets the same id. */
-	register(input: LedgerEvidenceInput): string {
+	register(input: LedgerEvidenceInput, handle?: LocalReadHandle): string {
 		const content = input.content.slice(0, MAX_CONTENT_CHARS);
 		// Key on the full normalized chunk, not the capped stored content: two
 		// distinct chunks sharing their first MAX_CONTENT_CHARS must keep their
 		// own ids and metadata instead of merging into the first one.
-		const digest = createHash("sha256").update(input.content.replace(/\s+/gu, " ").trim()).digest("hex");
-		const key = `${input.source}\0${digest}`;
+		const key = evidenceLedgerKey(input.source, input.content, handle);
 		const existing = this.byKey.get(key);
 		if (existing !== undefined) {
 			if (!existing.retrieverMix.includes(input.method)) {
@@ -243,21 +249,25 @@ export class EvidenceLedger {
 		const documentArea = metadataString(metadata, "documentArea");
 		const evidenceType = metadataString(metadata, "evidenceType");
 		const evidenceLocation = metadataString(metadata, "evidenceLocation");
-		const id = this.register({
-			method: metadataString(metadata, "method") ?? tool,
-			source: result.source,
-			content: result.content,
-			retrievalResultId: result.id,
-			...(chunkIndex !== undefined ? { chunkIndex } : {}),
-			...(lineNumber !== undefined ? { lineNumber } : {}),
-			...(parserType !== undefined ? { parserType } : {}),
-			...(documentType !== undefined ? { documentType } : {}),
-			...(documentArea !== undefined ? { documentArea } : {}),
-			...(evidenceType !== undefined ? { evidenceType } : {}),
-			...(evidenceLocation !== undefined ? { evidenceLocation } : {}),
-		});
+		const handle = (result as LocalEvidenceResult)[localEvidence]?.readHandle;
+		const id = this.register(
+			{
+				method: metadataString(metadata, "method") ?? tool,
+				source: result.source,
+				content: result.content,
+				retrievalResultId: result.id,
+				...(chunkIndex !== undefined ? { chunkIndex } : {}),
+				...(lineNumber !== undefined ? { lineNumber } : {}),
+				...(parserType !== undefined ? { parserType } : {}),
+				...(documentType !== undefined ? { documentType } : {}),
+				...(documentArea !== undefined ? { documentArea } : {}),
+				...(evidenceType !== undefined ? { evidenceType } : {}),
+				...(evidenceLocation !== undefined ? { evidenceLocation } : {}),
+			},
+			handle,
+		);
 		this.onLocalResult?.(id, result);
-		this.attachLocalReadHandle(id, (result as LocalEvidenceResult)[localEvidence]?.readHandle);
+		this.attachLocalReadHandle(id, handle);
 		return id;
 	}
 

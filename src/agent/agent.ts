@@ -205,6 +205,7 @@ import {
 	createReadLocalEvidenceTool,
 	READ_LOCAL_EVIDENCE_TOOL_NAME,
 } from "./read-local-evidence-tool.ts";
+import { assertTableReads, createReadLocalTableTool, READ_LOCAL_TABLE_TOOL_NAME } from "./read-local-table-tool.ts";
 import {
 	isRefreshOwnerAlive,
 	type PersistedRefreshProgress,
@@ -1223,6 +1224,17 @@ export class AutoRAGAgent {
 				),
 			(callId, id, handle, body, text) => this.contextSelection.registerEvidenceRead(callId, id, handle, body, text),
 		);
+		const readLocalTableTool = createReadLocalTableTool(
+			this.evidenceLedger,
+			(handle, rows, signal) =>
+				this.minSyncMethod.index.readTableSource(
+					handle,
+					(source, sourceId) => this.canReadLocalEvidence(source, sourceId),
+					rows,
+					signal,
+				),
+			() => (this.boundPiRuntime?.session.model as Model<Api> | undefined) ?? this.configuredModel,
+		);
 		const loadDatasourceSkillTool = createLoadDatasourceSkillTool(this);
 		const scanDuplicateDocumentsTool =
 			this.dupeyOptions === false ? undefined : createScanDuplicateDocumentsTool(this);
@@ -1315,6 +1327,7 @@ export class AutoRAGAgent {
 			SEARCH_MINSYNC_DOCUMENTS_TOOL_NAME,
 			SEARCH_ALL_DOCUMENTS_TOOL_NAME,
 			READ_LOCAL_EVIDENCE_TOOL_NAME,
+			READ_LOCAL_TABLE_TOOL_NAME,
 			JIKJI_FIND_TOOL_NAME,
 			EVERYTHING_SEARCH_TOOL_NAME,
 			FSEARCH_SEARCH_TOOL_NAME,
@@ -1343,7 +1356,9 @@ export class AutoRAGAgent {
 			checkMemoryTool,
 			searchMinSyncTool,
 			searchAllTool,
-			...(!this.telegram && !this.discordRemote ? [readLocalEvidenceTool] : []),
+			...(!this.telegram && !this.discordRemote
+				? [readLocalEvidenceTool, ...(documentBackend(this.parserOptions) === "docling" ? [readLocalTableTool] : [])]
+				: []),
 			...singleDatasourceTools,
 			loadDatasourceSkillTool,
 			...(webSearchTool !== undefined ? [webSearchTool] : []),
@@ -1758,7 +1773,9 @@ export class AutoRAGAgent {
 			finalizeContext: this.contextSelection.adaptive
 				? (messages) => this.contextSelection.finalize(messages)
 				: undefined,
-			onContextDispatch: (messages) => {
+			onContextDispatch: (messages, model, isAnswer) => {
+				assertTableReads(messages, (source, id) => this.canReadLocalEvidence(source, id), model);
+				if (!isAnswer) return;
 				assertCompleteEvidenceReads(messages, (source, sourceId) => this.canReadLocalEvidence(source, sourceId));
 				this.contextSelection.dispatch(messages);
 			},
@@ -1972,6 +1989,7 @@ export class AutoRAGAgent {
 			.filter((tool) => !PI_BUILTIN_TOOL_NAMES.includes(tool.name as (typeof PI_BUILTIN_TOOL_NAMES)[number]))
 			.map((tool) =>
 				this.searchToolNames.has(tool.name) ||
+				tool.name === READ_LOCAL_TABLE_TOOL_NAME ||
 				tool.name === WEB_SEARCH_TOOL_NAME ||
 				tool.name === WEB_FETCH_TOOL_NAME
 					? this.interruptibleBySteer(tool)
@@ -4876,6 +4894,8 @@ export class AutoRAGAgent {
 	}
 	private canReadLocalEvidence(source: string, sourceId: string): boolean {
 		if (this.telegram || this.discordRemote) return false;
+		if (this.activeRetrievalOptions?.sourceIds && !this.activeRetrievalOptions.sourceIds.includes(sourceId))
+			return false;
 		const canonical = realpathSync(source);
 		if (canonical !== source || !matchesVirtualPathScope(sourceId, this.activeRetrievalOptions?.scope)) return false;
 		const contained = (root: string) => {

@@ -69,6 +69,11 @@ export function buildSystemPrompt(config: SystemPromptConfig): string {
 			"read_local_evidence",
 			"restore the complete matching-version local chunk by a previously retrieved [eN] ID; rechecks current scope and source version without another semantic search",
 		),
+		toolLine(
+			config,
+			"read_local_table",
+			"page through the indexed table rows or original PDF/image pages using an [eN] from that source. For all/count questions inspect each relevant source through exhausted, regardless of topK. If OCR has no table, is uncertain, or table rows do not explain the result, search the file name for a verified anchor and inspect original pages during the same turn. Keep the same anchor and view when passing nextCursor. State unreviewed sources/pages and use row-group evidence IDs or the page's anchor with its page number. If original images are blocked by the answer model or scope, report that blocker rather than sending them through another tool.",
+		),
 		toolLine(config, "load_datasource_skill", "load instructions for a configured datasource"),
 		toolLine(config, "scan_duplicate_documents", "read-only dupey scan of configured local document roots"),
 		toolLine(
@@ -110,6 +115,7 @@ export function buildSystemPrompt(config: SystemPromptConfig): string {
 					![
 						"bash",
 						"read",
+						"read_local_table",
 						"write",
 						"edit",
 						"grep",

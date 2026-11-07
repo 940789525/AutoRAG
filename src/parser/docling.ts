@@ -39,7 +39,7 @@ export class DoclingParser extends Parser {
 			.update(readFileSync(workerPath()))
 			.update(
 				JSON.stringify([
-					"docling-accurate-v1",
+					"docling-accurate-v2",
 					options,
 					process.env.AUTORAG_DOCLING_PYTHON,
 					process.env.AUTORAG_DOCLING_MODELS,

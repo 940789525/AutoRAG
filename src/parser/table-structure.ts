@@ -240,6 +240,8 @@ export function serializeDocling(
 			locations,
 		});
 	}
+	// A file-name match supplies a verified original-page locator even if OCR found no content.
+	if (!markdown.trim()) markdown = `# ${line(title)}\n`;
 	return {
 		markdown,
 		structure: {

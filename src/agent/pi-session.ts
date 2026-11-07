@@ -95,7 +95,7 @@ export interface AutoRAGPiSessionOptions {
 	readonly contextTransform?: RequestContextTransform;
 	readonly onContextPrepared?: (messages: AgentMessage[]) => void;
 	readonly finalizeContext?: (messages: AgentMessage[]) => AgentMessage[];
-	readonly onContextDispatch?: (messages: readonly AgentMessage[]) => void;
+	readonly onContextDispatch?: (messages: readonly AgentMessage[], model: Model<Api>, isAnswer: boolean) => void;
 	readonly onContextSettled?: (success: boolean) => void;
 	readonly onContextReset?: (reason: string) => void;
 	readonly onModelUsage?: (
@@ -734,7 +734,7 @@ function attachContextLifecycle(
 		let firstTokenMs: number | undefined;
 		void (async () => {
 			try {
-				if (scope === "answer_session") options.onContextDispatch?.(context.messages);
+				options.onContextDispatch?.(context.messages, model, scope === "answer_session");
 				const upstream = await stream(model, context, requestOptions);
 				for await (const event of upstream) {
 					if (event.type === "text_delta" && firstTokenMs === undefined)

@@ -5,7 +5,7 @@ import { contentHash } from "../indexing/chunker.ts";
 import type { LocalReadHandle } from "../indexing/evidence.ts";
 import { MAX_EVIDENCE_BODY_BYTES } from "../indexing/evidence-reader.ts";
 import type { IndexEvidenceChunk } from "../indexing/types.ts";
-import type { EvidenceLedger } from "./evidence-ledger.ts";
+import { type EvidenceLedger, evidenceLedgerKey } from "./evidence-ledger.ts";
 
 export const READ_LOCAL_EVIDENCE_TOOL_NAME = "read_local_evidence";
 const schema = Type.Object({ evidenceId: Type.String({ pattern: "^e[1-9][0-9]*$" }) }, { additionalProperties: false });
@@ -85,7 +85,10 @@ export function createReadLocalEvidenceTool(
 				throw new Error(
 					`Local evidence body is ${bytes} bytes, exceeding the ${MAX_EVIDENCE_BODY_BYTES}-byte complete-body limit`,
 				);
-			if (entry.key !== `${handle.source}\0${contentHash(row.text.replace(/\s+/gu, " ").trim())}`)
+			if (
+				entry.key !== evidenceLedgerKey(handle.source, row.text, handle) &&
+				entry.key !== evidenceLedgerKey(handle.source, row.text)
+			)
 				throw new Error("Local evidence body does not match its original ledger identity");
 			signal?.throwIfAborted();
 			const details = {

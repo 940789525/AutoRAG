@@ -24,6 +24,7 @@ import { loadIndexTokenizer } from "./tokenizer.ts";
 import type {
 	IndexDocument,
 	IndexEvent,
+	IndexEvidenceChunk,
 	IndexPhase,
 	IndexReport,
 	IndexRow,
@@ -138,7 +139,9 @@ export class LocalDocumentIndex {
 		const store =
 			this.options.store ?? (await LanceIndexStore.openExisting(join(this.directory, handle.profile, "store")));
 		if (!store.readChunk) throw new Error("Local index does not support exact evidence reads");
-		const row = await store.readChunk(handle.sourceId, handle.chunkId);
+		const row = await store.readChunk(handle.sourceId, handle.chunkId).finally(() => {
+			if (!this.options.store && store instanceof LanceIndexStore) store.close();
+		});
 		signal?.throwIfAborted();
 		if (
 			!row ||
@@ -157,6 +160,43 @@ export class LocalDocumentIndex {
 			throw new Error("Local evidence index changed while reading; search again");
 		signal?.throwIfAborted();
 		return row;
+	}
+	async readTableSource(
+		handle: LocalReadHandle,
+		authorize: (source: string, sourceId: string) => boolean,
+		includeChunks: boolean,
+		signal?: AbortSignal,
+	) {
+		const readyPath = join(this.directory, "ready.json");
+		const ready = readFileSync(readyPath, "utf8");
+		await this.readEvidence(handle, authorize, signal);
+		if (!handle.structureSha256)
+			throw new Error("This evidence has no verified structure. Build with Docling and search again.");
+		const entry = loadActiveMirrorIndex(this.options.root).entries[handle.sourceId];
+		const revision = await verifyEvidenceRevision(this.options.root, handle, authorize, signal);
+		const structure = revision.structure;
+		if (!structure) throw new Error("Structured mirror is unavailable");
+		const check = async () => {
+			await verifyEvidenceRevision(this.options.root, handle, authorize, signal);
+			if (readFileSync(readyPath, "utf8") !== ready) throw new Error("Active table index changed; search again");
+		};
+		const chunks: { row: IndexEvidenceChunk; handle: LocalReadHandle }[] = [];
+		if (includeChunks && structure.tables.length) {
+			const store = await LanceIndexStore.openExisting(join(this.directory, handle.profile, "store"));
+			try {
+				for (const row of await store.readTableChunks(handle.sourceId)) {
+					const locator = evidenceHandle(row, handle.profile, revision);
+					if (!structure.tables.some((table) => row.start >= table.start && row.end <= table.end)) continue;
+					if (!locator || row.source_path !== entry.sourcePath)
+						throw new Error("Indexed table chunk does not match the verified structure");
+					chunks.push({ row, handle: locator });
+				}
+			} finally {
+				store.close();
+			}
+		}
+		await check();
+		return { structure, chunks, check };
 	}
 	isReady(): boolean {
 		return this.status() !== "configured";
